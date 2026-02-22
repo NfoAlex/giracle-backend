@@ -453,7 +453,7 @@ export namespace ServiceUser {
         id: sessionId
       }
     }).catch(() => {
-      throw status(404, "Session not found");
+      throw status(500, "Something went wrong");
     });
 
     return;
