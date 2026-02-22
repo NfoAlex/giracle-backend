@@ -421,7 +421,7 @@ export namespace ServiceUser {
     return userUpdated;
   };
 
-  export const GetSessions = async (userId: string, cursor: number = 1) => {
+  export const GetSessions = async (userId: string, tokenMarking: string, cursor: number = 1) => {
     const skipAmount = (cursor - 1) * 30;
     const sessions = await db.token.findMany({
       where: {
@@ -431,7 +431,11 @@ export namespace ServiceUser {
       skip: skipAmount
     });
 
-    return sessions.map((session) => ({ ...session, token: undefined }));
+    return sessions.map((session) => ({
+      ...session,
+      thisIsYou: session.token === tokenMarking,
+      token: undefined
+    }));
   };
 
   export const RemoveSession = async (userId: string, sessionId: number) => {

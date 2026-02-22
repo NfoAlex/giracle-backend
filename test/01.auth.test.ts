@@ -178,6 +178,7 @@ describe("/user", () => {
     expect(response.ok).toBe(true);
     expect(j.data).toBeArray();
     expect(j.data[0].userId).toBe("TESTUSER");
+    expect(j.data[0].thisIsYou).toBeTrue();
     sessionIdRemoving = j.data[0].id;
   });
 

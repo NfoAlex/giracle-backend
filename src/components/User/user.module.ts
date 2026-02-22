@@ -274,8 +274,8 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/session",
-    async ({ _userId, query: { cursor } }) => {
-      const sessions = await ServiceUser.GetSessions(_userId, cursor);
+    async ({ _userId, query: { cursor }, cookie: { token } }) => {
+      const sessions = await ServiceUser.GetSessions(_userId, token.value, cursor);
 
       return {
         message: "Fetched your sessions",
@@ -285,6 +285,9 @@ export const user = new Elysia({ prefix: "/user" })
     {
       query: t.Object({
         cursor: t.Optional(t.Number({ default: 1 })),
+      }),
+      cookie: t.Cookie({
+        token: t.String()
       })
     }
   )
