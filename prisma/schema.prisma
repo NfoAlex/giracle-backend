@@ -37,6 +37,7 @@ model Password {
 
 model Token {
   id        Int      @id @default(autoincrement())
+  name      String   @default("ログイン情報")
   token     String   @unique
   userId    String
   createdAt DateTime @default(now())

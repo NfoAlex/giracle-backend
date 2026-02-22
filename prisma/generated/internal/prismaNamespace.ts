@@ -1886,6 +1886,7 @@ export type PasswordScalarFieldEnum = (typeof PasswordScalarFieldEnum)[keyof typ
 
 export const TokenScalarFieldEnum = {
   id: 'id',
+  name: 'name',
   token: 'token',
   userId: 'userId',
   createdAt: 'createdAt'
