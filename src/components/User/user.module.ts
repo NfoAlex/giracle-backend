@@ -293,8 +293,8 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .delete(
     "/session",
-    async ({ body: { sessionId }, _userId }) => {
-      await ServiceUser.RemoveSession(_userId, sessionId);
+    async ({ body: { sessionId }, cookie: { token }, _userId }) => {
+      await ServiceUser.RemoveSession(_userId, sessionId, token.value);
 
       return {
         message: "Session removed",
@@ -307,6 +307,9 @@ export const user = new Elysia({ prefix: "/user" })
       body: t.Object({
         sessionId: t.Number({ minLength: 1 }),
       }),
+      cookie: t.Cookie({
+        token: t.String()
+      })
     }
   )
   .get(

@@ -438,7 +438,16 @@ export namespace ServiceUser {
     }));
   };
 
-  export const RemoveSession = async (userId: string, sessionId: number) => {
+  export const RemoveSession = async (userId: string, sessionId: number, activeToken: string) => {
+    const targetToken = await db.token.findUnique({
+      where: {
+        id: sessionId
+      }
+    });
+
+    if (targetToken === null) throw status(404, "Session not found");
+    if (targetToken.token === activeToken) throw status(400, "You cannot delete your active session");
+
     await db.token.delete({
       where: {
         id: sessionId

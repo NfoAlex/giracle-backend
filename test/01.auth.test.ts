@@ -54,6 +54,10 @@ beforeAll(async () => {
         token: "TESTUSERTOKEN_FOR_SIGNOUT_TEST",
       },
       {
+        userId: "TESTUSER",
+        token: "TESTUSERTOKEN_FOR_DELETION_TEST",
+      },
+      {
         userId: "TESTUSER2",
         token: "TESTUSER2TOKEN",
       },
@@ -170,7 +174,7 @@ describe("/user", () => {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Cookie: "token=TESTUSERTOKEN",
+          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
         },
       }),
     );
@@ -178,8 +182,9 @@ describe("/user", () => {
     expect(response.ok).toBe(true);
     expect(j.data).toBeArray();
     expect(j.data[0].userId).toBe("TESTUSER");
-    expect(j.data[0].thisIsYou).toBeTrue();
-    sessionIdRemoving = j.data[0].id;
+    //2番目のトークンがTESTUSERTOKEN_FOR_DELETION_TEST
+    expect(j.data[2].thisIsYou).toBeTrue();
+    sessionIdRemoving = j.data[2].id;
   });
 
   it("/sign-out :: 正常(ログアウトしてセッションが消えていることを確認する)", async () => {
@@ -213,8 +218,25 @@ describe("/user", () => {
       }),
     );
     const t = await response.text();
-    console.log("01.auth :: DELETE /session : 存在しないセッションを削除する", t);
     expect(t).toContain("Session not found");
+  });
+
+  it("DELETE /session :: 自分のセッションを削除しようとしてみる", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/session", {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `token=TESTUSERTOKEN_FOR_DELETION_TEST`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionIdRemoving,
+        })
+      }),
+    );
+    const t = await response.text();
+    expect(t).toBe("You cannot delete your active session");
   });
 
   it("DELETE /session :: 正常(セッションを削除する)", async () => {
