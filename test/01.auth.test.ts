@@ -226,6 +226,26 @@ describe("/user", () => {
     expect(responseChangingName.ok).toBe(false);
   });
 
+  it("/change-session-name :: 存在しないセッション", async () => {
+    const responseChangingName = await app.handle(
+      new Request("http://localhost/user/change-session-name", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
+        },
+        body: JSON.stringify({
+          sessionId: 999999,
+          name: "新しいセッション名2"
+        })
+      }),
+    );
+    expect(responseChangingName.ok).toBe(false);
+    const t = await responseChangingName.text();
+    expect(t).toBe("Session not found");
+  });
+
   it("/sign-out :: 正常(ログアウトしてセッションが消えていることを確認する)", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/sign-out", {
