@@ -421,6 +421,31 @@ export namespace ServiceUser {
     return userUpdated;
   };
 
+  export const GetSessions = async (userId: string, cursor: number = 1) => {
+    const skipAmount = (cursor - 1) * 30;
+    const sessions = await db.token.findMany({
+      where: {
+        userId
+      },
+      take: 30,
+      skip: skipAmount
+    });
+
+    return sessions.map((session) => ({ ...session, token: undefined }));
+  };
+
+  export const RemoveSession = async (userId: string, sessionId: number) => {
+    await db.token.delete({
+      where: {
+        id: sessionId
+      }
+    }).catch(() => {
+      throw status(404, "Session not found");
+    });
+
+    return;
+  };
+
   export const SignOut = async (token: string) => {
     //トークン削除
     await db.token.delete({

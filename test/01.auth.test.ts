@@ -50,6 +50,10 @@ beforeAll(async () => {
         token: "TESTUSERTOKEN",
       },
       {
+        userId: "TESTUSER",
+        token: "TESTUSERTOKEN_FOR_SIGNOUT_TEST",
+      },
+      {
         userId: "TESTUSER2",
         token: "TESTUSER2TOKEN",
       },
@@ -156,5 +160,79 @@ describe("/user", () => {
     const j = await response.json();
     expect(response.ok).toBe(true);
     expect(j.data.userId).toBe("TESTUSER");
+  });
+
+  let sessionIdRemoving = -1;
+  it("/session :: セッションを取得する", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/session", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN",
+        },
+      }),
+    );
+    const j = await response.json();
+    expect(response.ok).toBe(true);
+    expect(j.data).toBeArray();
+    expect(j.data[0].userId).toBe("TESTUSER");
+    sessionIdRemoving = j.data[0].id;
+  });
+
+  it("/sign-out :: 正常(ログアウトしてセッションが消えていることを確認する)", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/sign-out", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_SIGNOUT_TEST",
+        },
+      }),
+    );
+    const j = await response.json();
+    expect(response.ok).toBe(true);
+    expect(j.message).toBe("Signed out");
+  });
+
+  it("DELETE /session :: 存在しないセッションを削除する", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/session", {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `token=TESTUSERTOKEN`,
+        },
+        body: JSON.stringify({
+          sessionId: 999999, //存在しないセッションID
+        })
+      }),
+    );
+    const t = await response.text();
+    console.log("01.auth :: DELETE /session : 存在しないセッションを削除する", t);
+    expect(t).toContain("Session not found");
+  });
+
+  it("DELETE /session :: 正常(セッションを削除する)", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/session", {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `token=TESTUSERTOKEN`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionIdRemoving,
+        })
+      }),
+    );
+    const j = await response.json();
+    expect(response.ok).toBe(true);
+    expect(j.message).toBe("Session removed");
+    expect(j.data.sessionId).toBe(sessionIdRemoving);
   });
 });

@@ -273,6 +273,40 @@ export const user = new Elysia({ prefix: "/user" })
     },
   )
   .get(
+    "/session",
+    async ({ _userId, query: { cursor } }) => {
+      const sessions = await ServiceUser.GetSessions(_userId, cursor);
+
+      return {
+        message: "Fetched your sessions",
+        data: sessions,
+      };
+    },
+    {
+      query: t.Object({
+        cursor: t.Optional(t.Number({ default: 1 })),
+      })
+    }
+  )
+  .delete(
+    "/session",
+    async ({ body: { sessionId }, _userId }) => {
+      await ServiceUser.RemoveSession(_userId, sessionId);
+
+      return {
+        message: "Session removed",
+        data: {
+          sessionId,
+        }
+      };
+    },
+    {
+      body: t.Object({
+        sessionId: t.Number({ minLength: 1 }),
+      }),
+    }
+  )
+  .get(
     "/sign-out",
     async ({ cookie: { token } }) => {
       //トークン確認
