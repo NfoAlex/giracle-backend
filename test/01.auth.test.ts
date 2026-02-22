@@ -187,6 +187,45 @@ describe("/user", () => {
     sessionIdRemoving = j.data[2].id;
   });
 
+  it("/change-session-name :: 正常(セッション名を変更)", async () => {
+    const responseChangingName = await app.handle(
+      new Request("http://localhost/user/change-session-name", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
+        },
+        body: JSON.stringify({
+          sessionId: sessionIdRemoving,
+          name: "新しいセッション名"
+        })
+      }),
+    );
+    expect(responseChangingName.ok).toBe(true);
+    const j = await responseChangingName.json();
+    console.log("01.auth :: /change-session-name : j", j);
+    expect(j.data.name).toBe("新しいセッション名");
+  });
+
+  it("/change-session-name :: 変更しようとしているセッション名が空", async () => {
+    const responseChangingName = await app.handle(
+      new Request("http://localhost/user/change-session-name", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
+        },
+        body: JSON.stringify({
+          sessionId: sessionIdRemoving,
+          name: ""
+        })
+      }),
+    );
+    expect(responseChangingName.ok).toBe(false);
+  });
+
   it("/sign-out :: 正常(ログアウトしてセッションが消えていることを確認する)", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/sign-out", {

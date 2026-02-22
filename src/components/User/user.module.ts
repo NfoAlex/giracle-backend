@@ -291,6 +291,23 @@ export const user = new Elysia({ prefix: "/user" })
       })
     }
   )
+  .post(
+    "/change-session-name",
+    async ({ _userId, body: { sessionId, name } }) => {
+      const updatedSession = await ServiceUser.ChangeSessionName(_userId, sessionId, name);
+
+      return {
+        message: "Session name updated",
+        data: updatedSession
+      };
+    },
+    {
+      body: t.Object({
+        sessionId: t.Number(),
+        name: t.String({ minLength: 1 })
+      })
+    }
+  )
   .delete(
     "/session",
     async ({ body: { sessionId }, cookie: { token }, _userId }) => {

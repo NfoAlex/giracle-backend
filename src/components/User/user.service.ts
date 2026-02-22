@@ -438,6 +438,28 @@ export namespace ServiceUser {
     }));
   };
 
+  export const ChangeSessionName = async (userId: string, sessionId: number, newName: string) => {
+    const targetSession = await db.token.findUnique({
+      where: {
+        id: sessionId,
+        userId
+      }
+    });
+    if (targetSession === null) throw status(404, "Session not found");
+
+    const newSession = await db.token.update({
+      where: {
+        id: sessionId,
+        userId
+      },
+      data: {
+        name: newName
+      }
+    });
+
+    return { ...newSession, token: undefined };
+  };
+
   export const RemoveSession = async (userId: string, sessionId: number, activeToken: string) => {
     const targetToken = await db.token.findUnique({
       where: {
