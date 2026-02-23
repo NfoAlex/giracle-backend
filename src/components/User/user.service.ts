@@ -6,6 +6,7 @@ import { db } from "../..";
 import CheckChannelVisibility from "../../Utils/CheckChannelVisitiblity";
 import getUsersRoleLevel from "../../Utils/getUsersRoleLevel";
 import { userWSInstance } from "../../ws";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 export namespace ServiceUser {
   export const SignUp = async (
@@ -419,6 +420,66 @@ export namespace ServiceUser {
     });
 
     return userUpdated;
+  };
+
+  export const GetSessions = async (userId: string, tokenMarking: string, cursor: number = 1) => {
+    const skipAmount = (cursor - 1) * 30;
+    const sessions = await db.token.findMany({
+      where: {
+        userId
+      },
+      take: 30,
+      skip: skipAmount
+    });
+
+    return sessions.map((session) => ({
+      ...session,
+      thisIsYou: session.token === tokenMarking,
+      token: undefined
+    }));
+  };
+
+  export const ChangeSessionName = async (userId: string, sessionId: number, newName: string) => {
+    const newSession = await db.token.update({
+      where: {
+        id: sessionId,
+        userId
+      },
+      data: {
+        name: newName
+      }
+    }).catch((e) => {
+      if (e instanceof PrismaClientKnownRequestError) {
+        // P2025 は「対象のレコードが見つからなかった」際のエラーコード
+        if (e.code === "P2025") {
+          throw status(404, "Session not found");
+        }
+      }
+      throw status(500, "Something went wrong");
+    });
+
+    return { ...newSession, token: undefined };
+  };
+
+  export const RemoveSession = async (userId: string, sessionId: number, activeToken: string) => {
+    const targetToken = await db.token.findUnique({
+      where: {
+        id: sessionId
+      }
+    });
+
+    if (targetToken === null) throw status(404, "Session not found");
+    if (targetToken.token === activeToken) throw status(400, "You cannot delete your active session");
+
+    await db.token.delete({
+      where: {
+        id: sessionId
+      }
+    }).catch(() => {
+      throw status(500, "Something went wrong");
+    });
+
+    return;
   };
 
   export const SignOut = async (token: string) => {
