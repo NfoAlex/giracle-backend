@@ -186,8 +186,9 @@ export namespace ServiceMessage {
     _userId: string,
     sort: "asc" | "desc" | undefined = "desc",
   ) => {
+    const SEARCH_PAGE_SIZE = 30;
     //読み込みインデックス指定があるならスキップするメッセ数を計算
-    const messageSkipping = loadIndex ? (loadIndex - 1) * 50 : 0;
+    const messageSkipping = loadIndex ? (loadIndex - 1) * SEARCH_PAGE_SIZE : 0;
 
     //チャンネル指定が無かった時用のユーザーが閲覧できるチャンネルId配列
     let viewableChannelIds: string[] = [];
@@ -235,7 +236,7 @@ export namespace ServiceMessage {
         MessageUrlPreview: true,
         MessageFileAttached: true,
       },
-      take: 50,
+      take: SEARCH_PAGE_SIZE,
       skip: messageSkipping,
       orderBy: {
         createdAt: sort,
