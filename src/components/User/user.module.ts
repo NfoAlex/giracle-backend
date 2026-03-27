@@ -139,9 +139,10 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/icon/:userId",
-    async ({ params: { userId } }) => {
+    async ({ params: { userId }, set }) => {
       const userIcon = await ServiceUser.GetUserIcon(userId);
       if (userIcon) {
+        set.headers["cache-control"] = "public, max-age=86400, immutable"; //キャッシュを１日有効にする
         return userIcon;
       }
 
@@ -160,9 +161,10 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/banner/:userId",
-    async ({ params: { userId } }) => {
+    async ({ params: { userId }, set }) => {
       const userBanner = await ServiceUser.GetUserBanner(userId);
       if (userBanner) {
+        set.headers["cache-control"] = "public, max-age=86400, immutable"; //キャッシュを１日有効にする
         return userBanner;
       }
 
