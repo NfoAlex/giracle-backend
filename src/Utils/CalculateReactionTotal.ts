@@ -16,46 +16,36 @@ export default async function CalculateReactionTotal(
     includingYou: boolean;
   }[]
 > {
-  //結果用JSON
-  const emojiTotalJson: {
-    emojiCode: string;
-    count: number;
-    includingYou: boolean;
-  }[] = [];
-
-  //絵文字リアクションを取得、総合数計算
-  const reactionSummary = await db.messageReaction.groupBy({
-    by: ["messageId", "emojiCode", "reactedAt"], // messageIdとemojiCodeでグループ化
+  //全リアクションを取得し、集計・自分判定
+  const allReactions = await db.messageReaction.findMany({
     where: {
-      messageId: { in: [messageId] }, // 取得したメッセージIDに限定
-    },
-    _count: {
-      emojiCode: true, // 各emojiCodeの出現数をカウント
+      messageId: messageId,
     },
     orderBy: {
       reactedAt: "asc",
-    }
-  });
-
-  //対象メッセージにおける自分のリアクションを一括で取得
-  const myReactions = await db.messageReaction.findMany({
-    where: {
-      messageId: messageId,
-      userId: myUserId,
     },
   });
 
-  //パースして配列にし、参照しやすいように
-  for (const react of reactionSummary) {
-    //自分のリアクションがあるかどうか
-    const hasMyReaction = myReactions.some((r) => r.emojiCode === react.emojiCode);
-    //結果に格納
-    emojiTotalJson.push({
-      emojiCode: react.emojiCode,
-      count: react._count.emojiCode,
-      includingYou: hasMyReaction !== null, //自分が入るかどうかをboolで示す
-    });
+  //emojiCodeごとにカウントと自分のリアクション有無をまとめる
+  const emojiMap = new Map<string, { count: number; includingYou: boolean }>();
+
+  for (const reaction of allReactions) {
+    const existing = emojiMap.get(reaction.emojiCode);
+    if (existing) {
+      existing.count++;
+      if (reaction.userId === myUserId) existing.includingYou = true;
+    } else {
+      emojiMap.set(reaction.emojiCode, {
+        count: 1,
+        includingYou: reaction.userId === myUserId,
+      });
+    }
   }
+
+  const emojiTotalJson = Array.from(emojiMap.entries()).map(([emojiCode, data]) => ({
+    emojiCode,
+    ...data,
+  }));
 
   return emojiTotalJson;
 }
