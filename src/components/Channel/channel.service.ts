@@ -67,7 +67,7 @@ export namespace ServiceChannel {
           },
         },
       })
-      .catch(() => {});
+      .catch(() => { });
     //チャンネル参加データを削除
     await db.channelJoin.deleteMany({
       where: {
@@ -196,7 +196,7 @@ export namespace ServiceChannel {
     }
     //チャンネルへのアクセス権限があるか調べる
     if (!(await CheckChannelVisibility(channelId, _userId))) {
-      throw status(403, "You don't have permission to access this channel");
+      throw status(404, "Channel not found");
     }
 
     const { messageIdFrom, fetchDirection, fetchLength, messageTimeFrom } =
@@ -388,7 +388,7 @@ export namespace ServiceChannel {
                 width,
               };
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     }
