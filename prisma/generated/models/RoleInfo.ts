@@ -193,7 +193,7 @@ export type RoleInfoGroupByOutputType = {
   _max: RoleInfoMaxAggregateOutputType | null
 }
 
-type GetRoleInfoGroupByPayload<T extends RoleInfoGroupByArgs> = Prisma.PrismaPromise<
+export type GetRoleInfoGroupByPayload<T extends RoleInfoGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<RoleInfoGroupByOutputType, T['by']> &
       {
@@ -1543,6 +1543,11 @@ export type RoleInfoFindManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Skip the first `n` RoleInfos.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of RoleInfos.
+   */
   distinct?: Prisma.RoleInfoScalarFieldEnum | Prisma.RoleInfoScalarFieldEnum[]
 }
 

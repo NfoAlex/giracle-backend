@@ -196,7 +196,7 @@ export type BlockedIPAddressGroupByOutputType = {
   _max: BlockedIPAddressMaxAggregateOutputType | null
 }
 
-type GetBlockedIPAddressGroupByPayload<T extends BlockedIPAddressGroupByArgs> = Prisma.PrismaPromise<
+export type GetBlockedIPAddressGroupByPayload<T extends BlockedIPAddressGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<BlockedIPAddressGroupByOutputType, T['by']> &
       {
@@ -1001,6 +1001,11 @@ export type BlockedIPAddressFindManyArgs<ExtArgs extends runtime.Types.Extension
    * Skip the first `n` BlockedIPAddresses.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of BlockedIPAddresses.
+   */
   distinct?: Prisma.BlockedIPAddressScalarFieldEnum | Prisma.BlockedIPAddressScalarFieldEnum[]
 }
 

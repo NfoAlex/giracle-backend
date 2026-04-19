@@ -221,7 +221,7 @@ export type ServerConfigGroupByOutputType = {
   _max: ServerConfigMaxAggregateOutputType | null
 }
 
-type GetServerConfigGroupByPayload<T extends ServerConfigGroupByArgs> = Prisma.PrismaPromise<
+export type GetServerConfigGroupByPayload<T extends ServerConfigGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ServerConfigGroupByOutputType, T['by']> &
       {
@@ -1091,6 +1091,11 @@ export type ServerConfigFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` ServerConfigs.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of ServerConfigs.
+   */
   distinct?: Prisma.ServerConfigScalarFieldEnum | Prisma.ServerConfigScalarFieldEnum[]
 }
 
