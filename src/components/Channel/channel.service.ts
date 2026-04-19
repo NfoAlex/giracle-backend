@@ -528,6 +528,7 @@ export namespace ServiceChannel {
     description: string | undefined,
     isArchived: boolean | undefined,
     viewableRole: string[] | undefined,
+    _userId: string,
   ) => {
     //チャンネルの存在を確認
     const channel = await db.channel.findUnique({
@@ -536,6 +537,11 @@ export namespace ServiceChannel {
       },
     });
     if (channel === null) {
+      throw status(404, "Channel not found");
+    }
+
+    //チャンネルへのアクセス権限があるか調べる
+    if (!(await CheckChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 

@@ -278,6 +278,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     async ({
       body: { name, description, isArchived, channelId, viewableRole },
       server,
+      _userId
     }) => {
       const channelDataUpdated = await ServiceChannel.Update(
         channelId,
@@ -285,6 +286,7 @@ export const channel = new Elysia({ prefix: "/channel" })
         description,
         isArchived,
         viewableRole,
+        _userId,
       );
 
       //WSで通知
