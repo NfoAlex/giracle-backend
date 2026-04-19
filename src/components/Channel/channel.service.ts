@@ -5,6 +5,7 @@ import type { Message } from "../../../prisma/generated/client";
 import CalculateReactionTotal from "../../Utils/CalculateReactionTotal";
 import CheckChannelVisibility from "../../Utils/CheckChannelVisitiblity";
 import GetUserViewableChannel from "../../Utils/GetUserViewableChannel";
+import { WSUnsubscribe } from "../../ws";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
@@ -662,7 +663,7 @@ export namespace ServiceChannel {
     return newChannel;
   };
 
-  export const Delete = async (channelId: string) => {
+  export const Delete = async (channelId: string, _userId: string, server: Bun.Server<unknown> | null) => {
     //チャンネルの存在を確認
     const channel = await db.channel.findUnique({
       where: {
@@ -672,6 +673,35 @@ export namespace ServiceChannel {
     if (channel === null) {
       throw status(404, "Channel not found");
     }
+
+    //チャンネルへのアクセス権限があるか調べる
+    if (!(await CheckChannelVisibility(channelId, _userId))) {
+      throw status(404, "Channel not found");
+    }
+
+    //チャンネル参加者にWSで通知
+    server?.publish(
+      `channel::${channelId}`,
+      JSON.stringify({
+        signal: "channel::Deleted",
+        data: {
+          channelId,
+        },
+      }),
+    );
+    //チャンネルに参加しているユーザーのWS登録を解除
+    await db.channelJoin
+      .findMany({
+        where: {
+          channelId,
+        },
+      })
+      .then((data) => {
+        for (const channelJoinData of data) {
+          //userWSInstance.get(channelJoinData.userId)?.unsubscribe(`channel::${channelId}`);
+          WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
+        }
+      });
 
     //メッセージデータを削除
     const delMessage = db.message.deleteMany({
