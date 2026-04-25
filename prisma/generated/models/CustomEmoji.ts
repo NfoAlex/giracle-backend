@@ -144,7 +144,7 @@ export type CustomEmojiGroupByOutputType = {
   _max: CustomEmojiMaxAggregateOutputType | null
 }
 
-type GetCustomEmojiGroupByPayload<T extends CustomEmojiGroupByArgs> = Prisma.PrismaPromise<
+export type GetCustomEmojiGroupByPayload<T extends CustomEmojiGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<CustomEmojiGroupByOutputType, T['by']> &
       {
@@ -1051,6 +1051,11 @@ export type CustomEmojiFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` CustomEmojis.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of CustomEmojis.
+   */
   distinct?: Prisma.CustomEmojiScalarFieldEnum | Prisma.CustomEmojiScalarFieldEnum[]
 }
 

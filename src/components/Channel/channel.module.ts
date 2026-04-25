@@ -278,6 +278,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     async ({
       body: { name, description, isArchived, channelId, viewableRole },
       server,
+      _userId
     }) => {
       const channelDataUpdated = await ServiceChannel.Update(
         channelId,
@@ -285,6 +286,7 @@ export const channel = new Elysia({ prefix: "/channel" })
         description,
         isArchived,
         viewableRole,
+        _userId,
       );
 
       //WSで通知
@@ -346,43 +348,9 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .delete(
     "/delete",
-    async ({ body: { channelId }, server }) => {
-      //チャンネルの存在確認
-      const channel = await db.channel.findUnique({
-        where: {
-          id: channelId,
-        },
-      });
-      if (channel === null) {
-        throw status(404, "Channel not found");
-      }
-
-      //チャンネル参加者にWSで通知
-      server?.publish(
-        `channel::${channelId}`,
-        JSON.stringify({
-          signal: "channel::Deleted",
-          data: {
-            channelId,
-          },
-        }),
-      );
-      //チャンネルに参加しているユーザーのWS登録を解除
-      await db.channelJoin
-        .findMany({
-          where: {
-            channelId,
-          },
-        })
-        .then((data) => {
-          for (const channelJoinData of data) {
-            //userWSInstance.get(channelJoinData.userId)?.unsubscribe(`channel::${channelId}`);
-            WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
-          }
-        });
-
+    async ({ body: { channelId }, server, _userId }) => {
       //チャンネル削除処理
-      await ServiceChannel.Delete(channelId);
+      await ServiceChannel.Delete(channelId, _userId, server);
 
       return {
         message: "Channel deleted",

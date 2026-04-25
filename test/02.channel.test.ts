@@ -20,6 +20,12 @@ beforeAll(async () => {
         description: "Random discussions",
         createdUserId: "TESTUSER",
       },
+      {
+        id: "TESTCHANNEL3",
+        name: "Private Channel",
+        description: "Private discussions",
+        createdUserId: "TESTUSER",
+      },
     ],
   });
   await dbTest.message.upsert({
@@ -42,6 +48,18 @@ beforeAll(async () => {
       id: "TESTMESSAGE2",
       channelId: "TESTCHANNEL2",
       content: "Feel free to chat here.",
+      userId: "TESTUSER",
+    },
+    update: {},
+  });
+  await dbTest.message.upsert({
+    where: {
+      id: "TESTMESSAGE3",
+    },
+    create: {
+      id: "TESTMESSAGE3",
+      channelId: "TESTCHANNEL3",
+      content: "Secret message.",
       userId: "TESTUSER",
     },
     update: {},
@@ -70,6 +88,25 @@ beforeAll(async () => {
     data: {
       userId: "TESTUSER",
       roleId: "ChannelManage",
+    },
+  });
+  await dbTest.roleInfo.create({
+    data: {
+      id: "ChannelPrivateViewer",
+      name: "Channel Private Viewer Role",
+      createdUserId: "TESTUSER",
+    },
+  });
+  await dbTest.roleLink.create({
+    data: {
+      userId: "TESTUSER",
+      roleId: "ChannelPrivateViewer",
+    },
+  });
+  await dbTest.channelViewableRole.create({
+    data: {
+      channelId: "TESTCHANNEL3",
+      roleId: "ChannelPrivateViewer",
     },
   });
 });
@@ -117,6 +154,22 @@ describe("/channel/join", async () => {
         userId: "TESTUSER",
         channelId: "NON_EXISTENT_CHANNEL",
       },
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(t).toBe("Channel not found");
+  });
+
+  it("Private Channelにロール無しで入ろうとする", async () => {
+    const res = await FETCH({
+      path: "/channel/join",
+      method: "POST",
+      body: {
+        userId: "TESTUSER",
+        channelId: "TESTCHANNEL3",
+      },
+      useSecondaryUser: true
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
@@ -204,6 +257,18 @@ describe("/channel/get-info/:channelId", async () => {
     expect(res.status).toBe(404);
     expect(t).toBe("Channel not found");
   });
+
+  it("プライベートチャンネルを取得しようとする", async () => {
+    const res = await FETCH({
+      path: "/channel/get-info/TESTCHANNEL3",
+      method: "GET",
+      useSecondaryUser: true
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(t).toBe("Channel not found");
+  });
 });
 
 describe("/channel/list", async () => {
@@ -211,15 +276,31 @@ describe("/channel/list", async () => {
     const res = await FETCH({
       path: "/channel/list",
       method: "GET",
-      body: {
-        userId: "TESTUSER",
-      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(3);
+    expect(j.data[0].id).toBe("TESTCHANNEL1");
+    expect(j.data[0].name).toBe("General");
+    expect(j.data[1].id).toBe("TESTCHANNEL2");
+    expect(j.data[1].name).toBe("Random");
+    expect(j.data[2].id).toBe("TESTCHANNEL3");
+    expect(j.data[2].name).toBe("Private Channel");
+  });
+
+  it("正常 :: プライベートチャンネルが非表示になっていることを確認", async () => {
+    const res = await FETCH({
+      path: "/channel/list",
+      method: "GET",
+      useSecondaryUser: true
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(2);
     expect(j.data[0].id).toBe("TESTCHANNEL1");
     expect(j.data[0].name).toBe("General");
+    expect(j.data[1].id).toBe("TESTCHANNEL2");
+    expect(j.data[1].name).toBe("Random");
   });
 });
 
@@ -288,9 +369,18 @@ describe("/channel/get-history/:channelId", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL999",
       method: "POST",
-      body: {
-        userId: "TESTUSER",
-      },
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(t).toBe("Channel not found");
+  });
+
+  it("権限がないチャンネルを取得しようとする", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL3",
+      method: "POST",
+      useSecondaryUser: true
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
@@ -327,6 +417,17 @@ describe("/channel/search", async () => {
       method: "GET",
     });
     expect(res.ok).toBe(false);
+  });
+
+  it("プライベートが非表示なのを確認 :: 二番目のユーザー", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=Private",
+      method: "GET",
+      useSecondaryUser: true
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
   });
 });
 
@@ -498,6 +599,37 @@ describe("/channel/update", async () => {
     expect(res.status).toBe(400);
   });
 
+  it("ロール持たない人が更新", async () => {
+    const res = await FETCH({
+      path: "/channel/update",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        name: "Updated",
+      },
+      useSecondaryUser: true,
+    });
+    const t = await res.text();
+    expect(t).toBe("Role level not enough");
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+
+  it("編集ロールを持っているが閲覧できないチャンネル", async () => {
+    const res = await FETCH({
+      path: "/channel/update",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL3",
+        name: "Updated",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("Channel not found");
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+  });
+
   it("正常", async () => {
     const res = await FETCH({
       path: "/channel/update",
@@ -588,5 +720,34 @@ describe("/channel/delete", async () => {
     expect(t).toBe("Channel not found");
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
+  });
+
+  it("チャンネル管理ロールを持った状態で閲覧できないチャンネルを削除", async () => {
+    const res = await FETCH({
+      path: "/channel/delete",
+      method: "DELETE",
+      body: {
+        channelId: "TESTCHANNEL3",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("Channel not found");
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+  });
+
+  it("チャンネル管理ロールを持たずにチャンネルを削除", async () => {
+    const res = await FETCH({
+      path: "/channel/delete",
+      method: "DELETE",
+      body: {
+        channelId: "TESTCHANNEL1",
+      },
+      useSecondaryUser: true,
+    });
+    const t = await res.text();
+    expect(t).toBe("Role level not enough");
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
   });
 });

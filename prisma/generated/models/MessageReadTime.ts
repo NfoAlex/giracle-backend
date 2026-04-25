@@ -144,7 +144,7 @@ export type MessageReadTimeGroupByOutputType = {
   _max: MessageReadTimeMaxAggregateOutputType | null
 }
 
-type GetMessageReadTimeGroupByPayload<T extends MessageReadTimeGroupByArgs> = Prisma.PrismaPromise<
+export type GetMessageReadTimeGroupByPayload<T extends MessageReadTimeGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MessageReadTimeGroupByOutputType, T['by']> &
       {
@@ -1164,6 +1164,11 @@ export type MessageReadTimeFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` MessageReadTimes.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MessageReadTimes.
+   */
   distinct?: Prisma.MessageReadTimeScalarFieldEnum | Prisma.MessageReadTimeScalarFieldEnum[]
 }
 

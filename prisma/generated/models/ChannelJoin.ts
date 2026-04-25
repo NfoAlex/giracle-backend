@@ -144,7 +144,7 @@ export type ChannelJoinGroupByOutputType = {
   _max: ChannelJoinMaxAggregateOutputType | null
 }
 
-type GetChannelJoinGroupByPayload<T extends ChannelJoinGroupByArgs> = Prisma.PrismaPromise<
+export type GetChannelJoinGroupByPayload<T extends ChannelJoinGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ChannelJoinGroupByOutputType, T['by']> &
       {
@@ -1164,6 +1164,11 @@ export type ChannelJoinFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` ChannelJoins.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of ChannelJoins.
+   */
   distinct?: Prisma.ChannelJoinScalarFieldEnum | Prisma.ChannelJoinScalarFieldEnum[]
 }
 

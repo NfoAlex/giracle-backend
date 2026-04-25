@@ -263,7 +263,7 @@ describe("/message/search", async () => {
     const j = await res.json();
     expect(j.message).toBe("Searched messages");
     expect(j.data).toBeArray();
-    expect(j.data.length).toBe(4);
+    expect(j.data.length).toBe(5);
   });
 
   it("正常 :: 単一チャンネル", async () => {

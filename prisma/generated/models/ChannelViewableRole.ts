@@ -137,7 +137,7 @@ export type ChannelViewableRoleGroupByOutputType = {
   _max: ChannelViewableRoleMaxAggregateOutputType | null
 }
 
-type GetChannelViewableRoleGroupByPayload<T extends ChannelViewableRoleGroupByArgs> = Prisma.PrismaPromise<
+export type GetChannelViewableRoleGroupByPayload<T extends ChannelViewableRoleGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ChannelViewableRoleGroupByOutputType, T['by']> &
       {
@@ -1124,6 +1124,11 @@ export type ChannelViewableRoleFindManyArgs<ExtArgs extends runtime.Types.Extens
    * Skip the first `n` ChannelViewableRoles.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of ChannelViewableRoles.
+   */
   distinct?: Prisma.ChannelViewableRoleScalarFieldEnum | Prisma.ChannelViewableRoleScalarFieldEnum[]
 }
 

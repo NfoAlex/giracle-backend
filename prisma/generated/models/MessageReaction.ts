@@ -165,7 +165,7 @@ export type MessageReactionGroupByOutputType = {
   _max: MessageReactionMaxAggregateOutputType | null
 }
 
-type GetMessageReactionGroupByPayload<T extends MessageReactionGroupByArgs> = Prisma.PrismaPromise<
+export type GetMessageReactionGroupByPayload<T extends MessageReactionGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MessageReactionGroupByOutputType, T['by']> &
       {
@@ -1406,6 +1406,11 @@ export type MessageReactionFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` MessageReactions.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MessageReactions.
+   */
   distinct?: Prisma.MessageReactionScalarFieldEnum | Prisma.MessageReactionScalarFieldEnum[]
 }
 

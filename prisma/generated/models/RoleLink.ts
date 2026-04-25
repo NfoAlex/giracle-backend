@@ -144,7 +144,7 @@ export type RoleLinkGroupByOutputType = {
   _max: RoleLinkMaxAggregateOutputType | null
 }
 
-type GetRoleLinkGroupByPayload<T extends RoleLinkGroupByArgs> = Prisma.PrismaPromise<
+export type GetRoleLinkGroupByPayload<T extends RoleLinkGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<RoleLinkGroupByOutputType, T['by']> &
       {
@@ -1164,6 +1164,11 @@ export type RoleLinkFindManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Skip the first `n` RoleLinks.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of RoleLinks.
+   */
   distinct?: Prisma.RoleLinkScalarFieldEnum | Prisma.RoleLinkScalarFieldEnum[]
 }
 

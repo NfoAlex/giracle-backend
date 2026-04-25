@@ -220,7 +220,7 @@ export type MessageUrlPreviewGroupByOutputType = {
   _max: MessageUrlPreviewMaxAggregateOutputType | null
 }
 
-type GetMessageUrlPreviewGroupByPayload<T extends MessageUrlPreviewGroupByArgs> = Prisma.PrismaPromise<
+export type GetMessageUrlPreviewGroupByPayload<T extends MessageUrlPreviewGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MessageUrlPreviewGroupByOutputType, T['by']> &
       {
@@ -1300,6 +1300,11 @@ export type MessageUrlPreviewFindManyArgs<ExtArgs extends runtime.Types.Extensio
    * Skip the first `n` MessageUrlPreviews.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MessageUrlPreviews.
+   */
   distinct?: Prisma.MessageUrlPreviewScalarFieldEnum | Prisma.MessageUrlPreviewScalarFieldEnum[]
 }
 
