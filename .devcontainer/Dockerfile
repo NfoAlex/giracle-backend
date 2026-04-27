@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     ca-certificates \
+    unzip \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Create temp directory for Bun builds
