@@ -1,6 +1,6 @@
 import Elysia, { status, t, file } from "elysia";
 import { db } from "../..";
-import CheckToken, { checkRoleTerm } from "../../Middlewares";
+import { Middleware } from "../../Middlewares";
 import SendSystemMessage from "../../Utils/SendSystemMessage";
 import { ServiceUser } from "./user.service";
 
@@ -91,7 +91,7 @@ export const user = new Elysia({ prefix: "/user" })
     },
   )
 
-  .use(CheckToken)
+  .use(Middleware.CheckToken)
 
   .get(
     "/get-online",
@@ -427,7 +427,7 @@ export const user = new Elysia({ prefix: "/user" })
       },
     },
   )
-  .use(checkRoleTerm)
+  .use(Middleware.CheckRoleTerm)
   .post(
     "/ban",
     async ({ body: { userId }, server, _userId }) => {

@@ -1,9 +1,9 @@
 import Elysia, { status, t } from "elysia";
-import CheckToken, { checkRoleTerm } from "../../Middlewares";
+import { Middleware } from "../../Middlewares";
 import { ServiceRole } from "./role.service";
 
 export const role = new Elysia({ prefix: "/role" })
-  .use(CheckToken)
+  .use(Middleware.CheckToken)
   .get(
     "/search",
     async ({ query: { name } }) => {
@@ -25,7 +25,7 @@ export const role = new Elysia({ prefix: "/role" })
     },
   )
 
-  .use(checkRoleTerm)
+  .use(Middleware.CheckRoleTerm)
 
   .put(
     "/create",

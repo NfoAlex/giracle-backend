@@ -1,10 +1,10 @@
 import Elysia, { file, t } from "elysia";
 import { db } from "../..";
-import CheckToken, { urlPreviewControl } from "../../Middlewares";
+import { Middleware } from "../../Middlewares";
 import { ServiceMessage } from "./message.service";
 
 export const message = new Elysia({ prefix: "/message" })
-  .use(CheckToken)
+  .use(Middleware.CheckToken)
   .get(
     "/:messageId",
     async ({ params: { messageId }, _userId }) => {
@@ -392,7 +392,7 @@ export const message = new Elysia({ prefix: "/message" })
     },
   )
 
-  .use(urlPreviewControl)
+  .use(Middleware.UrlPreviewControl)
 
   .post(
     "/send",

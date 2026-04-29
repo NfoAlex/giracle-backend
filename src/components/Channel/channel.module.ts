@@ -1,12 +1,12 @@
 import Elysia, { status, t } from "elysia";
 import { db } from "../..";
-import CheckToken, { checkRoleTerm } from "../../Middlewares";
+import { Middleware } from "../../Middlewares";
 import SendSystemMessage from "../../Utils/SendSystemMessage";
 import { WSSubscribe, WSUnsubscribe } from "../../ws";
 import { ServiceChannel } from "./channel.service";
 
 export const channel = new Elysia({ prefix: "/channel" })
-  .use(CheckToken)
+  .use(Middleware.CheckToken)
   .post(
     "/join",
     async ({ body: { channelId }, _userId, server }) => {
@@ -193,7 +193,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     },
   )
 
-  .use(checkRoleTerm)
+  .use(Middleware.CheckRoleTerm)
 
   .post(
     "/invite",

@@ -1,5 +1,5 @@
 import Elysia, { status, t } from "elysia";
-import CheckToken, { checkRoleTerm } from "../../Middlewares";
+import { Middleware } from "../../Middlewares";
 import { ServiceServer } from "./server.service";
 
 export const server = new Elysia({ prefix: "/server" })
@@ -37,8 +37,8 @@ export const server = new Elysia({ prefix: "/server" })
     },
   )
 
-  .use(CheckToken)
-  .use(checkRoleTerm)
+  .use(Middleware.CheckToken)
+  .use(Middleware.CheckRoleTerm)
   .get(
     "/get-invite",
     async () => {

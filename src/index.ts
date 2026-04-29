@@ -2,7 +2,7 @@ import { cors } from "@elysiajs/cors";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { Elysia, status } from "elysia";
 import { PrismaClient } from "../prisma/generated/client";
-import { rateLimiter } from "./Middlewares";
+import { Middleware } from "./Middlewares";
 
 import { channel } from "./components/Channel/channel.module";
 import { message } from "./components/Message/message.module";
@@ -13,11 +13,11 @@ import { wsHandler } from "./ws";
 
 //ユーザーアップロード用のディレクトリ作成
 import { mkdir } from "node:fs/promises";
-await mkdir("./STORAGE", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/file", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/icon", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/banner", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((e) => {});
+await mkdir("./STORAGE", { recursive: true }).catch((e) => { });
+await mkdir("./STORAGE/file", { recursive: true }).catch((e) => { });
+await mkdir("./STORAGE/icon", { recursive: true }).catch((e) => { });
+await mkdir("./STORAGE/banner", { recursive: true }).catch((e) => { });
+await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((e) => { });
 
 const adapter = new PrismaLibSql(
   { url: process.env.DATABASE_URL || "file:./dev.db" },
@@ -31,7 +31,7 @@ export const app = new Elysia()
       origin: Bun.env.CORS_ORIGIN,
     }),
   )
-  .use(Bun.env.RATE_LIMIT_ENABLED === "true" ? rateLimiter : undefined)
+  .use(Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined)
   .onError(({ error, code }) => {
     if (code === "NOT_FOUND") return status(404, "Not Found :(");
     console.error("index :: エラー->", error);
