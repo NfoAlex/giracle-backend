@@ -28,80 +28,43 @@ export namespace ServiceMessage {
   };
 
   export const GetNew = async (_userId: string) => {
-    // ユーザーが参加しているチャンネルを取得
-    const userChannelJoined = await db.channelJoin.findMany({
-      where: {
-        userId: _userId,
-      },
-      select: {
-        channelId: true,
-      },
-    });
-    //チャンネルIdのJSONを配列化
-    const channelIds = userChannelJoined.map((channel) => channel.channelId);
-    //チャンネルがない場合は空JSONを返す
-    if (channelIds.length === 0) {
-      return {};
-    }
+    // 参加チャンネルと既読時間を並列取得
+    const [userChannelJoined, messageReadTime] = await Promise.all([
+      db.channelJoin.findMany({
+        where: { userId: _userId },
+        select: { channelId: true },
+      }),
+      db.messageReadTime.findMany({
+        where: { userId: _userId },
+        select: { channelId: true, readTime: true },
+      }),
+    ]);
 
-    //ユーザーの既読時間を取得
-    const messageReadTime = await db.messageReadTime.findMany({
-      where: {
-        userId: _userId,
-        channelId: {
-          in: channelIds,
-        },
-      },
-      select: {
-        channelId: true,
-        readTime: true,
-      },
-    });
+    const channelIds = userChannelJoined.map((c) => c.channelId);
+    if (channelIds.length === 0) return {};
 
-    //チャンネルごとの新着メッセージがあるかどうかを格納するJSON
-    const JSONNews: { [key: string]: boolean } = {};
-
-    //チャンネルごとの最新のメッセ時間を取得
+    // チャンネルごとの最新createdAtをDB側で集約（groupByはDB集約なので軽い）
     const latestTimes = await db.message.groupBy({
       by: ["channelId"],
-      where: {
-        channelId: { in: channelIds },
-      },
-      _max: {
-        createdAt: true,
-      },
+      where: { channelId: { in: channelIds } },
+      _max: { createdAt: true },
     });
-    //最新時間ごとにメッセージを取得
-    const newests = await db.message.findMany({
-      select: {
-        channelId: true,
-        createdAt: true,
-      },
-      where: {
-        OR: latestTimes
-          .filter((lt) => lt._max.createdAt !== null)
-          .map((lt) => ({
-            channelId: lt.channelId,
-            createdAt: lt._max.createdAt as Date,
-          })),
-      },
-    });
-    for (const newestMessage of newests) {
-      //最新メッセからチャンネルId
-      const channelId = newestMessage.channelId;
-      //既読時間を探し出す
-      const targetReadTime = messageReadTime.find(
-        (data) => data.channelId === channelId,
-      );
 
-      //既読時間が存在するなら比較してBooleanを返す、ないならfalse
-      if (targetReadTime) {
-        JSONNews[channelId] =
-          newestMessage.createdAt.valueOf() >
-          targetReadTime?.readTime.valueOf();
-      } else {
-        JSONNews[channelId] = false;
-      }
+    // 既読時間をMapに変換して参照
+    const readTimeMap = new Map(
+      messageReadTime.map((r) => [r.channelId, r.readTime]),
+    );
+
+    // _max.createdAt を直接比較して新着設定
+    const JSONNews: { [key: string]: boolean } = {};
+    for (const lt of latestTimes) {
+      const latestCreatedAt = lt._max.createdAt;
+      if (!latestCreatedAt) continue;
+
+      const readTime = readTimeMap.get(lt.channelId);
+      JSONNews[lt.channelId] = readTime
+        ? latestCreatedAt.valueOf() > readTime.valueOf()
+        : false;
     }
 
     return JSONNews;
@@ -263,7 +226,7 @@ export namespace ServiceMessage {
     const fileNameGen = `${Date.now()}_${file.name}`;
     //チャンネルIdのディレクトリを作成
     await mkdir(`./STORAGE/file/${channelId}`, { recursive: true }).catch(
-      () => {},
+      () => { },
     );
 
     console.log("message.module :: /file/upload : file.type->", file.type);
