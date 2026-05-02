@@ -2,6 +2,7 @@ import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
 import { db } from ".";
 import type { Message } from "../prisma/generated/client";
+import { MessageUrlPreviewCreateManyMessageInput } from "../prisma/generated/models";
 
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<string, { userId: string; isBanned: boolean; cachedAt: number }>();
@@ -260,7 +261,7 @@ export namespace Middleware {
             //レスポンスデータ取り出し
             const responseData = responseValue?.data;
             //URLプレビューが無効あるいはレスポンスが存在しないなら何もしない
-            if (!isEnabled || responseData === undefined || responseData === null)
+            if (!isEnabled || responseData === undefined)
               return;
 
             //メッセージデータを取得
@@ -302,7 +303,10 @@ export namespace Middleware {
               },
             });
 
-            //URLプレビュー情報取得、格納
+            //DBに挿入するURLプレビューデータ用配列
+            const creatingPreviewDataArr: MessageUrlPreviewCreateManyMessageInput[] = [];
+
+            //URLプレビュー情報取得、挿入予定配列へ格納
             for (const url of urlMatched) {
               await ogs({ url }).then(async (data) => {
                 if (data.error) {
@@ -310,49 +314,47 @@ export namespace Middleware {
                   return;
                 }
 
-                //メッセージデータにURLプレビュー情報を紐付けしながら変数として保存
-                await db.message.update({
-                  where: {
-                    id: messageId,
-                  },
-                  data: {
-                    MessageUrlPreview: {
-                      create: {
-                        url: data.result.requestUrl || "",
-                        type: data.result.ogType || "UNKNOWN",
-                        title: data.result.ogTitle || "",
-                        description: data.result.ogDescription || "",
-                        faviconLink: data.result.favicon || "",
-                        imageLink:
-                          data.result.ogImage !== undefined
-                            ? data.result.ogImage[0].url
-                            : null,
-                        videoLink:
-                          data.result.ogVideo !== undefined
-                            ? data.result.ogVideo[0].url
-                            : null,
-                      },
-                    },
-                  },
+                creatingPreviewDataArr.push({
+                  url: data.result.requestUrl || "",
+                  type: data.result.ogType || "UNKNOWN",
+                  title: data.result.ogTitle || "",
+                  description: data.result.ogDescription || "",
+                  faviconLink: data.result.favicon || "",
+                  imageLink:
+                    data.result.ogImage !== undefined
+                      ? data.result.ogImage[0].url
+                      : null,
+                  videoLink:
+                    data.result.ogVideo !== undefined
+                      ? data.result.ogVideo[0].url
+                      : null,
                 });
               });
             }
 
-            //現在のメッセージを取得
-            const message = await db.message.findUnique({
+            //メッセージデータにURLプレビューを適用しつつ受け取り
+            const messageUpdated = await db.message.update({
               where: {
                 id: messageId,
+              },
+              data: {
+                MessageUrlPreview: {
+                  createMany: {
+                    data: creatingPreviewDataArr,
+                  },
+                },
               },
               include: {
                 MessageUrlPreview: true,
               },
             });
+
             //WSで通知
             server?.publish(
-              `channel::${messageData.channelId}`,
+              `channel::${messageUpdated.channelId}`,
               JSON.stringify({
                 signal: "message::UpdateMessage",
-                data: message,
+                data: messageUpdated,
               }),
             );
           },
