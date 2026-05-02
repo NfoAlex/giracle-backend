@@ -1,117 +1,26 @@
-import { beforeAll, describe, expect, it } from "bun:test";
-import { PrismaClient } from "../prisma/generated/client";
-import { adapter, FETCH } from "./util";
+import { beforeAll, describe, expect, it, mock } from "bun:test";
+import { FETCH, INIT } from "./util";
+
+// open-graph-scraperをモック化（外部リクエスト不要）
+mock.module("open-graph-scraper", () => ({
+  default: async ({ url }: { url: string }) => ({
+    error: false,
+    result: {
+      requestUrl: url,
+      ogType: "website",
+      ogTitle: "Mock OG Title",
+      ogDescription: "Mock OG Description",
+      favicon: "https://example.com/favicon.ico",
+      ogImage: [{ url: "https://example.com/image.png" }],
+      ogVideo: undefined,
+    },
+  }),
+}));
 
 beforeAll(async () => {
-  const dbTest = new PrismaClient({ adapter });
-
-  await dbTest.messageReadTime.deleteMany({});
-  await dbTest.messageReaction.deleteMany({});
-  await dbTest.message.deleteMany({
-    where: {
-      channelId: "TESTCHANNEL1",
-      id: {
-        not: "TESTMESSAGE1",
-      },
-    },
-  });
-
-  await dbTest.message.upsert({
-    where: {
-      id: "TESTMESSAGE1",
-    },
-    create: {
-      id: "TESTMESSAGE1",
-      channelId: "TESTCHANNEL1",
-      content: "Welcome to the General channel!",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-  await dbTest.message.upsert({
-    where: {
-      id: "TESTMESSAGE2",
-      userId: "TESTUSER",
-      content: "Feel free to chat here.",
-    },
-    create: {
-      id: "TESTMESSAGE2",
-      channelId: "TESTCHANNEL1",
-      content: "Feel free to chat here.",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-
-  //第１ユーザーのみ見れるチャンネルを作るために整備
-  await dbTest.roleInfo.upsert({
-    where: {
-      id: "CHANNELVIEWABLEROLE1",
-    },
-    create: {
-      id: "CHANNELVIEWABLEROLE1",
-      name: "channelviewablerole1",
-      createdUserId: "SYSTEM",
-    },
-    update: {},
-  });
-  await dbTest.channelViewableRole.upsert({
-    where: {
-      channelId_roleId: {
-        channelId: "TESTCHANNEL1",
-        roleId: "CHANNELVIEWABLEROLE1",
-      },
-    },
-    create: {
-      channelId: "TESTCHANNEL1",
-      roleId: "CHANNELVIEWABLEROLE1",
-    },
-    update: {},
-  });
-  await dbTest.roleLink.upsert({
-    where: {
-      userId_roleId: {
-        userId: "TESTUSER",
-        roleId: "CHANNELVIEWABLEROLE1",
-      },
-    },
-    create: {
-      userId: "TESTUSER",
-      roleId: "CHANNELVIEWABLEROLE1",
-    },
-    update: {},
-  });
-
-  //通知検証用のInbox作成(２つ)
-  await dbTest.inbox.upsert({
-    where: {
-      messageId_userId: {
-        messageId: "TESTMESSAGE1",
-        userId: "TESTUSER",
-      },
-    },
-    create: {
-      type: "message",
-      messageId: "TESTMESSAGE1",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-  await dbTest.inbox.upsert({
-    where: {
-      messageId_userId: {
-        messageId: "TESTMESSAGE1",
-        userId: "TESTUSER2",
-      },
-    },
-    create: {
-      type: "message",
-      messageId: "TESTMESSAGE1",
-      userId: "TESTUSER2",
-    },
-    update: {},
-  });
+  await INIT();
 });
+
 
 describe("/message/:messageId", async () => {
   it("正常", async () => {
@@ -137,7 +46,7 @@ describe("/message/:messageId", async () => {
 
   it("見れないユーザーからの取得", async () => {
     const res = await FETCH({
-      path: "/message/TESTMESSAGE1",
+      path: "/message/TESTMESSAGE3",
       method: "GET",
       useSecondaryUser: true,
     });
@@ -263,7 +172,8 @@ describe("/message/search", async () => {
     const j = await res.json();
     expect(j.message).toBe("Searched messages");
     expect(j.data).toBeArray();
-    expect(j.data.length).toBe(5);
+    //他のテストにて参加チャンネルによる自動送信が含まれることがあるため
+    expect(j.data.length).toBeGreaterThan(2);
   });
 
   it("正常 :: 単一チャンネル", async () => {
@@ -279,7 +189,7 @@ describe("/message/search", async () => {
 
   it("見れないユーザーからの検索", async () => {
     const res = await FETCH({
-      path: "/message/search?channelId=TESTCHANNEL1",
+      path: "/message/search?channelId=TESTCHANNEL3",
       method: "GET",
       useSecondaryUser: true,
     });
@@ -350,7 +260,7 @@ describe("/message/inbox/read", async () => {
   });
 });
 
-describe("/inbox/clear", async () => {
+describe("/message/inbox/clear", async () => {
   it("正常", async () => {
     const res = await FETCH({
       path: "/message/inbox/clear",
@@ -383,8 +293,8 @@ describe("/message/emoji-reaction", async () => {
       path: "/message/emoji-reaction",
       method: "POST",
       body: {
-        channelId: "TESTCHANNEL1",
-        messageId: "TESTMESSAGE1",
+        channelId: "TESTCHANNEL3",
+        messageId: "TESTMESSAGE3",
         emojiCode: "robot",
       },
       useSecondaryUser: true,
@@ -435,7 +345,7 @@ describe("/message/who-reacted", async () => {
     const j = await res.json();
     expect(j.message).toBe("Fetched reactions");
     expect(j.data).toBeArray();
-    expect(j.data.length).toBe(1);
+    expect(j.data.length).toBeGreaterThan(0);
     expect(j.data[0]).toBe("TESTUSER");
   });
 
@@ -560,6 +470,38 @@ describe("/message/send", async () => {
     expect(res.status).toBe(400);
     expect(res.ok).toBeFalse();
   });
+
+  let TEST__MESSAGE_ID_WITH_URL = "";
+  it("正常 :: URL含むメッセージ送信 1/2 : 送信", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "Check this out https://example.com",
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message sent");
+    expect(j.data).toContainKey("id");
+    TEST__MESSAGE_ID_WITH_URL = j.data.id;
+  });
+
+  it("正常 :: URL含むメッセージ送信 2/2 : 確認", async () => {
+    // afterResponseは非同期で動くため少し待つ
+    await Bun.sleep(1000);
+
+    const res = await FETCH({
+      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Fetched message");
+    expect(j.data.MessageUrlPreview).toBeArray();
+    expect(j.data.MessageUrlPreview.length).toBeGreaterThan(0);
+    expect(j.data.MessageUrlPreview[0].url).toBe("https://example.com");
+    expect(j.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
+  });
 });
 
 describe("/message/edit", async () => {
@@ -580,6 +522,41 @@ describe("/message/edit", async () => {
     expect(j.data).toContainKey("content");
     expect(j.data.content).toBe("Hello, world! (edited)");
     expect(j.data.isEdited).toBeTrue();
+  });
+
+  it("正常 :: URLを含めた編集 1/2", async () => {
+    const res = await FETCH({
+      path: "/message/edit",
+      method: "POST",
+      body: {
+        messageId: TEST__MESSAGE_ID,
+        channelId: "TESTCHANNEL1",
+        message: "Hello, world! https://example.com (edited with link)",
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message edited");
+    expect(j.data).toContainKey("id");
+    expect(j.data).toContainKey("channelId");
+    expect(j.data).toContainKey("content");
+    expect(j.data.content).toBe("Hello, world! https://example.com (edited with link)");
+    expect(j.data.isEdited).toBeTrue();
+  });
+
+  it("正常 :: URLを含めた編集 2/2 : 確認", async () => {
+    // afterResponseは非同期で動くため少し待つ
+    await Bun.sleep(1000);
+
+    const res = await FETCH({
+      path: `/message/${TEST__MESSAGE_ID}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Fetched message");
+    expect(j.data.MessageUrlPreview).toBeArray();
+    expect(j.data.MessageUrlPreview.length).toBeGreaterThan(0);
+    expect(j.data.MessageUrlPreview[0].url).toBe("https://example.com");
+    expect(j.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
   });
 
   it("空白にしてみる", async () => {

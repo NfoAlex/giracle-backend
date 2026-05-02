@@ -13,6 +13,9 @@ export namespace ServiceMessage {
       where: {
         id: messageId,
       },
+      include: {
+        MessageUrlPreview: true,
+      },
     });
     //メッセージが見つからなければエラー
     if (messageData === null) {

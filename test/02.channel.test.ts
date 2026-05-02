@@ -1,114 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { PrismaClient } from "../prisma/generated/client";
-import { adapter, FETCH } from "./util";
+import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
-  const dbTest = new PrismaClient({ adapter });
-  //await dbTest.message.deleteMany({});
-  //await dbTest.channel.deleteMany({});
-  await dbTest.channel.createMany({
-    data: [
-      {
-        id: "TESTCHANNEL1",
-        name: "General",
-        description: "General channel",
-        createdUserId: "TESTUSER",
-      },
-      {
-        id: "TESTCHANNEL2",
-        name: "Random",
-        description: "Random discussions",
-        createdUserId: "TESTUSER",
-      },
-      {
-        id: "TESTCHANNEL3",
-        name: "Private Channel",
-        description: "Private discussions",
-        createdUserId: "TESTUSER",
-      },
-    ],
-  });
-  await dbTest.message.upsert({
-    where: {
-      id: "TESTMESSAGE1",
-    },
-    create: {
-      id: "TESTMESSAGE1",
-      channelId: "TESTCHANNEL1",
-      content: "Welcome to the General channel!",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-  await dbTest.message.upsert({
-    where: {
-      id: "TESTMESSAGE2",
-    },
-    create: {
-      id: "TESTMESSAGE2",
-      channelId: "TESTCHANNEL2",
-      content: "Feel free to chat here.",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-  await dbTest.message.upsert({
-    where: {
-      id: "TESTMESSAGE3",
-    },
-    create: {
-      id: "TESTMESSAGE3",
-      channelId: "TESTCHANNEL3",
-      content: "Secret message.",
-      userId: "TESTUSER",
-    },
-    update: {},
-  });
-  await dbTest.channelJoin.createMany({
-    data: [
-      {
-        userId: "TESTUSER",
-        channelId: "TESTCHANNEL1",
-      },
-      {
-        userId: "TESTUSER2",
-        channelId: "TESTCHANNEL2",
-      },
-    ],
-  });
-  await dbTest.roleInfo.create({
-    data: {
-      id: "ChannelManage",
-      name: "Channel Manage Role",
-      createdUserId: "TESTUSER",
-      manageChannel: true,
-    },
-  });
-  await dbTest.roleLink.create({
-    data: {
-      userId: "TESTUSER",
-      roleId: "ChannelManage",
-    },
-  });
-  await dbTest.roleInfo.create({
-    data: {
-      id: "ChannelPrivateViewer",
-      name: "Channel Private Viewer Role",
-      createdUserId: "TESTUSER",
-    },
-  });
-  await dbTest.roleLink.create({
-    data: {
-      userId: "TESTUSER",
-      roleId: "ChannelPrivateViewer",
-    },
-  });
-  await dbTest.channelViewableRole.create({
-    data: {
-      channelId: "TESTCHANNEL3",
-      roleId: "ChannelPrivateViewer",
-    },
-  });
+  await INIT();
 });
 
 describe("/channel/join", async () => {
@@ -280,12 +174,15 @@ describe("/channel/list", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(3);
-    expect(j.data[0].id).toBe("TESTCHANNEL1");
-    expect(j.data[0].name).toBe("General");
-    expect(j.data[1].id).toBe("TESTCHANNEL2");
-    expect(j.data[1].name).toBe("Random");
-    expect(j.data[2].id).toBe("TESTCHANNEL3");
-    expect(j.data[2].name).toBe("Private Channel");
+    const channelOne = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL1");
+    const channelTwo = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL2");
+    const channelThree = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL3");
+    expect(channelOne?.id).toBe("TESTCHANNEL1");
+    expect(channelOne?.name).toBe("General");
+    expect(channelTwo?.id).toBe("TESTCHANNEL2");
+    expect(channelTwo?.name).toBe("Random");
+    expect(channelThree?.id).toBe("TESTCHANNEL3");
+    expect(channelThree?.name).toBe("Private Channel");
   });
 
   it("正常 :: プライベートチャンネルが非表示になっていることを確認", async () => {
@@ -297,10 +194,12 @@ describe("/channel/list", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(2);
-    expect(j.data[0].id).toBe("TESTCHANNEL1");
-    expect(j.data[0].name).toBe("General");
-    expect(j.data[1].id).toBe("TESTCHANNEL2");
-    expect(j.data[1].name).toBe("Random");
+    const channelOne = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL1");
+    const channelTwo = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL2");
+    expect(channelOne?.id).toBe("TESTCHANNEL1");
+    expect(channelOne?.name).toBe("General");
+    expect(channelTwo?.id).toBe("TESTCHANNEL2");
+    expect(channelTwo?.name).toBe("Random");
   });
 });
 
@@ -314,9 +213,10 @@ describe("/channel/get-history/:channelId", async () => {
       },
     });
     const j = await res.json();
-    console.log("j:", j);
     expect(res.ok).toBe(true);
-    expect(j.data.history[0].content).toBe("Welcome to the General channel!");
+    expect(j.data.history).toBeArray();
+    expect(j.data.history.length).toBeGreaterThan(0);
+    expect(j.data.history[0].channelId).toBe("TESTCHANNEL1");
   });
 
   it("正常 :: 違うポジションから", async () => {

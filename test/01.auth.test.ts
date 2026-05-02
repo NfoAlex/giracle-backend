@@ -1,75 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
-import { execSync } from "node:child_process";
-import { PrismaClient } from "../prisma/generated/client";
 import { app } from "../src";
-import { adapter, FETCH } from "./util";
+import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
-  const dbTest = new PrismaClient({ adapter });
-  //DBのマイグレーション
-  execSync("bunx prisma db push --accept-data-loss");
-
-  //Prismaでuserデータにかかわるものをすべて削除
-  await dbTest.token.deleteMany({});
-  await dbTest.password.deleteMany({});
-  await dbTest.channelViewableRole.deleteMany({});
-  await dbTest.channelJoin.deleteMany({});
-  await dbTest.inbox.deleteMany({});
-  await dbTest.messageReadTime.deleteMany({});
-  await dbTest.messageReaction.deleteMany({});
-  await dbTest.message.deleteMany({});
-  await dbTest.roleLink.deleteMany({});
-  await dbTest.roleInfo.deleteMany({});
-  await dbTest.channel.deleteMany({});
-  await dbTest.invitation.deleteMany({});
-  await dbTest.user.deleteMany({});
-  await dbTest.serverConfig.deleteMany({});
-
-  //DBの初期シード挿入
-  execSync("bun ./prisma/seeds.ts");
-  //テストユーザー用データ登録
-  await dbTest.user.createMany({
-    data: [
-      {
-        id: "TESTUSER",
-        name: "testsystemuser",
-        selfIntroduction: "",
-      },
-      {
-        id: "TESTUSER2",
-        name: "testsystemuser2",
-        selfIntroduction: "",
-      },
-    ],
-  });
-  await dbTest.token.createMany({
-    data: [
-      {
-        userId: "TESTUSER",
-        token: "TESTUSERTOKEN",
-      },
-      {
-        userId: "TESTUSER",
-        token: "TESTUSERTOKEN_FOR_SIGNOUT_TEST",
-      },
-      {
-        userId: "TESTUSER",
-        token: "TESTUSERTOKEN_FOR_DELETION_TEST",
-      },
-      {
-        userId: "TESTUSER2",
-        token: "TESTUSER2TOKEN",
-      },
-    ],
-  });
-  //テスト用の招待コードをここで作成しておく
-  await dbTest.invitation.create({
-    data: {
-      inviteCode: "testinvite",
-      createdUserId: "SYSTEM",
-    },
-  });
+  await INIT();
 });
 
 describe("/user", () => {
