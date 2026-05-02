@@ -1,25 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { PrismaClient } from "../prisma/generated/client";
-import { adapter, FETCH } from "./util";
+import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
-  const dbTest = new PrismaClient({ adapter });
-
-  //ロール管理権限を付与
-  await dbTest.roleInfo.create({
-    data: {
-      id: "RoleManage",
-      name: "Role Manage Role",
-      createdUserId: "TESTUSER",
-      manageRole: true,
-    },
-  });
-  await dbTest.roleLink.create({
-    data: {
-      roleId: "RoleManage",
-      userId: "TESTUSER",
-    },
-  });
+  await INIT();
 });
 
 describe("/role/search", async () => {
