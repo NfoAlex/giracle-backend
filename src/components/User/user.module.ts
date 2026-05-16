@@ -112,7 +112,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/search",
-    async ({ query: { username, joinedChannel, cursor }, _userId }) => {
+    async ({ query: { username, joinedChannel, cursor }, CheckToken: { _userId } }) => {
       const users = await ServiceUser.Search(
         _userId,
         username,
@@ -183,7 +183,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/change-icon",
-    async ({ body: { icon }, _userId }) => {
+    async ({ body: { icon }, CheckToken: { _userId } }) => {
       await ServiceUser.ChangeIcon(icon, _userId);
 
       return {
@@ -202,7 +202,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/change-banner",
-    async ({ _userId, body: { banner } }) => {
+    async ({ CheckToken: { _userId }, body: { banner } }) => {
       await ServiceUser.ChangeBanner(banner, _userId);
 
       return {
@@ -221,7 +221,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/change-password",
-    async ({ body: { currentPassword, newPassword }, _userId }) => {
+    async ({ body: { currentPassword, newPassword }, CheckToken: { _userId } }) => {
       await ServiceUser.ChangePassword(currentPassword, newPassword, _userId);
 
       return {
@@ -242,7 +242,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/profile-update",
-    async ({ body: { name, selfIntroduction }, _userId, server }) => {
+    async ({ body: { name, selfIntroduction }, CheckToken: { _userId }, server }) => {
       const userUpdated = await ServiceUser.UpdateProfile(
         _userId,
         name,
@@ -276,7 +276,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/session",
-    async ({ _userId, query: { cursor }, cookie: { token } }) => {
+    async ({ CheckToken: { _userId }, query: { cursor }, cookie: { token } }) => {
       const sessions = await ServiceUser.GetSessions(_userId, token.value, cursor);
 
       return {
@@ -295,7 +295,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/change-session-name",
-    async ({ _userId, body: { sessionId, name } }) => {
+    async ({ CheckToken: { _userId }, body: { sessionId, name } }) => {
       const updatedSession = await ServiceUser.ChangeSessionName(_userId, sessionId, name);
 
       return {
@@ -312,7 +312,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .delete(
     "/session",
-    async ({ body: { sessionId }, cookie: { token }, _userId }) => {
+    async ({ body: { sessionId }, cookie: { token }, CheckToken: { _userId } }) => {
       await ServiceUser.RemoveSession(_userId, sessionId, token.value);
 
       return {
@@ -360,7 +360,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/verify-token",
-    ({ _userId }) => {
+    ({ CheckToken: { _userId } }) => {
       //もし空ならトークンが無効
       if (_userId === "") {
         throw status(401, "Token is invalid");
@@ -430,7 +430,7 @@ export const user = new Elysia({ prefix: "/user" })
   .use(Middleware.CheckRoleTerm)
   .post(
     "/ban",
-    async ({ body: { userId }, server, _userId }) => {
+    async ({ body: { userId }, server, CheckToken: { _userId } }) => {
       const userBanned = await ServiceUser.Ban(userId, _userId);
 
       //WSで全体へ通知
@@ -460,7 +460,7 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/unban",
-    async ({ body: { userId }, server, _userId }) => {
+    async ({ body: { userId }, server, CheckToken: { _userId } }) => {
       const userUnbanned = await ServiceUser.Unban(userId, _userId);
 
       //WSで全体へ通知

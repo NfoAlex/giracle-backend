@@ -65,7 +65,7 @@ export namespace Middleware {
           return status(401, "User is banned");
         }
         token.expires = new Date(now + ONE_MINUITE * 60 * 24 * 15);
-        return { _userId: cachedToken.userId };
+        return { CheckToken: { _userId: cachedToken.userId } };
       }
 
       //トークンがDBにあるか確認
@@ -99,9 +99,7 @@ export namespace Middleware {
       //トークンの期限を延長
       token.expires = new Date(now + 1000 * 60 * 60 * 24 * 15); //15日間有効
 
-      return {
-        _userId: tokenData.userId,
-      };
+      return { CheckToken: { _userId: tokenData.userId } };
     });
 
   export const CheckRoleTerm = new Elysia({ name: "checkRoleTerm" })
@@ -110,8 +108,9 @@ export namespace Middleware {
     .macro({
       checkRoleTerm(roleTerm: string) {
         return {
-          async beforeHandle({ _userId }) {
-            //console.log("Middlewares :: checkRoleTerm : 送信者のユーザーId->", _userId);
+          async beforeHandle({ CheckToken }) {
+            if (CheckToken === undefined) return status(401, "Unauthorized");
+            const _userId = CheckToken._userId;
 
             //該当権限を持つロール付与情報あるいはサーバー管理権限を検索
             const roleLink = await db.roleLink.findFirst({

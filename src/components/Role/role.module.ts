@@ -29,7 +29,7 @@ export const role = new Elysia({ prefix: "/role" })
 
   .put(
     "/create",
-    async ({ body: { roleName, rolePower }, _userId, server }) => {
+    async ({ body: { roleName, rolePower }, CheckToken: { _userId }, server }) => {
       const newRole = await ServiceRole.Create(roleName, rolePower, _userId);
 
       //WSで通知
@@ -63,7 +63,7 @@ export const role = new Elysia({ prefix: "/role" })
   )
   .post(
     "/update",
-    async ({ body: { roleId, roleData }, _userId, server }) => {
+    async ({ body: { roleId, roleData }, CheckToken: { _userId }, server }) => {
       const roleUpdated = await ServiceRole.Update(roleId, roleData, _userId);
 
       //WSで通知
@@ -99,7 +99,7 @@ export const role = new Elysia({ prefix: "/role" })
   )
   .post(
     "/link",
-    async ({ body: { userId, roleId }, _userId, server }) => {
+    async ({ body: { userId, roleId }, CheckToken: { _userId }, server }) => {
       await ServiceRole.Link(userId, roleId, _userId);
 
       //WSで通知
@@ -126,7 +126,7 @@ export const role = new Elysia({ prefix: "/role" })
   )
   .post(
     "/unlink",
-    async ({ body: { userId, roleId }, _userId, server }) => {
+    async ({ body: { userId, roleId }, CheckToken: { _userId }, server }) => {
       await ServiceRole.Unlink(userId, roleId, _userId);
 
       //WSで通知
@@ -153,7 +153,7 @@ export const role = new Elysia({ prefix: "/role" })
   )
   .delete(
     "/delete",
-    async ({ body: { roleId }, _userId, server }) => {
+    async ({ body: { roleId }, CheckToken: { _userId }, server }) => {
       await ServiceRole.Delete(roleId, _userId);
 
       //WSで通知
