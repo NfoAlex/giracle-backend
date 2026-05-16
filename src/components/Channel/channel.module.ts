@@ -9,7 +9,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   .use(Middleware.CheckToken)
   .post(
     "/join",
-    async ({ body: { channelId }, _userId, server }) => {
+    async ({ body: { channelId }, CheckToken: { _userId }, server }) => {
       //参加処理
       await ServiceChannel.Join(channelId, _userId);
 
@@ -59,7 +59,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .post(
     "/leave",
-    async ({ body: { channelId }, _userId, server }) => {
+    async ({ body: { channelId }, CheckToken: { _userId }, server }) => {
       //チャンネル退出処理
       await ServiceChannel.Leave(channelId, _userId);
 
@@ -102,7 +102,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .get(
     "/get-info/:channelId",
-    async ({ params: { channelId }, _userId }) => {
+    async ({ params: { channelId }, CheckToken: { _userId } }) => {
       const channelData = await ServiceChannel.GetInfo(channelId, _userId);
 
       return {
@@ -122,7 +122,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .get(
     "/list",
-    async ({ _userId }) => {
+    async ({ CheckToken: { _userId } }) => {
       const ChannelList = await ServiceChannel.List(_userId);
 
       return {
@@ -139,7 +139,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .post(
     "/get-history/:channelId",
-    async ({ params: { channelId }, body, _userId }) => {
+    async ({ params: { channelId }, body, CheckToken: { _userId } }) => {
       const results = await ServiceChannel.GetHistory(channelId, body, _userId);
 
       return {
@@ -174,7 +174,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .get(
     "/search",
-    async ({ query: { query }, _userId }) => {
+    async ({ query: { query }, CheckToken: { _userId } }) => {
       const channelInfos = await ServiceChannel.Search(query, _userId);
 
       return {
@@ -197,7 +197,7 @@ export const channel = new Elysia({ prefix: "/channel" })
 
   .post(
     "/invite",
-    async ({ body: { channelId, userId }, _userId, server }) => {
+    async ({ body: { channelId, userId }, CheckToken: { _userId }, server }) => {
       //招待処理
       await ServiceChannel.Invite(channelId, userId, _userId);
 
@@ -236,7 +236,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .post(
     "/kick",
-    async ({ body: { channelId, userId }, _userId, server }) => {
+    async ({ body: { channelId, userId }, CheckToken: { _userId }, server }) => {
       //キック処理
       await ServiceChannel.Kick(channelId, userId, _userId);
 
@@ -278,7 +278,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     async ({
       body: { name, description, isArchived, channelId, viewableRole },
       server,
-      _userId
+      CheckToken: { _userId }
     }) => {
       const channelDataUpdated = await ServiceChannel.Update(
         channelId,
@@ -320,7 +320,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .put(
     "/create",
-    async ({ body: { channelName, description = "" }, _userId }) => {
+    async ({ body: { channelName, description = "" }, CheckToken: { _userId } }) => {
       const newChannel = await ServiceChannel.Create(
         channelName,
         description,
@@ -348,7 +348,7 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .delete(
     "/delete",
-    async ({ body: { channelId }, server, _userId }) => {
+    async ({ body: { channelId }, server, CheckToken: { _userId } }) => {
       //チャンネル削除処理
       await ServiceChannel.Delete(channelId, _userId, server);
 

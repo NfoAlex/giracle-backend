@@ -59,7 +59,7 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .put(
     "/create-invite",
-    async ({ body: { inviteCode }, _userId }) => {
+    async ({ body: { inviteCode }, CheckToken: { _userId } }) => {
       const newInvite = await ServiceServer.CreateInvite(inviteCode, _userId);
 
       return {
@@ -245,7 +245,7 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .put(
     "/custom-emoji/upload",
-    async ({ body: { emoji, emojiCode }, server, _userId }) => {
+    async ({ body: { emoji, emojiCode }, server, CheckToken: { _userId } }) => {
       const emojiUploaded = await ServiceServer.uploadCustomEmoji(
         emoji,
         emojiCode,

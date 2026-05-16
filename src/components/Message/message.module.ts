@@ -7,7 +7,7 @@ export const message = new Elysia({ prefix: "/message" })
   .use(Middleware.CheckToken)
   .get(
     "/:messageId",
-    async ({ params: { messageId }, _userId }) => {
+    async ({ params: { messageId }, CheckToken: { _userId } }) => {
       const message = await ServiceMessage.Get(messageId, _userId);
 
       return {
@@ -27,7 +27,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/get-new",
-    async ({ _userId }) => {
+    async ({ CheckToken: { _userId } }) => {
       const news = await ServiceMessage.GetNew(_userId);
 
       return {
@@ -44,7 +44,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/read-time/get",
-    async ({ _userId }) => {
+    async ({ CheckToken: { _userId } }) => {
       const readTime = await ServiceMessage.GetReadTime(_userId);
 
       return {
@@ -61,7 +61,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/read-time/update",
-    async ({ _userId, body: { channelId, readTime }, server }) => {
+    async ({ CheckToken: { _userId }, body: { channelId, readTime }, server }) => {
       const readTimeUpdated = await ServiceMessage.UpdateReadTime(
         channelId,
         readTime,
@@ -105,7 +105,7 @@ export const message = new Elysia({ prefix: "/message" })
         loadIndex,
         sort,
       },
-      _userId,
+      CheckToken: { _userId },
     }) => {
       const messages = await ServiceMessage.Search(
         content,
@@ -141,7 +141,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/file/upload",
-    async ({ body: { channelId, file }, _userId }) => {
+    async ({ body: { channelId, file }, CheckToken: { _userId } }) => {
       const fileId = await ServiceMessage.UploadFile(channelId, file, _userId);
 
       return {
@@ -186,7 +186,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/delete",
-    async ({ body: { messageId }, _userId, server }) => {
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
       const messageDeleted = await ServiceMessage.Delete(messageId, _userId);
 
       //WSで通知
@@ -218,7 +218,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/inbox",
-    async ({ _userId }) => {
+    async ({ CheckToken: { _userId } }) => {
       //通知を取得する
       const inboxAll = await ServiceMessage.GetInbox(_userId);
 
@@ -236,7 +236,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/inbox/read",
-    async ({ body: { messageId }, _userId, server }) => {
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
       await ServiceMessage.ReadInbox(messageId, _userId);
 
       //WSで通知の既読を通知
@@ -268,7 +268,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/inbox/clear",
-    async ({ _userId, server }) => {
+    async ({ CheckToken: { _userId }, server }) => {
       await ServiceMessage.ClearInbox(_userId);
 
       //WSで通知の全既読を通知
@@ -294,7 +294,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/emoji-reaction",
-    async ({ body: { messageId, channelId, emojiCode }, _userId, server }) => {
+    async ({ body: { messageId, channelId, emojiCode }, CheckToken: { _userId }, server }) => {
       const reaction = await ServiceMessage.Reaction(
         messageId,
         channelId,
@@ -330,7 +330,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/who-reacted",
-    async ({ query: { messageId, emojiCode, cursor }, _userId }) => {
+    async ({ query: { messageId, emojiCode, cursor }, CheckToken: { _userId } }) => {
       //リアクションしたユーザーを取得
       const messageWithReactions = await ServiceMessage.GetWhoReacted(
         messageId,
@@ -358,7 +358,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/delete-emoji-reaction",
-    async ({ body: { messageId, channelId, emojiCode }, _userId, server }) => {
+    async ({ body: { messageId, channelId, emojiCode }, CheckToken: { _userId }, server }) => {
       const reactionDeleted = await ServiceMessage.DeleteEmojiReaction(
         messageId,
         emojiCode,
@@ -398,7 +398,7 @@ export const message = new Elysia({ prefix: "/message" })
     "/send",
     async ({
       body: { channelId, message, fileIds, replyingMessageId },
-      _userId,
+      CheckToken: { _userId },
       server,
     }) => {
       //メッセージの保存処理
@@ -482,7 +482,7 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/edit",
-    async ({ body: { messageId, message }, _userId, server }) => {
+    async ({ body: { messageId, message }, CheckToken: { _userId }, server }) => {
       const messageEditing = await ServiceMessage.Edit(
         messageId,
         message,
