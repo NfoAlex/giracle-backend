@@ -307,6 +307,8 @@ export namespace Middleware {
 
             //URLプレビュー情報取得、挿入予定配列へ格納
             for (const url of urlMatched) {
+              if (url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1")) continue;
+
               await ogs({ url }).then(async (data) => {
                 if (data.error) {
                   //console.error("Middleware :: urlPreviewControl : URLプレビュー情報取得エラー->", data.error);
