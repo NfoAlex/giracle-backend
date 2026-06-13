@@ -238,14 +238,16 @@ export namespace ServiceMessage {
 
     //ファイルを保存する
     if (file.type.startsWith("image/") && file.type !== "image/gif") {
-      await sharp(await file.arrayBuffer())
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await sharp(buffer)
         .rotate()
         .webp({ quality: 95 })
         .toFile(`./STORAGE/file/${channelId}/${fileNameGen}.webp`);
       //webpで保存されたことと設定
       isWebp = true;
     } else if (file.type === "image/gif") {
-      await sharp(await file.arrayBuffer(), { animated: true })
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await sharp(buffer, { animated: true })
         .gif({
           colours: 128, // 色数を128に削減
           dither: 0, // ディザリングを無効化
