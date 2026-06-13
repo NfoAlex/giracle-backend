@@ -232,7 +232,7 @@ export namespace ServiceMessage {
       () => { },
     );
 
-    console.log("message.module :: /file/upload : file.type->", file.type);
+    //console.log("message.module :: /file/upload : file.type->", file.type);
     //webpファイルであるかどうかフラグ
     let isWebp = false;
 
