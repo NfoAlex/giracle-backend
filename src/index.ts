@@ -37,7 +37,7 @@ export const app = new Elysia()
     process.env.NODE_ENV !== "test" && console.error("index :: エラー->", error);
     if (typeof code === "number")
       return status(code, error.response || "somethin went wrong :(");
-    return status(500, "somethin went wrong :(");
+    return status(500, `somethin went wrong :( ${error.message})`);
   })
   .use(wsHandler)
   .use(user)
