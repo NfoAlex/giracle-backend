@@ -219,7 +219,7 @@ export namespace ServiceMessage {
   ) => {
     //サーバー設定からメッセージの最大ファイルサイズを取得
     const serverConfig = await db.serverConfig.findFirst();
-    const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 500;
+    const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 100;
     //ファイルサイズが最大ファイルサイズを超える場合はエラー
     if (file.size > maxFileSize) {
       throw status(400, "File size is too large");
