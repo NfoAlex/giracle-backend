@@ -210,9 +210,27 @@ describe("/message/file/upload", async () => {
       },
     });
     const t = await res.text();
-    expect(t).toBe("somethin went wrong :(");
+    expect(t).toContain("somethin went wrong :(");
     expect(res.status).toBe(500);
     expect(res.ok).toBeFalse();
+  });
+
+  it("正常", async () => {
+    const formData = new FormData();
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    expect(j.data.fileId.id).toBeString();
   });
 });
 

@@ -219,7 +219,7 @@ export namespace ServiceMessage {
   ) => {
     //サーバー設定からメッセージの最大ファイルサイズを取得
     const serverConfig = await db.serverConfig.findFirst();
-    const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 500;
+    const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 100;
     //ファイルサイズが最大ファイルサイズを超える場合はエラー
     if (file.size > maxFileSize) {
       throw status(400, "File size is too large");
@@ -232,20 +232,22 @@ export namespace ServiceMessage {
       () => { },
     );
 
-    console.log("message.module :: /file/upload : file.type->", file.type);
+    //console.log("message.module :: /file/upload : file.type->", file.type);
     //webpファイルであるかどうかフラグ
     let isWebp = false;
 
     //ファイルを保存する
     if (file.type.startsWith("image/") && file.type !== "image/gif") {
-      await sharp(await file.arrayBuffer())
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await sharp(buffer)
         .rotate()
         .webp({ quality: 95 })
         .toFile(`./STORAGE/file/${channelId}/${fileNameGen}.webp`);
       //webpで保存されたことと設定
       isWebp = true;
     } else if (file.type === "image/gif") {
-      await sharp(await file.arrayBuffer(), { animated: true })
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await sharp(buffer, { animated: true })
         .gif({
           colours: 128, // 色数を128に削減
           dither: 0, // ディザリングを無効化
@@ -265,7 +267,7 @@ export namespace ServiceMessage {
         size: file.size,
         actualFileName: isWebp ? `${file.name}.webp` : file.name,
         savedFileName: isWebp ? `${fileNameGen}.webp` : fileNameGen,
-        type: file.type,
+        type: isWebp ? "image/webp" : file.type,
       },
       select: {
         id: true,
