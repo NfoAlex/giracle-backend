@@ -265,7 +265,7 @@ export namespace ServiceMessage {
         size: file.size,
         actualFileName: isWebp ? `${file.name}.webp` : file.name,
         savedFileName: isWebp ? `${fileNameGen}.webp` : fileNameGen,
-        type: file.type,
+        type: isWebp ? "image/webp" : file.type,
       },
       select: {
         id: true,
