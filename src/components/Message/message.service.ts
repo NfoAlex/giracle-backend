@@ -15,6 +15,7 @@ export namespace ServiceMessage {
       },
       include: {
         MessageUrlPreview: true,
+        MessageFileAttached: true,
       },
     });
     //メッセージが見つからなければエラー
