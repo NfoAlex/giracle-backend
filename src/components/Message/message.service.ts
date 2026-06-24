@@ -628,10 +628,11 @@ export namespace ServiceMessage {
     const mentionedUserIds =
       message.match(/@<([\w-]+)>/g)?.map((mention) => mention.slice(2, -1)) ||
       [];
+    const mentionedUserIdsMerged = [...new Set(mentionedUserIds)];
 
     //DBに保存するInbox用データを作成
     const savingInboxData = [];
-    for (const mentionedUserId of mentionedUserIds) {
+    for (const mentionedUserId of mentionedUserIdsMerged) {
       savingInboxData.push({
         userId: mentionedUserId,
         messageId: messageSaved.id,
