@@ -489,6 +489,20 @@ describe("/message/send", async () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("同じユーザーに対し２回以上メンション", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "@<TESTUSER> @<TESTUSER> test",
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message sent");
+    expect(res.status).toBe(200);
+  });
+
   let TEST__MESSAGE_ID_WITH_URL = "";
   it("正常 :: URL含むメッセージ送信 1/2 : 送信", async () => {
     const res = await FETCH({
