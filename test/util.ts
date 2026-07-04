@@ -1,4 +1,5 @@
-import { execSync } from "node:child_process";
+import fs from 'node:fs/promises'
+import { $ } from "bun";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "../prisma/generated/client";
 import { app } from "../src";
@@ -20,7 +21,7 @@ export async function INIT() {
   const db = new PrismaClient({ adapter });
 
   // --- 01.auth: DBリセット + シード + ユーザー/トークン作成 ---
-  execSync("bunx prisma db push --accept-data-loss");
+  await $`bunx prisma db push --accept-data-loss`;
 
   await db.token.deleteMany({});
   await db.password.deleteMany({});
@@ -38,7 +39,8 @@ export async function INIT() {
   await db.user.deleteMany({});
   await db.serverConfig.deleteMany({});
 
-  execSync("bun ./prisma/seeds.ts");
+  await fs.rm('STORAGE\\file\\TESTCHANNEL1', { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
+  await $`bun ./prisma/seeds.ts`;
 
   await db.user.createMany({
     data: [
@@ -64,6 +66,7 @@ export async function INIT() {
       { id: "TESTCHANNEL1", name: "General", description: "General channel", createdUserId: "TESTUSER" },
       { id: "TESTCHANNEL2", name: "Random", description: "Random discussions", createdUserId: "TESTUSER" },
       { id: "TESTCHANNEL3", name: "Private Channel", description: "Private discussions", createdUserId: "TESTUSER" },
+      { id: "TESTCHANNEL4", name: "Private Channel w/o users", description: "Private discussions", createdUserId: "SYSTEM" },
     ],
   });
   await db.message.upsert({
@@ -96,6 +99,11 @@ export async function INIT() {
   });
   await db.roleLink.create({ data: { userId: "TESTUSER", roleId: "ChannelPrivateViewer" } });
   await db.channelViewableRole.create({ data: { channelId: "TESTCHANNEL3", roleId: "ChannelPrivateViewer" } });
+  // 無人のプライベートなチャンネル(TESTCHANNEL4)用
+  await db.roleInfo.create({
+    data: { id: "CompletePrivate", name: "Comple private role", createdUserId: "SYSTEM" },
+  });
+  await db.channelViewableRole.create({ data: { channelId: "TESTCHANNEL4", roleId: "CompletePrivate" } });
 
   // --- 03.role: ロール管理権限付与 ---
   await db.roleInfo.create({

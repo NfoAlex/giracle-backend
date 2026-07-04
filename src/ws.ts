@@ -1,10 +1,10 @@
 import Elysia, { t } from "elysia";
-import type { ElysiaWS } from "elysia/dist/ws";
 import { db } from ".";
+import { ServerWebSocket } from "elysia/ws/bun";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
 // biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
-export const userWSInstance = new Map<string, ElysiaWS<any, any>[]>();
+export const userWSInstance = new Map<string, ServerWebSocket<any>[]>();
 
 /**
  * WebSocket用 ハンドラ
@@ -126,7 +126,7 @@ export const wsHandler = new Elysia().ws("/ws", {
  * @returns
  */
 // biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSaddUserInstance(userId: string, ws: ElysiaWS<any, any>) {
+function WSaddUserInstance(userId: string, ws: ServerWebSocket<any>) {
   const currentInstance = userWSInstance.get(userId);
   //存在しない場合普通にset
   if (!currentInstance) {
@@ -143,7 +143,7 @@ function WSaddUserInstance(userId: string, ws: ElysiaWS<any, any>) {
  * @returns
  */
 // biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSremoveUserInstance(userId: string, ws: ElysiaWS<any, any>) {
+function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
   const currentInstance = userWSInstance.get(userId);
   //存在しない場合スルー
   if (!currentInstance) {

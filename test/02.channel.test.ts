@@ -287,6 +287,17 @@ describe("/channel/get-history/:channelId", async () => {
     expect(res.status).toBe(404);
     expect(t).toBe("Channel not found");
   });
+
+  it("権限がないチャンネルを取得しようとする with CompletePrivate", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL4",
+      method: "POST",
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(t).toBe("Channel not found");
+  });
 });
 
 describe("/channel/search", async () => {
@@ -520,7 +531,7 @@ describe("/channel/update", async () => {
       path: "/channel/update",
       method: "POST",
       body: {
-        channelId: "TESTCHANNEL3",
+        channelId: "TESTCHANNEL4",
         name: "Updated",
       },
     });
@@ -627,7 +638,7 @@ describe("/channel/delete", async () => {
       path: "/channel/delete",
       method: "DELETE",
       body: {
-        channelId: "TESTCHANNEL3",
+        channelId: "TESTCHANNEL4",
       },
     });
     const t = await res.text();

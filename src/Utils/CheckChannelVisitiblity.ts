@@ -41,7 +41,7 @@ export default async function CheckChannelVisibility(
 
       // ロールを持っていれば閲覧可能
       if (hasViewableRole) {
-        true;
+        return true;
       }
 
       // サーバー管理者の場合は閲覧可能
