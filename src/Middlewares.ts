@@ -137,7 +137,7 @@ export namespace Middleware {
     });
 
   export const RateLimiter = new Elysia({ name: "rateLimiter" })
-    .resolve({ as: "scoped" }, async ({ request, cookie: { token } }) => {
+    .resolve({ as: "scoped" }, async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
       //識別キー
@@ -146,23 +146,11 @@ export namespace Middleware {
       //未ログインの場合は状態を設定しIPアドレス等をキーにする
       if (token?.value === undefined) {
         isAnonymous = true;
-        key =
-          request.headers.get("x-real-ip") ??
-          request.headers.get("x-forwarded-for") ??
-          request.headers.get("cf-connecting-ip") ??
-          request.headers.get("x-client-ip") ??
-          request.headers.get("x-forwarded") ??
-          request.headers.get("forwarded") ??
-          request.headers.get("via") ??
-          request.headers.get("remote-addr") ??
-          request.headers.get("x-cluster-client-ip") ??
-          request.headers.get("proxy-client-ip") ??
-          request.headers.get("wl-proxy-client-ip") ??
-          request.headers.get("x-forwarded-host") ??
-          request.headers.get("x-forwarded-server") ??
-          request.headers.get("host") ??
-          request.headers.get("user-agent") ??
-          ("anonymous" as string);
+        const socketAddress = server?.requestIP(request);
+        if (socketAddress === null || socketAddress === undefined) {
+          return status(500, "somethin went wrong :(");
+        }
+        key = socketAddress.address;
 
         //IPアドレスが既にブロックされているか確認
         const blockedIP = await db.blockedIPAddress.findUnique({
