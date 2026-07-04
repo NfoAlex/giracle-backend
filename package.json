@@ -20,9 +20,9 @@
     "@prisma/client": "^7.8.0",
     "elysia": "^1.4.29",
     "image-size": "^2.0.2",
-    "open-graph-scraper": "^6.11.0",
+    "open-graph-scraper": "^6.12.0",
     "prisma": "^7.8.0",
-    "sharp": "^0.35.2"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
