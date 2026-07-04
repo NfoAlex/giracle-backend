@@ -245,125 +245,116 @@ export namespace Middleware {
       bindUrlPreview(isEnabled: boolean) {
         return {
           async afterResponse({ server, responseValue }) {
-            //レスポンスデータ取り出し
             const responseData = responseValue?.data;
-            //URLプレビューが無効あるいはレスポンスが存在しないなら何もしない
-            if (!isEnabled || responseData === undefined)
-              return;
+            if (!isEnabled || responseData === undefined) return;
 
-            //メッセージデータを取得
             const messageData = responseData;
-            //メッセージId取り出し
             const messageId = messageData.id;
 
-            //URLを抽出
             const urlRegex: RegExp =
               /https?:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#\u3000-\u30FE\u4E00-\u9FA0\uFF01-\uFFE3]+/g;
-            const urlMatched = messageData.content?.match(urlRegex) ?? [];
 
-            //URLが含まれていないかつ編集された状態じゃないなら何もしない
+            // 重複したURLを排除（同じURLのOGPを何度も取得しないようにする）
+            let urlMatched = [...new Set(messageData.content?.match(urlRegex) ?? [])];
+
             if (urlMatched.length === 0 && !messageData.isEdited) return;
 
-            //TwitterのリンクがあればfxTwitterへ
-            for (const index in urlMatched) {
+            // Twitter/Xのリンクをfxtwitterに置換（URLオブジェクトを使って安全にパース）
+            urlMatched = urlMatched.map((urlStr) => {
               try {
-                const urlObj = new URL(urlMatched[index]);
-                if (
-                  (urlObj.host === "twitter.com" || urlObj.host === "x.com")
-                  &&
-                  urlObj.pathname.includes("status")
-                  &&
-                  !urlMatched[index].includes("fxtwitter.com")
-                ) {
-                  urlMatched[index] = urlMatched[index].replace(
-                    "twitter.com",
-                    "fxtwitter.com",
-                  );
-                  urlMatched[index] = urlMatched[index].replace(
-                    "x.com",
-                    "fxtwitter.com",
-                  );
-                }
-              } catch (e) {
-                console.error("Middlewares :: bindUrlPreview : x.com置き換え部分 ", { errorContext: e });
-              }
-            }
+                const parsedUrl = new URL(urlStr);
+                const isTwitterOrX =
+                  parsedUrl.hostname === "twitter.com" ||
+                  parsedUrl.hostname === "www.twitter.com" ||
+                  parsedUrl.hostname === "x.com" ||
+                  parsedUrl.hostname === "www.x.com";
 
-            //編集された時用に現在のURLプレビュー情報を削除
-            await db.messageUrlPreview.deleteMany({
-              where: {
-                messageId,
-              },
+                if (isTwitterOrX && parsedUrl.pathname.includes("/status/")) {
+                  parsedUrl.hostname = "fxtwitter.com";
+                  return parsedUrl.toString();
+                }
+                return urlStr;
+              } catch {
+                return urlStr; // パース失敗時はそのまま返す
+              }
             });
 
-            //DBに挿入するURLプレビューデータ用配列
-            const creatingPreviewDataArr: MessageUrlPreviewCreateManyMessageInput[] = [];
+            // 編集された時用に現在のURLプレビュー情報を削除
+            await db.messageUrlPreview.deleteMany({
+              where: { messageId },
+            });
 
-            //URLプレビュー情報取得、挿入予定配列へ格納
-            for (const url of urlMatched) {
-              //localhostは無許可
-              if (url.startsWith("http://localhost")) continue;
+            // URLリストから不正なもの（ローカルIPなど）を事前にフィルタリング
+            const validUrls = urlMatched.filter((urlStr) => {
+              try {
+                const parsedUrl = new URL(urlStr);
+                const hostname = parsedUrl.hostname;
 
-              //IPアドレスをブロック
-              const hostname = (() => {
-                try {
-                  return new URL(url).hostname;
-                } catch {
-                  return "";
-                }
-              })();
-              const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
-              if (isIpAddress) continue;
+                // 基本的なSSRF対策（より強固にするならDNS名前解決の結果をチェックする必要があります）
+                if (hostname === "localhost" || hostname === "127.0.0.1") return false;
+                if (hostname.includes("169.254.")) return false; // クラウドのメタデータサーバー
 
-              await ogs({ url }).then(async (data) => {
-                if (data.error) {
-                  //console.error("Middleware :: urlPreviewControl : URLプレビュー情報取得エラー->", data.error);
-                  return;
-                }
+                const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
+                if (isIpAddress) return false;
 
-                creatingPreviewDataArr.push({
-                  url: data.result.requestUrl || "",
-                  type: data.result.ogType || "UNKNOWN",
-                  title: data.result.ogTitle || "",
-                  description: data.result.ogDescription || "",
-                  faviconLink: data.result.favicon || "",
-                  imageLink:
-                    data.result.ogImage !== undefined
-                      ? data.result.ogImage?.[0]?.url
-                      : null,
-                  videoLink:
-                    data.result.ogVideo !== undefined
-                      ? data.result.ogVideo?.[0]?.url
-                      : null,
-                });
+                return true;
+              } catch {
+                return false; // 無効なURLは除外
+              }
+            });
+
+            // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
+            const fetchPromises = validUrls.map(async (url) => {
+              const data = await ogs({ url });
+              if (data.error) {
+                throw new Error(`OGS Fetch Error for ${url}`);
+              }
+              return data.result;
+            });
+
+            const results = await Promise.allSettled(fetchPromises);
+
+            // 成功した結果だけをDB保存用のフォーマットに変換
+            const creatingPreviewDataArr: MessageUrlPreviewCreateManyMessageInput[] = results
+              .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
+              .map((result) => {
+                const res = result.value;
+                return {
+                  url: res.requestUrl || "",
+                  type: res.ogType || "UNKNOWN",
+                  title: res.ogTitle || "",
+                  description: res.ogDescription || "",
+                  faviconLink: res.favicon || "",
+                  // オプショナルチェーンを用いて、配列が空の場合のクラッシュを防ぐ
+                  imageLink: res.ogImage?.[0]?.url ?? null,
+                  videoLink: res.ogVideo?.[0]?.url ?? null,
+                };
               });
-            }
 
-            //メッセージデータにURLプレビューを適用しつつ受け取り
-            const messageUpdated = await db.message.update({
-              where: {
-                id: messageId,
-              },
-              data: {
-                MessageUrlPreview: {
-                  createMany: {
-                    data: creatingPreviewDataArr,
+            // OGPデータが存在する場合、または編集によってURLがすべて消えた場合のみ更新・通知
+            if (creatingPreviewDataArr.length > 0 || messageData.isEdited) {
+              const messageUpdated = await db.message.update({
+                where: { id: messageId },
+                data: {
+                  MessageUrlPreview: {
+                    createMany: {
+                      data: creatingPreviewDataArr,
+                    },
                   },
                 },
-              },
-              include: {
-                MessageUrlPreview: true,
-              },
-            });
+                include: {
+                  MessageUrlPreview: true,
+                },
+              });
 
-            //WSで通知
-            server?.publish(
-              `channel::${messageUpdated.channelId}`,
-              JSON.stringify({
-                signal: "message::UpdateMessage",
-                data: messageUpdated,
-              }),
-            );
+              server?.publish(
+                `channel::${messageUpdated.channelId}`,
+                JSON.stringify({
+                  signal: "message::UpdateMessage",
+                  data: messageUpdated,
+                }),
+              );
+            }
           },
         };
       },
