@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { FETCH, INIT } from "./util";
+import { db } from "../src";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 mock.module("open-graph-scraper", () => ({
@@ -201,6 +202,7 @@ describe("/message/search", async () => {
 });
 
 describe("/message/file/upload", async () => {
+
   it("存在しないファイル", async () => {
     const res = await FETCH({
       path: "/message/file/upload",
@@ -270,7 +272,84 @@ describe("/message/file/upload", async () => {
   });
 });
 
-// /message/file/:dileId
+describe("/message/file/get", async () => {
+  let TEST_FILEID_FOR_GET = "";
+  let TEST_FILEID_FOR_PRIVATE_CHANNEL = "";
+  beforeAll(async () => {
+    const pngBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+
+    let j = null;
+
+    const formData1 = new FormData();
+    formData1.append("channelId", "TESTCHANNEL1");
+    formData1.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    const res1 = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData1
+    });
+    j = await res1.json();
+    TEST_FILEID_FOR_GET = j.data.fileId.id;
+    j = null;
+
+    // TESTCHANNEL3はTESTUSERも参加していないためファイルアップロードするためにわざわざ参加
+    await db.channelJoin.create({
+      data: {
+        userId: "TESTUSER",
+        channelId: "TESTCHANNEL3"
+      }
+    });
+    const formData2 = new FormData();
+    formData2.append("channelId", "TESTCHANNEL3"); //プライベートであるTESTCHANNEL3指定
+    formData2.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    const res2 = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData2
+    });
+    j = await res2.json();
+    TEST_FILEID_FOR_PRIVATE_CHANNEL = j.data.fileId.id;
+    await db.channelJoin.delete({
+      where: {
+        userId_channelId: {
+          userId: "TESTUSER",
+          channelId: "TESTCHANNEL3"
+        }
+      }
+    });
+  });
+
+  it("正常", async () => {
+    const res = await FETCH({
+      path: `/message/file/${TEST_FILEID_FOR_GET}`,
+      method: "GET",
+    });
+    const buf = await res.arrayBuffer();
+    expect(res.headers.get("content-type")).toBe("image/webp");
+    expect(buf).toBeObject();
+  });
+
+  it("参加していなくても他チャンネルのファイルを見られる", async () => {
+    const res = await FETCH({
+      path: `/message/file/${TEST_FILEID_FOR_GET}`,
+      method: "GET",
+      useSecondaryUser: true
+    });
+    expect(res.ok).toBeTrue();
+  });
+
+  it("プライベートチャンネルのファイルにアクセス", async () => {
+    const res = await FETCH({
+      path: `/message/file/${TEST_FILEID_FOR_PRIVATE_CHANNEL}`,
+      method: "GET",
+      useSecondaryUser: true
+    });
+    expect(res.ok).toBeFalse();
+  });
+});
+
 // /message/file/delete
 
 describe("/message/inbox", async () => {
