@@ -164,8 +164,8 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/file/:fileId",
-    async ({ params: { fileId }, set }) => {
-      const fileData = await ServiceMessage.GetFile(fileId);
+    async ({ params: { fileId }, set, CheckToken: { _userId } }) => {
+      const fileData = await ServiceMessage.GetFile(fileId, _userId);
 
       //画像のキャッシュ期間を設定
       set.headers["Cache-Control"] = "public, max-age=604800"; // 1週間

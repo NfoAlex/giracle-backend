@@ -295,15 +295,19 @@ export namespace ServiceMessage {
     return fileData;
   };
 
-  export const GetFile = async (fileId: string) => {
+  export const GetFile = async (fileId: string, _userId: string) => {
     const fileData = await db.messageFileAttached.findUnique({
       where: {
         id: fileId,
       },
     });
-
     if (fileData === null) {
       throw status(404, "File not found");
+    }
+
+    const canView = await CheckChannelVisibility(fileData?.channelId, _userId);
+    if (!canView) {
+      throw status(400, "This file is hidden in private channel");
     }
 
     return fileData;
