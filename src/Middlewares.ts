@@ -266,20 +266,26 @@ export namespace Middleware {
 
             //TwitterのリンクがあればfxTwitterへ
             for (const index in urlMatched) {
-              if (
-                (urlMatched[index].includes("twitter.com") ||
-                  urlMatched[index].includes("x.com")) &&
-                urlMatched[index].includes("status") &&
-                !urlMatched[index].includes("fxtwitter.com")
-              ) {
-                urlMatched[index] = urlMatched[index].replace(
-                  "twitter.com",
-                  "fxtwitter.com",
-                );
-                urlMatched[index] = urlMatched[index].replace(
-                  "x.com",
-                  "fxtwitter.com",
-                );
+              try {
+                const urlObj = new URL(urlMatched[index]);
+                if (
+                  (urlObj.host === "twitter.com" || urlObj.host === "x.com")
+                  &&
+                  urlObj.pathname.includes("status")
+                  &&
+                  !urlMatched[index].includes("fxtwitter.com")
+                ) {
+                  urlMatched[index] = urlMatched[index].replace(
+                    "twitter.com",
+                    "fxtwitter.com",
+                  );
+                  urlMatched[index] = urlMatched[index].replace(
+                    "x.com",
+                    "fxtwitter.com",
+                  );
+                }
+              } catch (e) {
+                console.error("Middlewares :: bindUrlPreview : x.com置き換え部分 ", { errorContext: e });
               }
             }
 
