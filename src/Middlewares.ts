@@ -329,11 +329,11 @@ export namespace Middleware {
                   faviconLink: data.result.favicon || "",
                   imageLink:
                     data.result.ogImage !== undefined
-                      ? data.result.ogImage[0].url
+                      ? data.result.ogImage?.[0]?.url
                       : null,
                   videoLink:
                     data.result.ogVideo !== undefined
-                      ? data.result.ogVideo[0].url
+                      ? data.result.ogVideo?.[0]?.url
                       : null,
                 });
               });
