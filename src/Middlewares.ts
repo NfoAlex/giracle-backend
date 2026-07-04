@@ -295,7 +295,19 @@ export namespace Middleware {
 
             //URLプレビュー情報取得、挿入予定配列へ格納
             for (const url of urlMatched) {
-              if (url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1")) continue;
+              //localhostは無許可
+              if (url.startsWith("http://localhost")) continue;
+
+              //IPアドレスをブロック
+              const hostname = (() => {
+                try {
+                  return new URL(url).hostname;
+                } catch {
+                  return "";
+                }
+              })();
+              const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
+              if (isIpAddress) continue;
 
               await ogs({ url }).then(async (data) => {
                 if (data.error) {
