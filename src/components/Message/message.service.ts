@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { unlink } from "node:fs/promises";
+import path from "node:path";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
@@ -218,6 +219,15 @@ export namespace ServiceMessage {
     file: File,
     _userId: string,
   ) => {
+    const joinedChannel = await db.channelJoin.findFirst({
+      where: {
+        userId: _userId,
+        channelId
+      }
+    });
+    console.log("message.service :: UploadFile : ", { joinedChannel });
+    if (joinedChannel === null) throw status(400, "You are not joined to this channel");
+
     //サーバー設定からメッセージの最大ファイルサイズを取得
     const serverConfig = await db.serverConfig.findFirst();
     const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 100;
@@ -226,8 +236,15 @@ export namespace ServiceMessage {
       throw status(400, "File size is too large");
     }
 
+    //channelIdにパス要素が混入していないか検証(パストラバーサル対策)
+    if (!/^[a-zA-Z0-9_-]+$/.test(channelId)) {
+      throw status(400, "Invalid channelId");
+    }
+
+    //ファイル名からディレクトリ要素を除去(パストラバーサル対策)
+    const safeFileName = path.basename(file.name).replace(/[/\\]/g, "_");
     //保存するためのファイル名保存
-    const fileNameGen = `${Date.now()}_${file.name}`;
+    const fileNameGen = `${Date.now()}_${safeFileName}`;
     //チャンネルIdのディレクトリを作成
     await mkdir(`./STORAGE/file/${channelId}`, { recursive: true }).catch(
       () => { },

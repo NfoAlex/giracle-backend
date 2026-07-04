@@ -232,6 +232,42 @@ describe("/message/file/upload", async () => {
     expect(j.message).toBe("File uploaded");
     expect(j.data.fileId.id).toBeString();
   });
+
+  it("正常 :: 不正なファイル名の正常パース", async () => {
+    const formData = new FormData();
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append("file", new File([pngBuffer], "testあ/test_xss.png", { type: "image/png" }));
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    expect(j.data.fileId.id).toBeString();
+    console.log("04.message :: /message/file/upload : ", { j });
+  });
+
+  it("未参加のチャンネルへアップロード", async () => {
+    const formData = new FormData();
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+      useSecondaryUser: true
+    });
+    expect(res.ok).toBeFalse();
+  });
 });
 
 // /message/file/:dileId
