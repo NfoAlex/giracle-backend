@@ -136,8 +136,8 @@ giracle-backend/
 | GET | `/message/read-time/get` | ✅ | - | 既読時刻取得 |
 | POST | `/message/read-time/update` | ✅ | - | 既読時刻更新（WS通知: `message::ReadTimeUpdated`） |
 | GET | `/message/search` | ✅ | - | メッセージ検索 |
-| POST | `/message/file/upload` | ✅ | - | ファイルアップロード |
-| GET | `/message/file/:fileId` | ✅ | - | ファイル取得（キャッシュ: 1週間） |
+| POST | `/message/file/upload` | ✅ | - | ファイルアップロード（チャンネル参加を確認） |
+| GET | `/message/file/:fileId` | ✅ | - | ファイル取得（キャッシュ: 1週間、チャンネル閲覧権限を確認） |
 | DELETE | `/message/delete` | ✅ | - | メッセージ削除（WS通知: `message::MessageDeleted`） |
 | GET | `/message/inbox` | ✅ | - | 通知（inbox）一覧取得 |
 | POST | `/message/inbox/read` | ✅ | - | 通知を既読（WS通知: `inbox::Deleted`） |
@@ -241,7 +241,7 @@ giracle-backend/
 |------|------|
 | `CheckToken` | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減 |
 | `CheckRoleTerm` | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認 |
-| `RateLimiter` | 未認証は IP ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
+| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
 | `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化 |
 
 ### 権限（`checkRoleTerm`）の種類
@@ -290,11 +290,12 @@ giracle-backend/
 
 ### セキュリティ・本番運用
 
-- **HTTPS 必須。** 認証トークンは Cookie で扱う。TLS 終端の背後でのみ運用すること。平文 HTTP ではトークンが盗聴される。
+- **HTTPS 必須。** 認証トークンは Cookie（`httpOnly`）で扱う。TLS 終端の背後でのみ運用すること。平文 HTTP ではトークンが盗聴される。
 - **`CORS_ORIGIN` を必ず設定する。** 未設定だとオリジン制限が効かず、Cookie 認証と組み合わさると危険。本番では信頼するフロントエンドのオリジンを明示する。
 - **レート制限はデフォルト無効。** `RATE_LIMIT_ENABLED=true` にしない限りログインの総当たりに無防備。本番では有効化する。
-- **リバースプロキシ前提で運用する。** 未認証リクエストのレート制限・IP ブロックは `x-forwarded-for` 等のヘッダを基準にキーを決めている。クライアントが直接到達できる構成だとヘッダ偽装で回避される。信頼できるプロキシ配下に置き、プロキシ側で正しいクライアント IP ヘッダを上書きすること。
+- **未認証リクエストの IP 判定は接続元ソケットの IP（`server.requestIP()`）を基準にする。** ヘッダー偽装では回避できないが、リバースプロキシ配下ではリクエストが全てプロキシの IP として扱われ、レート制限が実質機能しなくなる（あるいは利用者全員が同一キーとして巻き込まれる）。プロキシ経由で運用する場合は、プロキシ側で L4/L7 のレート制限・IP ブロックを別途用意するか、信頼できるプロキシのみが到達できる構成にすること。
 - **パスワードの最小長は 4 文字と緩い。** 必要なら運用ポリシーやフロント側のバリデーションで補う。
+- **URL プレビュー取得時は SSRF 対策として `localhost` / `127.0.0.1` / `169.254.` 始まり（クラウドのメタデータサーバー想定）/ 生 IP アドレス指定の URL を除外している。** 完全な対策ではない（DNS 解決結果までは検証していない）ため、内部ネットワークからの到達性が問題になる場合は追加の対策を検討すること。
 
 ### インフラ・データ
 
