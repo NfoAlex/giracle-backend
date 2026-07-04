@@ -520,7 +520,7 @@ describe("/channel/update", async () => {
       path: "/channel/update",
       method: "POST",
       body: {
-        channelId: "TESTCHANNEL3",
+        channelId: "TESTCHANNEL4",
         name: "Updated",
       },
     });
@@ -627,7 +627,7 @@ describe("/channel/delete", async () => {
       path: "/channel/delete",
       method: "DELETE",
       body: {
-        channelId: "TESTCHANNEL3",
+        channelId: "TESTCHANNEL4",
       },
     });
     const t = await res.text();
