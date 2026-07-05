@@ -3,10 +3,11 @@ import { Middleware } from "../../Middlewares";
 import { NOTIFICATION_MODES, ServiceNotification } from "./notification.service";
 
 export const notification = new Elysia({ prefix: "/notification" })
+  .use(Middleware.WebPush)
   .get(
     "/vapid-public-key",
-    () => {
-      const key = ServiceNotification.GetVapidPublicKey();
+    ({ webpush }) => {
+      const key = ServiceNotification.GetVapidPublicKey(webpush);
       return {
         message: "Fetched VAPID public key",
         data: { publicKey: key },

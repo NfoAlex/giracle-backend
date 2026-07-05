@@ -10,25 +10,32 @@ export type PushPayload = {
 };
 
 /**
- * デバイスに紐付いた鍵情報。プラットフォームごとにスキーマが違うので JSON 文字列で保持。
- * - web  : { p256dh: string, auth: string }
- * - android/ios : (将来) FCM/APNs では追加鍵不要のため空
+ * Webプッシュ購読時に受け取る鍵。DBには JSON文字列で保存する。
  */
 export type WebPushKeys = {
   p256dh: string;
   auth: string;
 };
 
-export type SendResult = {
+/**
+ * WebPush.sendToDevice の戻り値。invalidateToken=true なら Dispatch 側で
+ * DB から購読を削除する。
+ */
+export type WebPushSendResult = {
   ok: boolean;
-  /** true の場合、このデバイストークンは無効なので DB から削除すべき */
   invalidateToken: boolean;
 };
 
-export interface PushProvider {
-  send(
-    token: string,
-    keys: string | null,
+/**
+ * Middleware.WebPush の decorate 型。
+ * ハンドラ引数から `webpush` を型付きで受け取れる。
+ */
+export type WebPushClient = {
+  isReady: () => boolean;
+  getPublicKey: () => string;
+  sendToDevice: (
+    endpoint: string,
+    keysJson: string | null,
     payload: PushPayload,
-  ): Promise<SendResult>;
-}
+  ) => Promise<WebPushSendResult>;
+};
