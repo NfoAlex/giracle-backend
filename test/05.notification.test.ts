@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { FETCH, INIT } from "./util";
 import { db } from "../src";
+import SendPushNotification from "../src/Utils/SendPushNotification";
 
-// web-push をモック化: 実際のFCMは叩かず、setVapidDetails/sendNotification を no-op に
+// web-push の sendNotification をモック化: 実際のFCMは叩かない
+// setVapidDetails は .env.test の実VAPIDキーで通るのでモック不要
 const sendNotificationMock = mock(async () => undefined);
 mock.module("web-push", () => ({
   default: {
@@ -149,7 +151,6 @@ describe("/notification/device", () => {
   });
 
   it("unregister :: 他人の token は 403", async () => {
-    // TESTUSER が登録した webToken を TESTUSER2 が解除しようとする
     const res = await FETCH({
       path: "/notification/device/unregister",
       method: "POST",
@@ -235,7 +236,9 @@ describe("/notification/mute", () => {
       method: "GET",
     });
     const j = await res.json();
-    expect(j.data.some((m: { channelId: string }) => m.channelId === "TESTCHANNEL1")).toBe(true);
+    expect(
+      j.data.some((m: { channelId: string }) => m.channelId === "TESTCHANNEL1"),
+    ).toBe(true);
   });
 
   it("unmute-channel :: 正常解除", async () => {
@@ -272,124 +275,134 @@ describe("/notification/mute", () => {
 // /notification/vapid-public-key
 //
 describe("/notification/vapid-public-key", () => {
-  it("VAPID 未設定なら 503", async () => {
-    // .env.test で VAPID_* を設定していない前提
+  it("VAPID 設定済なら 200 + キー", async () => {
     const res = await FETCH({
       path: "/notification/vapid-public-key",
       method: "GET",
       excludeCredential: true,
     });
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(503);
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(typeof j.data.publicKey).toBe("string");
+    expect(j.data.publicKey.length).toBeGreaterThan(0);
   });
 });
 
 //
-// Dispatch の分岐ロジック (Service 層直呼びで検証)
-// web-push は上の mock.module で send をスタブしているため、実ネットワークには出ない。
-// 追加で VAPID を実質的に有効化するため、vapidReady を要求する経路は avoid し、
-// ここでは分岐 (config/mute) だけを検証する。
+// SendPushNotification (Util) の分岐ロジック検証
+// web-push の sendNotification は mock されているので実ネットワークには出ない。
 //
-describe("ServiceNotification.Dispatch :: 分岐", () => {
-  const { ServiceNotification } = require("../src/components/Notification/notification.service");
-  // モック用の webpush クライアント (実際の Middleware ではなくテスト用)
-  const sendMock = mock(async () => ({ ok: true, invalidateToken: false }));
-  const stubWebPush = {
-    isReady: () => true,
-    getPublicKey: () => "STUB",
-    sendToDevice: sendMock,
+describe("SendPushNotification :: 分岐", () => {
+  const testUser = "TESTUSER2";
+  const testChannel = "TESTCHANNEL2";
+  const testDeviceToken = "dispatch-test-token";
+  const testDeviceKeys = JSON.stringify({ p256dh: "x", auth: "y" });
+
+  const setupDevice = async () => {
+    await db.notificationDevice.upsert({
+      where: { token: testDeviceToken },
+      create: {
+        token: testDeviceToken,
+        platform: "web",
+        keys: testDeviceKeys,
+        userId: testUser,
+      },
+      update: { keys: testDeviceKeys, platform: "web", userId: testUser },
+    });
   };
 
   it("enabled=false ならスキップ", async () => {
-    sendMock.mockClear();
+    sendNotificationMock.mockClear();
+    await setupDevice();
     await db.notificationConfig.upsert({
-      where: { userId: "TESTUSER2" },
-      create: { userId: "TESTUSER2", enabled: false, mode: "all" },
+      where: { userId: testUser },
+      create: { userId: testUser, enabled: false, mode: "all" },
       update: { enabled: false, mode: "all" },
     });
-    await db.notificationDevice.upsert({
-      where: { token: "dispatch-test-token" },
-      create: {
-        token: "dispatch-test-token",
-        platform: "web",
-        keys: JSON.stringify({ p256dh: "x", auth: "y" }),
-        userId: "TESTUSER2",
-      },
-      update: {},
-    });
 
-    await ServiceNotification.Dispatch(stubWebPush, {
-      userId: "TESTUSER2",
-      channelId: "TESTCHANNEL2",
+    await SendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
       eventType: "mention",
       payload: { title: "t", body: "b" },
     });
-    expect(sendMock).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
   it("mode=mention のとき message はスキップ", async () => {
-    sendMock.mockClear();
+    sendNotificationMock.mockClear();
+    await setupDevice();
     await db.notificationConfig.update({
-      where: { userId: "TESTUSER2" },
+      where: { userId: testUser },
       data: { enabled: true, mode: "mention" },
     });
 
-    await ServiceNotification.Dispatch(stubWebPush, {
-      userId: "TESTUSER2",
-      channelId: "TESTCHANNEL2",
+    await SendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
       eventType: "message",
       payload: { title: "t", body: "b" },
     });
-    expect(sendMock).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
   it("mode=mention + eventType=mention なら送信", async () => {
-    sendMock.mockClear();
-    await ServiceNotification.Dispatch(stubWebPush, {
-      userId: "TESTUSER2",
-      channelId: "TESTCHANNEL2",
+    sendNotificationMock.mockClear();
+    await setupDevice();
+
+    await SendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
       eventType: "mention",
       payload: { title: "t", body: "b" },
     });
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1);
   });
 
   it("ChannelMute があるとスキップ", async () => {
-    sendMock.mockClear();
+    sendNotificationMock.mockClear();
+    await setupDevice();
     await db.channelMute.upsert({
-      where: { userId_channelId: { userId: "TESTUSER2", channelId: "TESTCHANNEL2" } },
-      create: { userId: "TESTUSER2", channelId: "TESTCHANNEL2" },
+      where: {
+        userId_channelId: { userId: testUser, channelId: testChannel },
+      },
+      create: { userId: testUser, channelId: testChannel },
       update: {},
     });
 
-    await ServiceNotification.Dispatch(stubWebPush, {
-      userId: "TESTUSER2",
-      channelId: "TESTCHANNEL2",
+    await SendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
       eventType: "mention",
       payload: { title: "t", body: "b" },
     });
-    expect(sendMock).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
 
     // クリーンアップ
     await db.channelMute.delete({
-      where: { userId_channelId: { userId: "TESTUSER2", channelId: "TESTCHANNEL2" } },
+      where: {
+        userId_channelId: { userId: testUser, channelId: testChannel },
+      },
     });
   });
 
-  it("invalidateToken=true なら DB から削除される", async () => {
-    sendMock.mockClear();
-    const localSendMock = mock(async () => ({ ok: false, invalidateToken: true }));
-    const stub2 = { ...stubWebPush, sendToDevice: localSendMock };
+  it("410 Gone なら DB から購読削除", async () => {
+    await setupDevice();
+    // 一度だけ 410 でエラーを返すよう再モック
+    const goneError = Object.assign(new Error("Gone"), { statusCode: 410 });
+    sendNotificationMock.mockImplementationOnce(async () => {
+      throw goneError;
+    });
 
-    await ServiceNotification.Dispatch(stub2, {
-      userId: "TESTUSER2",
-      channelId: "TESTCHANNEL2",
+    await SendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
       eventType: "mention",
       payload: { title: "t", body: "b" },
     });
 
     const remain = await db.notificationDevice.findUnique({
-      where: { token: "dispatch-test-token" },
+      where: { token: testDeviceToken },
     });
     expect(remain).toBeNull();
   });

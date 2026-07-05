@@ -1,6 +1,6 @@
 import { status } from "elysia";
 import { db } from "../..";
-import type { NotificationPlatform, PushPayload, WebPushClient, WebPushKeys } from "./types";
+import type { WebPushKeys } from "./types";
 
 export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
 export type NotificationMode = (typeof NOTIFICATION_MODES)[number];
@@ -8,16 +8,7 @@ export type NotificationMode = (typeof NOTIFICATION_MODES)[number];
 const isValidMode = (v: string): v is NotificationMode =>
   (NOTIFICATION_MODES as readonly string[]).includes(v);
 
-export type NotifyEventType = "mention" | "reply" | "message";
-
 export namespace ServiceNotification {
-  export const GetVapidPublicKey = (webpush: WebPushClient) => {
-    if (!webpush.isReady()) {
-      throw status(503, "Web push is not configured on this server");
-    }
-    return webpush.getPublicKey();
-  };
-
   export const GetConfig = async (_userId: string) => {
     const config = await db.notificationConfig.findUnique({
       where: { userId: _userId },
@@ -128,73 +119,5 @@ export namespace ServiceNotification {
       })
       .catch(() => null);
     return channelId;
-  };
-
-  /**
-   * 通知を配信する。configとミュート、eventTypeを見て振り分け、
-   * 該当プラットフォームのプロバイダで送信する。
-   * 現状 web のみ対応。将来 android/ios を追加する時はここに分岐を足す。
-   */
-  export const Dispatch = async (
-    webpush: WebPushClient,
-    input: {
-      userId: string;
-      channelId: string;
-      eventType: NotifyEventType;
-      payload: PushPayload;
-    },
-  ) => {
-    const { userId, channelId, eventType, payload } = input;
-
-    // 設定取得
-    const config = await GetConfig(userId);
-    if (!config.enabled || config.mode === "off") return;
-
-    // メンションのみモードなら message は無視
-    if (
-      config.mode === "mention" &&
-      eventType !== "mention" &&
-      eventType !== "reply"
-    ) {
-      return;
-    }
-
-    // チャンネルミュートチェック
-    const muted = await db.channelMute.findUnique({
-      where: { userId_channelId: { userId, channelId } },
-    });
-    if (muted !== null) return;
-
-    // デバイス取得
-    const devices = await db.notificationDevice.findMany({
-      where: { userId },
-    });
-    if (devices.length === 0) return;
-
-    const invalidTokens: string[] = [];
-
-    await Promise.all(
-      devices.map(async (device) => {
-        const platform = device.platform as NotificationPlatform;
-        if (platform === "web") {
-          const result = await webpush.sendToDevice(
-            device.token,
-            device.keys,
-            payload,
-          );
-          if (result.invalidateToken) {
-            invalidTokens.push(device.token);
-          }
-          return;
-        }
-        // 未対応プラットフォーム (android/ios) は何もしない
-      }),
-    );
-
-    if (invalidTokens.length > 0) {
-      await db.notificationDevice.deleteMany({
-        where: { token: { in: invalidTokens } },
-      });
-    }
   };
 }
