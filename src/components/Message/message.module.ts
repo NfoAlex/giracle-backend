@@ -1,10 +1,12 @@
 import Elysia, { file, t } from "elysia";
 import { db } from "../..";
 import { Middleware } from "../../Middlewares";
+import { ServiceNotification } from "../Notification/notification.service";
 import { ServiceMessage } from "./message.service";
 
 export const message = new Elysia({ prefix: "/message" })
   .use(Middleware.CheckToken)
+  .use(Middleware.WebPush)
   .get(
     "/:messageId",
     async ({ params: { messageId }, CheckToken: { _userId } }) => {
@@ -400,6 +402,7 @@ export const message = new Elysia({ prefix: "/message" })
       body: { channelId, message, fileIds, replyingMessageId },
       CheckToken: { _userId },
       server,
+      webpush,
     }) => {
       //メッセージの保存処理
       const { messageSaved, messageReplyingTo, mentionedUserIds } =
@@ -420,8 +423,20 @@ export const message = new Elysia({ prefix: "/message" })
         }),
       );
 
+      //プッシュ通知用のメタ情報 (送信者名 / 本文プレビュー)
+      const senderInfo = await db.user.findUnique({
+        where: { id: _userId },
+        select: { name: true },
+      });
+      const senderName = senderInfo?.name ?? "誰か";
+      const bodyPreview =
+        messageSaved.content.length > 120
+          ? `${messageSaved.content.slice(0, 120)}…`
+          : messageSaved.content;
+
       //メンションされたユーザーに通知
-      for (const mentionedUserId of mentionedUserIds) {
+      const mentionedSet = new Set(mentionedUserIds);
+      for (const mentionedUserId of mentionedSet) {
         //メンションされたWSで通知
         server?.publish(
           `user::${mentionedUserId}`,
@@ -433,24 +448,44 @@ export const message = new Elysia({ prefix: "/message" })
             },
           }),
         );
+
+        if (mentionedUserId !== _userId) {
+          ServiceNotification.Dispatch(webpush, {
+            userId: mentionedUserId,
+            channelId,
+            eventType: "mention",
+            payload: {
+              title: `${senderName} さんからのメンション`,
+              body: bodyPreview,
+              tag: `mention-${messageSaved.id}`,
+              data: {
+                type: "mention",
+                messageId: messageSaved.id,
+                channelId,
+              },
+            },
+          }).catch((e) => console.error("push mention error", e));
+        }
       }
 
       //返信メッセージがあるなら返信先の送信者に通知(自分自身には通知しない)
-      if (
+      const replyTargetUserId =
         replyingMessageId &&
         messageReplyingTo &&
         messageReplyingTo.userId !== _userId
-      ) {
+          ? messageReplyingTo.userId
+          : null;
+      if (replyTargetUserId) {
         await db.inbox.create({
           data: {
-            userId: messageReplyingTo.userId,
+            userId: replyTargetUserId,
             messageId: messageSaved.id,
             type: "reply",
           },
         });
         //WS通知
         server?.publish(
-          `user::${messageReplyingTo.userId}`,
+          `user::${replyTargetUserId}`,
           JSON.stringify({
             signal: "inbox::Added",
             data: {
@@ -459,6 +494,49 @@ export const message = new Elysia({ prefix: "/message" })
             },
           }),
         );
+        //プッシュ通知
+        ServiceNotification.Dispatch(webpush, {
+          userId: replyTargetUserId,
+          channelId,
+          eventType: "reply",
+          payload: {
+            title: `${senderName} さんからの返信`,
+            body: bodyPreview,
+            tag: `reply-${messageSaved.id}`,
+            data: {
+              type: "reply",
+              messageId: messageSaved.id,
+              channelId,
+            },
+          },
+        }).catch((e) => console.error("push reply error", e));
+      }
+
+      //「全通知」モードのユーザー向け: チャンネル参加者へ配信
+      //  除外対象: 送信者本人 / mention 済 / reply 対象 (二重通知防止)
+      const channelMembers = await db.channelJoin.findMany({
+        where: { channelId },
+        select: { userId: true },
+      });
+      const excluded = new Set<string>([_userId, ...mentionedSet]);
+      if (replyTargetUserId) excluded.add(replyTargetUserId);
+      for (const { userId: memberId } of channelMembers) {
+        if (excluded.has(memberId)) continue;
+        ServiceNotification.Dispatch(webpush, {
+          userId: memberId,
+          channelId,
+          eventType: "message",
+          payload: {
+            title: `${senderName} さんからのメッセージ`,
+            body: bodyPreview,
+            tag: `message-${messageSaved.id}`,
+            data: {
+              type: "message",
+              messageId: messageSaved.id,
+              channelId,
+            },
+          },
+        }).catch((e) => console.error("push all-message error", e));
       }
 
       return {

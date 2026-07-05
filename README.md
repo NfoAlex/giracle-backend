@@ -283,6 +283,21 @@ giracle-backend/
 | `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
+| `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
+| `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
+| `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
+
+### プッシュ通知 (Web Push) セットアップ
+
+現状は Web のみ対応。Android(Flutter) / iOS(Swift) は将来対応予定。
+
+1. VAPID キーを生成
+   ```bash
+   bunx web-push generate-vapid-keys
+   ```
+2. 出力を `.env` の `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` に設定
+
+`VAPID_*` 未設定でもサーバーは起動するが、Web プッシュは無効化 (`/notification/vapid-public-key` が 503)。
 
 ---
 

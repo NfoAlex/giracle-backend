@@ -52,6 +52,9 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  NotificationDevice: 'NotificationDevice',
+  NotificationConfig: 'NotificationConfig',
+  ChannelMute: 'ChannelMute',
   Password: 'Password',
   Token: 'Token',
   ChannelViewableRole: 'ChannelViewableRole',
@@ -93,6 +96,38 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const NotificationDeviceScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  platform: 'platform',
+  keys: 'keys',
+  deviceName: 'deviceName',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  lastUsedAt: 'lastUsedAt'
+} as const
+
+export type NotificationDeviceScalarFieldEnum = (typeof NotificationDeviceScalarFieldEnum)[keyof typeof NotificationDeviceScalarFieldEnum]
+
+
+export const NotificationConfigScalarFieldEnum = {
+  userId: 'userId',
+  enabled: 'enabled',
+  mode: 'mode'
+} as const
+
+export type NotificationConfigScalarFieldEnum = (typeof NotificationConfigScalarFieldEnum)[keyof typeof NotificationConfigScalarFieldEnum]
+
+
+export const ChannelMuteScalarFieldEnum = {
+  userId: 'userId',
+  channelId: 'channelId',
+  mutedAt: 'mutedAt'
+} as const
+
+export type ChannelMuteScalarFieldEnum = (typeof ChannelMuteScalarFieldEnum)[keyof typeof ChannelMuteScalarFieldEnum]
 
 
 export const PasswordScalarFieldEnum = {

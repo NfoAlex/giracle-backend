@@ -14,6 +14,7 @@ model User {
   isBanned            Boolean               @default(false)
   Channel             Channel[]
   ChannelJoin         ChannelJoin[]
+  ChannelMute         ChannelMute[]
   CustomEmoji         CustomEmoji[]
   Inbox               Inbox[]
   Invitation          Invitation[]
@@ -21,10 +22,45 @@ model User {
   MessageFileAttached MessageFileAttached[]
   MessageReaction     MessageReaction[]
   MessageReadTime     MessageReadTime[]
+  NotificationConfig  NotificationConfig?
+  NotificationDevice  NotificationDevice[]
   password            Password?
   RoleInfo            RoleInfo[]
   RoleLink            RoleLink[]
   Token               Token[]
+}
+
+model NotificationDevice {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  platform   String
+  keys       String?
+  deviceName String?
+  userId     String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+}
+
+model NotificationConfig {
+  userId  String  @id
+  enabled Boolean @default(true)
+  mode    String  @default("mention")
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model ChannelMute {
+  userId    String
+  channelId String
+  mutedAt   DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([userId, channelId])
+  @@index([userId])
+  @@index([channelId])
 }
 
 model Password {
@@ -78,6 +114,7 @@ model Channel {
   user                 User                  @relation(fields: [createdUserId], references: [id])
   ChannelJoin          ChannelJoin[]
   ChannelJoinOnDefault ChannelJoinOnDefault?
+  ChannelMute          ChannelMute[]
   ChannelViewableRole  ChannelViewableRole[]
   Message              Message[]
   MessageFileAttached  MessageFileAttached[]

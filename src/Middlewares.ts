@@ -1,8 +1,14 @@
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
+import webpush from "web-push";
 import { db } from ".";
 import type { Message } from "../prisma/generated/client";
 import { MessageUrlPreviewCreateManyMessageInput } from "../prisma/generated/models";
+import type {
+  PushPayload,
+  WebPushKeys,
+  WebPushSendResult,
+} from "./components/Notification/types";
 
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<string, { userId: string; isBanned: boolean; cachedAt: number }>();
@@ -42,6 +48,20 @@ setInterval(() => {
     }
   }
 }, ONE_MINUITE);
+
+//Web Push (VAPID) 初期化
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+let vapidReady = false;
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  vapidReady = true;
+} else {
+  console.warn(
+    "Middlewares :: WebPush : VAPID keys are not set. Web push is disabled.",
+  );
+}
 
 export namespace Middleware {
 
@@ -226,6 +246,45 @@ export namespace Middleware {
 
       //カウント増加
       bucket.count += 1;
+    });
+
+  export const WebPush = new Elysia({ name: "WebPush" })
+    .decorate("webpush", {
+      isReady: (): boolean => vapidReady,
+      getPublicKey: (): string => VAPID_PUBLIC_KEY,
+      sendToDevice: async (
+        endpoint: string,
+        keysJson: string | null,
+        payload: PushPayload,
+      ): Promise<WebPushSendResult> => {
+        if (!vapidReady) return { ok: false, invalidateToken: false };
+        if (!keysJson) return { ok: false, invalidateToken: true };
+
+        let keys: WebPushKeys;
+        try {
+          keys = JSON.parse(keysJson) as WebPushKeys;
+        } catch {
+          return { ok: false, invalidateToken: true };
+        }
+
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint,
+              keys: { p256dh: keys.p256dh, auth: keys.auth },
+            },
+            JSON.stringify(payload),
+          );
+          return { ok: true, invalidateToken: false };
+        } catch (e: unknown) {
+          const statusCode = (e as { statusCode?: number }).statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            return { ok: false, invalidateToken: true };
+          }
+          console.error("Middlewares :: WebPush : send error", endpoint, e);
+          return { ok: false, invalidateToken: false };
+        }
+      },
     });
 
   export const UrlPreviewControl = new Elysia({ name: "urlPreviewControl" })

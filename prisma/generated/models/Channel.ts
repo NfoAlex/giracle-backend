@@ -185,6 +185,7 @@ export type ChannelWhereInput = {
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   ChannelJoin?: Prisma.ChannelJoinListRelationFilter
   ChannelJoinOnDefault?: Prisma.XOR<Prisma.ChannelJoinOnDefaultNullableScalarRelationFilter, Prisma.ChannelJoinOnDefaultWhereInput> | null
+  ChannelMute?: Prisma.ChannelMuteListRelationFilter
   ChannelViewableRole?: Prisma.ChannelViewableRoleListRelationFilter
   Message?: Prisma.MessageListRelationFilter
   MessageFileAttached?: Prisma.MessageFileAttachedListRelationFilter
@@ -201,6 +202,7 @@ export type ChannelOrderByWithRelationInput = {
   user?: Prisma.UserOrderByWithRelationInput
   ChannelJoin?: Prisma.ChannelJoinOrderByRelationAggregateInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultOrderByWithRelationInput
+  ChannelMute?: Prisma.ChannelMuteOrderByRelationAggregateInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleOrderByRelationAggregateInput
   Message?: Prisma.MessageOrderByRelationAggregateInput
   MessageFileAttached?: Prisma.MessageFileAttachedOrderByRelationAggregateInput
@@ -220,6 +222,7 @@ export type ChannelWhereUniqueInput = Prisma.AtLeast<{
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   ChannelJoin?: Prisma.ChannelJoinListRelationFilter
   ChannelJoinOnDefault?: Prisma.XOR<Prisma.ChannelJoinOnDefaultNullableScalarRelationFilter, Prisma.ChannelJoinOnDefaultWhereInput> | null
+  ChannelMute?: Prisma.ChannelMuteListRelationFilter
   ChannelViewableRole?: Prisma.ChannelViewableRoleListRelationFilter
   Message?: Prisma.MessageListRelationFilter
   MessageFileAttached?: Prisma.MessageFileAttachedListRelationFilter
@@ -257,6 +260,7 @@ export type ChannelCreateInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -272,6 +276,7 @@ export type ChannelUncheckedCreateInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -287,6 +292,7 @@ export type ChannelUpdateInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -302,6 +308,7 @@ export type ChannelUncheckedUpdateInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -413,6 +420,20 @@ export type ChannelUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.ChannelScalarWhereInput | Prisma.ChannelScalarWhereInput[]
 }
 
+export type ChannelCreateNestedOneWithoutChannelMuteInput = {
+  create?: Prisma.XOR<Prisma.ChannelCreateWithoutChannelMuteInput, Prisma.ChannelUncheckedCreateWithoutChannelMuteInput>
+  connectOrCreate?: Prisma.ChannelCreateOrConnectWithoutChannelMuteInput
+  connect?: Prisma.ChannelWhereUniqueInput
+}
+
+export type ChannelUpdateOneRequiredWithoutChannelMuteNestedInput = {
+  create?: Prisma.XOR<Prisma.ChannelCreateWithoutChannelMuteInput, Prisma.ChannelUncheckedCreateWithoutChannelMuteInput>
+  connectOrCreate?: Prisma.ChannelCreateOrConnectWithoutChannelMuteInput
+  upsert?: Prisma.ChannelUpsertWithoutChannelMuteInput
+  connect?: Prisma.ChannelWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ChannelUpdateToOneWithWhereWithoutChannelMuteInput, Prisma.ChannelUpdateWithoutChannelMuteInput>, Prisma.ChannelUncheckedUpdateWithoutChannelMuteInput>
+}
+
 export type ChannelCreateNestedOneWithoutChannelViewableRoleInput = {
   create?: Prisma.XOR<Prisma.ChannelCreateWithoutChannelViewableRoleInput, Prisma.ChannelUncheckedCreateWithoutChannelViewableRoleInput>
   connectOrCreate?: Prisma.ChannelCreateOrConnectWithoutChannelViewableRoleInput
@@ -518,6 +539,7 @@ export type ChannelCreateWithoutUserInput = {
   isArchived?: boolean
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -532,6 +554,7 @@ export type ChannelUncheckedCreateWithoutUserInput = {
   isArchived?: boolean
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -575,6 +598,82 @@ export type ChannelScalarWhereInput = {
   createdUserId?: Prisma.StringFilter<"Channel"> | string
 }
 
+export type ChannelCreateWithoutChannelMuteInput = {
+  id?: string
+  name: string
+  description: string
+  isArchived?: boolean
+  user: Prisma.UserCreateNestedOneWithoutChannelInput
+  ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
+  ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
+  Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
+  MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
+  MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutChannelInput
+  MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutChannelInput
+}
+
+export type ChannelUncheckedCreateWithoutChannelMuteInput = {
+  id?: string
+  name: string
+  description: string
+  isArchived?: boolean
+  createdUserId: string
+  ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
+  ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
+  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
+  MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutChannelInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutChannelInput
+}
+
+export type ChannelCreateOrConnectWithoutChannelMuteInput = {
+  where: Prisma.ChannelWhereUniqueInput
+  create: Prisma.XOR<Prisma.ChannelCreateWithoutChannelMuteInput, Prisma.ChannelUncheckedCreateWithoutChannelMuteInput>
+}
+
+export type ChannelUpsertWithoutChannelMuteInput = {
+  update: Prisma.XOR<Prisma.ChannelUpdateWithoutChannelMuteInput, Prisma.ChannelUncheckedUpdateWithoutChannelMuteInput>
+  create: Prisma.XOR<Prisma.ChannelCreateWithoutChannelMuteInput, Prisma.ChannelUncheckedCreateWithoutChannelMuteInput>
+  where?: Prisma.ChannelWhereInput
+}
+
+export type ChannelUpdateToOneWithWhereWithoutChannelMuteInput = {
+  where?: Prisma.ChannelWhereInput
+  data: Prisma.XOR<Prisma.ChannelUpdateWithoutChannelMuteInput, Prisma.ChannelUncheckedUpdateWithoutChannelMuteInput>
+}
+
+export type ChannelUpdateWithoutChannelMuteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
+  ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
+  Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
+  MessageReaction?: Prisma.MessageReactionUpdateManyWithoutChannelNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutChannelNestedInput
+}
+
+export type ChannelUncheckedUpdateWithoutChannelMuteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
+  ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
+  Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
+  MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutChannelNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutChannelNestedInput
+}
+
 export type ChannelCreateWithoutChannelViewableRoleInput = {
   id?: string
   name: string
@@ -583,6 +682,7 @@ export type ChannelCreateWithoutChannelViewableRoleInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutChannelInput
@@ -597,6 +697,7 @@ export type ChannelUncheckedCreateWithoutChannelViewableRoleInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutChannelInput
@@ -627,6 +728,7 @@ export type ChannelUpdateWithoutChannelViewableRoleInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutChannelNestedInput
@@ -641,6 +743,7 @@ export type ChannelUncheckedUpdateWithoutChannelViewableRoleInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutChannelNestedInput
@@ -654,6 +757,7 @@ export type ChannelCreateWithoutChannelJoinInput = {
   isArchived?: boolean
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -668,6 +772,7 @@ export type ChannelUncheckedCreateWithoutChannelJoinInput = {
   isArchived?: boolean
   createdUserId: string
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -698,6 +803,7 @@ export type ChannelUpdateWithoutChannelJoinInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -712,6 +818,7 @@ export type ChannelUncheckedUpdateWithoutChannelJoinInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -727,6 +834,7 @@ export type ChannelCreateWithoutMessageReadTimeInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -741,6 +849,7 @@ export type ChannelUncheckedCreateWithoutMessageReadTimeInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -771,6 +880,7 @@ export type ChannelUpdateWithoutMessageReadTimeInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -785,6 +895,7 @@ export type ChannelUncheckedUpdateWithoutMessageReadTimeInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -799,6 +910,7 @@ export type ChannelCreateWithoutMessageFileAttachedInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutChannelInput
@@ -813,6 +925,7 @@ export type ChannelUncheckedCreateWithoutMessageFileAttachedInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutChannelInput
@@ -843,6 +956,7 @@ export type ChannelUpdateWithoutMessageFileAttachedInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutChannelNestedInput
@@ -857,6 +971,7 @@ export type ChannelUncheckedUpdateWithoutMessageFileAttachedInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutChannelNestedInput
@@ -871,6 +986,7 @@ export type ChannelCreateWithoutMessageReactionInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -885,6 +1001,7 @@ export type ChannelUncheckedCreateWithoutMessageReactionInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -915,6 +1032,7 @@ export type ChannelUpdateWithoutMessageReactionInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -929,6 +1047,7 @@ export type ChannelUncheckedUpdateWithoutMessageReactionInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -943,6 +1062,7 @@ export type ChannelCreateWithoutMessageInput = {
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutChannelInput
@@ -957,6 +1077,7 @@ export type ChannelUncheckedCreateWithoutMessageInput = {
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedCreateNestedOneWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutChannelInput
@@ -987,6 +1108,7 @@ export type ChannelUpdateWithoutMessageInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutChannelNestedInput
@@ -1001,6 +1123,7 @@ export type ChannelUncheckedUpdateWithoutMessageInput = {
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutChannelNestedInput
@@ -1014,6 +1137,7 @@ export type ChannelCreateWithoutChannelJoinOnDefaultInput = {
   isArchived?: boolean
   user: Prisma.UserCreateNestedOneWithoutChannelInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutChannelInput
@@ -1028,6 +1152,7 @@ export type ChannelUncheckedCreateWithoutChannelJoinOnDefaultInput = {
   isArchived?: boolean
   createdUserId: string
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutChannelInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutChannelInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedCreateNestedManyWithoutChannelInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutChannelInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutChannelInput
@@ -1058,6 +1183,7 @@ export type ChannelUpdateWithoutChannelJoinOnDefaultInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneRequiredWithoutChannelNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -1072,6 +1198,7 @@ export type ChannelUncheckedUpdateWithoutChannelJoinOnDefaultInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdUserId?: Prisma.StringFieldUpdateOperationsInput | string
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -1093,6 +1220,7 @@ export type ChannelUpdateWithoutUserInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutChannelNestedInput
@@ -1107,6 +1235,7 @@ export type ChannelUncheckedUpdateWithoutUserInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutChannelNestedInput
   ChannelJoinOnDefault?: Prisma.ChannelJoinOnDefaultUncheckedUpdateOneWithoutChannelNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutChannelNestedInput
   ChannelViewableRole?: Prisma.ChannelViewableRoleUncheckedUpdateManyWithoutChannelNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutChannelNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutChannelNestedInput
@@ -1128,6 +1257,7 @@ export type ChannelUncheckedUpdateManyWithoutUserInput = {
 
 export type ChannelCountOutputType = {
   ChannelJoin: number
+  ChannelMute: number
   ChannelViewableRole: number
   Message: number
   MessageFileAttached: number
@@ -1137,6 +1267,7 @@ export type ChannelCountOutputType = {
 
 export type ChannelCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   ChannelJoin?: boolean | ChannelCountOutputTypeCountChannelJoinArgs
+  ChannelMute?: boolean | ChannelCountOutputTypeCountChannelMuteArgs
   ChannelViewableRole?: boolean | ChannelCountOutputTypeCountChannelViewableRoleArgs
   Message?: boolean | ChannelCountOutputTypeCountMessageArgs
   MessageFileAttached?: boolean | ChannelCountOutputTypeCountMessageFileAttachedArgs
@@ -1159,6 +1290,13 @@ export type ChannelCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Exte
  */
 export type ChannelCountOutputTypeCountChannelJoinArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ChannelJoinWhereInput
+}
+
+/**
+ * ChannelCountOutputType without action
+ */
+export type ChannelCountOutputTypeCountChannelMuteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ChannelMuteWhereInput
 }
 
 /**
@@ -1206,6 +1344,7 @@ export type ChannelSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   ChannelJoin?: boolean | Prisma.Channel$ChannelJoinArgs<ExtArgs>
   ChannelJoinOnDefault?: boolean | Prisma.Channel$ChannelJoinOnDefaultArgs<ExtArgs>
+  ChannelMute?: boolean | Prisma.Channel$ChannelMuteArgs<ExtArgs>
   ChannelViewableRole?: boolean | Prisma.Channel$ChannelViewableRoleArgs<ExtArgs>
   Message?: boolean | Prisma.Channel$MessageArgs<ExtArgs>
   MessageFileAttached?: boolean | Prisma.Channel$MessageFileAttachedArgs<ExtArgs>
@@ -1245,6 +1384,7 @@ export type ChannelInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   ChannelJoin?: boolean | Prisma.Channel$ChannelJoinArgs<ExtArgs>
   ChannelJoinOnDefault?: boolean | Prisma.Channel$ChannelJoinOnDefaultArgs<ExtArgs>
+  ChannelMute?: boolean | Prisma.Channel$ChannelMuteArgs<ExtArgs>
   ChannelViewableRole?: boolean | Prisma.Channel$ChannelViewableRoleArgs<ExtArgs>
   Message?: boolean | Prisma.Channel$MessageArgs<ExtArgs>
   MessageFileAttached?: boolean | Prisma.Channel$MessageFileAttachedArgs<ExtArgs>
@@ -1265,6 +1405,7 @@ export type $ChannelPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     user: Prisma.$UserPayload<ExtArgs>
     ChannelJoin: Prisma.$ChannelJoinPayload<ExtArgs>[]
     ChannelJoinOnDefault: Prisma.$ChannelJoinOnDefaultPayload<ExtArgs> | null
+    ChannelMute: Prisma.$ChannelMutePayload<ExtArgs>[]
     ChannelViewableRole: Prisma.$ChannelViewableRolePayload<ExtArgs>[]
     Message: Prisma.$MessagePayload<ExtArgs>[]
     MessageFileAttached: Prisma.$MessageFileAttachedPayload<ExtArgs>[]
@@ -1674,6 +1815,7 @@ export interface Prisma__ChannelClient<T, Null = never, ExtArgs extends runtime.
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   ChannelJoin<T extends Prisma.Channel$ChannelJoinArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$ChannelJoinArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelJoinPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   ChannelJoinOnDefault<T extends Prisma.Channel$ChannelJoinOnDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$ChannelJoinOnDefaultArgs<ExtArgs>>): Prisma.Prisma__ChannelJoinOnDefaultClient<runtime.Types.Result.GetResult<Prisma.$ChannelJoinOnDefaultPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  ChannelMute<T extends Prisma.Channel$ChannelMuteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$ChannelMuteArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelMutePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   ChannelViewableRole<T extends Prisma.Channel$ChannelViewableRoleArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$ChannelViewableRoleArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelViewableRolePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   Message<T extends Prisma.Channel$MessageArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$MessageArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   MessageFileAttached<T extends Prisma.Channel$MessageFileAttachedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Channel$MessageFileAttachedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessageFileAttachedPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2152,6 +2294,30 @@ export type Channel$ChannelJoinOnDefaultArgs<ExtArgs extends runtime.Types.Exten
    */
   include?: Prisma.ChannelJoinOnDefaultInclude<ExtArgs> | null
   where?: Prisma.ChannelJoinOnDefaultWhereInput
+}
+
+/**
+ * Channel.ChannelMute
+ */
+export type Channel$ChannelMuteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ChannelMute
+   */
+  select?: Prisma.ChannelMuteSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ChannelMute
+   */
+  omit?: Prisma.ChannelMuteOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ChannelMuteInclude<ExtArgs> | null
+  where?: Prisma.ChannelMuteWhereInput
+  orderBy?: Prisma.ChannelMuteOrderByWithRelationInput | Prisma.ChannelMuteOrderByWithRelationInput[]
+  cursor?: Prisma.ChannelMuteWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ChannelMuteScalarFieldEnum | Prisma.ChannelMuteScalarFieldEnum[]
 }
 
 /**

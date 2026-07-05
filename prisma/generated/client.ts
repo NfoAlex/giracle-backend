@@ -47,6 +47,21 @@ export { Prisma }
  */
 export type User = Prisma.UserModel
 /**
+ * Model NotificationDevice
+ * 
+ */
+export type NotificationDevice = Prisma.NotificationDeviceModel
+/**
+ * Model NotificationConfig
+ * 
+ */
+export type NotificationConfig = Prisma.NotificationConfigModel
+/**
+ * Model ChannelMute
+ * 
+ */
+export type ChannelMute = Prisma.ChannelMuteModel
+/**
  * Model Password
  * 
  */

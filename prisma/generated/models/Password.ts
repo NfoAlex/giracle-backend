@@ -363,14 +363,6 @@ export type PasswordUncheckedUpdateOneWithoutUserNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PasswordUpdateToOneWithWhereWithoutUserInput, Prisma.PasswordUpdateWithoutUserInput>, Prisma.PasswordUncheckedUpdateWithoutUserInput>
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type PasswordCreateWithoutUserInput = {
   password: string
   salt: string

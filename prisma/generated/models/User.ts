@@ -176,6 +176,7 @@ export type UserWhereInput = {
   isBanned?: Prisma.BoolFilter<"User"> | boolean
   Channel?: Prisma.ChannelListRelationFilter
   ChannelJoin?: Prisma.ChannelJoinListRelationFilter
+  ChannelMute?: Prisma.ChannelMuteListRelationFilter
   CustomEmoji?: Prisma.CustomEmojiListRelationFilter
   Inbox?: Prisma.InboxListRelationFilter
   Invitation?: Prisma.InvitationListRelationFilter
@@ -183,6 +184,8 @@ export type UserWhereInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedListRelationFilter
   MessageReaction?: Prisma.MessageReactionListRelationFilter
   MessageReadTime?: Prisma.MessageReadTimeListRelationFilter
+  NotificationConfig?: Prisma.XOR<Prisma.NotificationConfigNullableScalarRelationFilter, Prisma.NotificationConfigWhereInput> | null
+  NotificationDevice?: Prisma.NotificationDeviceListRelationFilter
   password?: Prisma.XOR<Prisma.PasswordNullableScalarRelationFilter, Prisma.PasswordWhereInput> | null
   RoleInfo?: Prisma.RoleInfoListRelationFilter
   RoleLink?: Prisma.RoleLinkListRelationFilter
@@ -196,6 +199,7 @@ export type UserOrderByWithRelationInput = {
   isBanned?: Prisma.SortOrder
   Channel?: Prisma.ChannelOrderByRelationAggregateInput
   ChannelJoin?: Prisma.ChannelJoinOrderByRelationAggregateInput
+  ChannelMute?: Prisma.ChannelMuteOrderByRelationAggregateInput
   CustomEmoji?: Prisma.CustomEmojiOrderByRelationAggregateInput
   Inbox?: Prisma.InboxOrderByRelationAggregateInput
   Invitation?: Prisma.InvitationOrderByRelationAggregateInput
@@ -203,6 +207,8 @@ export type UserOrderByWithRelationInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedOrderByRelationAggregateInput
   MessageReaction?: Prisma.MessageReactionOrderByRelationAggregateInput
   MessageReadTime?: Prisma.MessageReadTimeOrderByRelationAggregateInput
+  NotificationConfig?: Prisma.NotificationConfigOrderByWithRelationInput
+  NotificationDevice?: Prisma.NotificationDeviceOrderByRelationAggregateInput
   password?: Prisma.PasswordOrderByWithRelationInput
   RoleInfo?: Prisma.RoleInfoOrderByRelationAggregateInput
   RoleLink?: Prisma.RoleLinkOrderByRelationAggregateInput
@@ -219,6 +225,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   isBanned?: Prisma.BoolFilter<"User"> | boolean
   Channel?: Prisma.ChannelListRelationFilter
   ChannelJoin?: Prisma.ChannelJoinListRelationFilter
+  ChannelMute?: Prisma.ChannelMuteListRelationFilter
   CustomEmoji?: Prisma.CustomEmojiListRelationFilter
   Inbox?: Prisma.InboxListRelationFilter
   Invitation?: Prisma.InvitationListRelationFilter
@@ -226,6 +233,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   MessageFileAttached?: Prisma.MessageFileAttachedListRelationFilter
   MessageReaction?: Prisma.MessageReactionListRelationFilter
   MessageReadTime?: Prisma.MessageReadTimeListRelationFilter
+  NotificationConfig?: Prisma.XOR<Prisma.NotificationConfigNullableScalarRelationFilter, Prisma.NotificationConfigWhereInput> | null
+  NotificationDevice?: Prisma.NotificationDeviceListRelationFilter
   password?: Prisma.XOR<Prisma.PasswordNullableScalarRelationFilter, Prisma.PasswordWhereInput> | null
   RoleInfo?: Prisma.RoleInfoListRelationFilter
   RoleLink?: Prisma.RoleLinkListRelationFilter
@@ -259,6 +268,7 @@ export type UserCreateInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -266,6 +276,8 @@ export type UserCreateInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -279,6 +291,7 @@ export type UserUncheckedCreateInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -286,6 +299,8 @@ export type UserUncheckedCreateInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -299,6 +314,7 @@ export type UserUpdateInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -306,6 +322,8 @@ export type UserUpdateInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -319,6 +337,7 @@ export type UserUncheckedUpdateInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -326,6 +345,8 @@ export type UserUncheckedUpdateInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -389,6 +410,48 @@ export type NullableStringFieldUpdateOperationsInput = {
 
 export type BoolFieldUpdateOperationsInput = {
   set?: boolean
+}
+
+export type UserCreateNestedOneWithoutNotificationDeviceInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutNotificationDeviceInput, Prisma.UserUncheckedCreateWithoutNotificationDeviceInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutNotificationDeviceInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutNotificationDeviceNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutNotificationDeviceInput, Prisma.UserUncheckedCreateWithoutNotificationDeviceInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutNotificationDeviceInput
+  upsert?: Prisma.UserUpsertWithoutNotificationDeviceInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutNotificationDeviceInput, Prisma.UserUpdateWithoutNotificationDeviceInput>, Prisma.UserUncheckedUpdateWithoutNotificationDeviceInput>
+}
+
+export type UserCreateNestedOneWithoutNotificationConfigInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutNotificationConfigInput, Prisma.UserUncheckedCreateWithoutNotificationConfigInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutNotificationConfigInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutNotificationConfigNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutNotificationConfigInput, Prisma.UserUncheckedCreateWithoutNotificationConfigInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutNotificationConfigInput
+  upsert?: Prisma.UserUpsertWithoutNotificationConfigInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutNotificationConfigInput, Prisma.UserUpdateWithoutNotificationConfigInput>, Prisma.UserUncheckedUpdateWithoutNotificationConfigInput>
+}
+
+export type UserCreateNestedOneWithoutChannelMuteInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutChannelMuteInput, Prisma.UserUncheckedCreateWithoutChannelMuteInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutChannelMuteInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutChannelMuteNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutChannelMuteInput, Prisma.UserUncheckedCreateWithoutChannelMuteInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutChannelMuteInput
+  upsert?: Prisma.UserUpsertWithoutChannelMuteInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutChannelMuteInput, Prisma.UserUpdateWithoutChannelMuteInput>, Prisma.UserUncheckedUpdateWithoutChannelMuteInput>
 }
 
 export type UserCreateNestedOneWithoutPasswordInput = {
@@ -573,7 +636,215 @@ export type UserUpdateOneRequiredWithoutInvitationNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInvitationInput, Prisma.UserUpdateWithoutInvitationInput>, Prisma.UserUncheckedUpdateWithoutInvitationInput>
 }
 
-export type UserCreateWithoutPasswordInput = {
+export type UserCreateWithoutNotificationDeviceInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  password?: Prisma.PasswordCreateNestedOneWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutNotificationDeviceInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutNotificationDeviceInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutNotificationDeviceInput, Prisma.UserUncheckedCreateWithoutNotificationDeviceInput>
+}
+
+export type UserUpsertWithoutNotificationDeviceInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutNotificationDeviceInput, Prisma.UserUncheckedUpdateWithoutNotificationDeviceInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutNotificationDeviceInput, Prisma.UserUncheckedCreateWithoutNotificationDeviceInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutNotificationDeviceInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutNotificationDeviceInput, Prisma.UserUncheckedUpdateWithoutNotificationDeviceInput>
+}
+
+export type UserUpdateWithoutNotificationDeviceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutNotificationDeviceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutNotificationConfigInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
+  password?: Prisma.PasswordCreateNestedOneWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutNotificationConfigInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
+  password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutNotificationConfigInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutNotificationConfigInput, Prisma.UserUncheckedCreateWithoutNotificationConfigInput>
+}
+
+export type UserUpsertWithoutNotificationConfigInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutNotificationConfigInput, Prisma.UserUncheckedUpdateWithoutNotificationConfigInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutNotificationConfigInput, Prisma.UserUncheckedCreateWithoutNotificationConfigInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutNotificationConfigInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutNotificationConfigInput, Prisma.UserUncheckedUpdateWithoutNotificationConfigInput>
+}
+
+export type UserUpdateWithoutNotificationConfigInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
+  password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutNotificationConfigInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
+  password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutChannelMuteInput = {
   id?: string
   name?: string | null
   selfIntroduction: string
@@ -587,12 +858,15 @@ export type UserCreateWithoutPasswordInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
+  password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenCreateNestedManyWithoutUserInput
 }
 
-export type UserUncheckedCreateWithoutPasswordInput = {
+export type UserUncheckedCreateWithoutChannelMuteInput = {
   id?: string
   name?: string | null
   selfIntroduction: string
@@ -606,6 +880,113 @@ export type UserUncheckedCreateWithoutPasswordInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
+  password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutChannelMuteInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutChannelMuteInput, Prisma.UserUncheckedCreateWithoutChannelMuteInput>
+}
+
+export type UserUpsertWithoutChannelMuteInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutChannelMuteInput, Prisma.UserUncheckedUpdateWithoutChannelMuteInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutChannelMuteInput, Prisma.UserUncheckedCreateWithoutChannelMuteInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutChannelMuteInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutChannelMuteInput, Prisma.UserUncheckedUpdateWithoutChannelMuteInput>
+}
+
+export type UserUpdateWithoutChannelMuteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
+  password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutChannelMuteInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
+  isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
+  Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
+  Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
+  Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
+  MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
+  password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
+  RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
+  RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
+  Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutPasswordInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
+  RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
+  RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
+  Token?: Prisma.TokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutPasswordInput = {
+  id?: string
+  name?: string | null
+  selfIntroduction: string
+  isBanned?: boolean
+  Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
+  ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
+  CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
+  Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
+  Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
+  Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
+  MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
+  MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
+  MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
@@ -634,6 +1015,7 @@ export type UserUpdateWithoutPasswordInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -641,6 +1023,8 @@ export type UserUpdateWithoutPasswordInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
@@ -653,6 +1037,7 @@ export type UserUncheckedUpdateWithoutPasswordInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -660,6 +1045,8 @@ export type UserUncheckedUpdateWithoutPasswordInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
@@ -672,6 +1059,7 @@ export type UserCreateWithoutTokenInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -679,6 +1067,8 @@ export type UserCreateWithoutTokenInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -691,6 +1081,7 @@ export type UserUncheckedCreateWithoutTokenInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -698,6 +1089,8 @@ export type UserUncheckedCreateWithoutTokenInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -726,6 +1119,7 @@ export type UserUpdateWithoutTokenInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -733,6 +1127,8 @@ export type UserUpdateWithoutTokenInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -745,6 +1141,7 @@ export type UserUncheckedUpdateWithoutTokenInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -752,6 +1149,8 @@ export type UserUncheckedUpdateWithoutTokenInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -763,6 +1162,7 @@ export type UserCreateWithoutChannelJoinInput = {
   selfIntroduction: string
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -770,6 +1170,8 @@ export type UserCreateWithoutChannelJoinInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -782,6 +1184,7 @@ export type UserUncheckedCreateWithoutChannelJoinInput = {
   selfIntroduction: string
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -789,6 +1192,8 @@ export type UserUncheckedCreateWithoutChannelJoinInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -817,6 +1222,7 @@ export type UserUpdateWithoutChannelJoinInput = {
   selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -824,6 +1230,8 @@ export type UserUpdateWithoutChannelJoinInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -836,6 +1244,7 @@ export type UserUncheckedUpdateWithoutChannelJoinInput = {
   selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -843,6 +1252,8 @@ export type UserUncheckedUpdateWithoutChannelJoinInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -855,6 +1266,7 @@ export type UserCreateWithoutChannelInput = {
   selfIntroduction: string
   isBanned?: boolean
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -862,6 +1274,8 @@ export type UserCreateWithoutChannelInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -874,6 +1288,7 @@ export type UserUncheckedCreateWithoutChannelInput = {
   selfIntroduction: string
   isBanned?: boolean
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -881,6 +1296,8 @@ export type UserUncheckedCreateWithoutChannelInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -909,6 +1326,7 @@ export type UserUpdateWithoutChannelInput = {
   selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -916,6 +1334,8 @@ export type UserUpdateWithoutChannelInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -928,6 +1348,7 @@ export type UserUncheckedUpdateWithoutChannelInput = {
   selfIntroduction?: Prisma.StringFieldUpdateOperationsInput | string
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -935,6 +1356,8 @@ export type UserUncheckedUpdateWithoutChannelInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -948,12 +1371,15 @@ export type UserCreateWithoutMessageReadTimeInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -967,12 +1393,15 @@ export type UserUncheckedCreateWithoutMessageReadTimeInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1002,12 +1431,15 @@ export type UserUpdateWithoutMessageReadTimeInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1021,12 +1453,15 @@ export type UserUncheckedUpdateWithoutMessageReadTimeInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1040,12 +1475,15 @@ export type UserCreateWithoutMessageFileAttachedInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1059,12 +1497,15 @@ export type UserUncheckedCreateWithoutMessageFileAttachedInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1094,12 +1535,15 @@ export type UserUpdateWithoutMessageFileAttachedInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1113,12 +1557,15 @@ export type UserUncheckedUpdateWithoutMessageFileAttachedInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1132,12 +1579,15 @@ export type UserCreateWithoutMessageReactionInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1151,12 +1601,15 @@ export type UserUncheckedCreateWithoutMessageReactionInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1186,12 +1639,15 @@ export type UserUpdateWithoutMessageReactionInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1205,12 +1661,15 @@ export type UserUncheckedUpdateWithoutMessageReactionInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1224,12 +1683,15 @@ export type UserCreateWithoutInboxInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1243,12 +1705,15 @@ export type UserUncheckedCreateWithoutInboxInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1278,12 +1743,15 @@ export type UserUpdateWithoutInboxInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1297,12 +1765,15 @@ export type UserUncheckedUpdateWithoutInboxInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1316,12 +1787,15 @@ export type UserCreateWithoutMessageInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1335,12 +1809,15 @@ export type UserUncheckedCreateWithoutMessageInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1370,12 +1847,15 @@ export type UserUpdateWithoutMessageInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1389,12 +1869,15 @@ export type UserUncheckedUpdateWithoutMessageInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1408,12 +1891,15 @@ export type UserCreateWithoutCustomEmojiInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1427,12 +1913,15 @@ export type UserUncheckedCreateWithoutCustomEmojiInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1462,12 +1951,15 @@ export type UserUpdateWithoutCustomEmojiInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1481,12 +1973,15 @@ export type UserUncheckedUpdateWithoutCustomEmojiInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1500,6 +1995,7 @@ export type UserCreateWithoutRoleLinkInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -1507,6 +2003,8 @@ export type UserCreateWithoutRoleLinkInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenCreateNestedManyWithoutUserInput
@@ -1519,6 +2017,7 @@ export type UserUncheckedCreateWithoutRoleLinkInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -1526,6 +2025,8 @@ export type UserUncheckedCreateWithoutRoleLinkInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
@@ -1554,6 +2055,7 @@ export type UserUpdateWithoutRoleLinkInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -1561,6 +2063,8 @@ export type UserUpdateWithoutRoleLinkInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
@@ -1573,6 +2077,7 @@ export type UserUncheckedUpdateWithoutRoleLinkInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -1580,6 +2085,8 @@ export type UserUncheckedUpdateWithoutRoleLinkInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
@@ -1592,6 +2099,7 @@ export type UserCreateWithoutRoleInfoInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationCreateNestedManyWithoutUserInput
@@ -1599,6 +2107,8 @@ export type UserCreateWithoutRoleInfoInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenCreateNestedManyWithoutUserInput
@@ -1611,6 +2121,7 @@ export type UserUncheckedCreateWithoutRoleInfoInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Invitation?: Prisma.InvitationUncheckedCreateNestedManyWithoutUserInput
@@ -1618,6 +2129,8 @@ export type UserUncheckedCreateWithoutRoleInfoInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
   Token?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
@@ -1646,6 +2159,7 @@ export type UserUpdateWithoutRoleInfoInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUpdateManyWithoutUserNestedInput
@@ -1653,6 +2167,8 @@ export type UserUpdateWithoutRoleInfoInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUpdateManyWithoutUserNestedInput
@@ -1665,6 +2181,7 @@ export type UserUncheckedUpdateWithoutRoleInfoInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Invitation?: Prisma.InvitationUncheckedUpdateManyWithoutUserNestedInput
@@ -1672,6 +2189,8 @@ export type UserUncheckedUpdateWithoutRoleInfoInput = {
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
   Token?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
@@ -1684,12 +2203,15 @@ export type UserCreateWithoutInvitationInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkCreateNestedManyWithoutUserInput
@@ -1703,12 +2225,15 @@ export type UserUncheckedCreateWithoutInvitationInput = {
   isBanned?: boolean
   Channel?: Prisma.ChannelUncheckedCreateNestedManyWithoutUserInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedCreateNestedManyWithoutUserInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedCreateNestedManyWithoutUserInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedCreateNestedManyWithoutUserInput
   Inbox?: Prisma.InboxUncheckedCreateNestedManyWithoutUserInput
   Message?: Prisma.MessageUncheckedCreateNestedManyWithoutUserInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedCreateNestedManyWithoutUserInput
   MessageReaction?: Prisma.MessageReactionUncheckedCreateNestedManyWithoutUserInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedCreateNestedManyWithoutUserInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedCreateNestedOneWithoutUserInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedCreateNestedManyWithoutUserInput
   password?: Prisma.PasswordUncheckedCreateNestedOneWithoutUserInput
   RoleInfo?: Prisma.RoleInfoUncheckedCreateNestedManyWithoutUserInput
   RoleLink?: Prisma.RoleLinkUncheckedCreateNestedManyWithoutUserInput
@@ -1738,12 +2263,15 @@ export type UserUpdateWithoutInvitationInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUpdateManyWithoutUserNestedInput
@@ -1757,12 +2285,15 @@ export type UserUncheckedUpdateWithoutInvitationInput = {
   isBanned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   Channel?: Prisma.ChannelUncheckedUpdateManyWithoutUserNestedInput
   ChannelJoin?: Prisma.ChannelJoinUncheckedUpdateManyWithoutUserNestedInput
+  ChannelMute?: Prisma.ChannelMuteUncheckedUpdateManyWithoutUserNestedInput
   CustomEmoji?: Prisma.CustomEmojiUncheckedUpdateManyWithoutUserNestedInput
   Inbox?: Prisma.InboxUncheckedUpdateManyWithoutUserNestedInput
   Message?: Prisma.MessageUncheckedUpdateManyWithoutUserNestedInput
   MessageFileAttached?: Prisma.MessageFileAttachedUncheckedUpdateManyWithoutUserNestedInput
   MessageReaction?: Prisma.MessageReactionUncheckedUpdateManyWithoutUserNestedInput
   MessageReadTime?: Prisma.MessageReadTimeUncheckedUpdateManyWithoutUserNestedInput
+  NotificationConfig?: Prisma.NotificationConfigUncheckedUpdateOneWithoutUserNestedInput
+  NotificationDevice?: Prisma.NotificationDeviceUncheckedUpdateManyWithoutUserNestedInput
   password?: Prisma.PasswordUncheckedUpdateOneWithoutUserNestedInput
   RoleInfo?: Prisma.RoleInfoUncheckedUpdateManyWithoutUserNestedInput
   RoleLink?: Prisma.RoleLinkUncheckedUpdateManyWithoutUserNestedInput
@@ -1777,6 +2308,7 @@ export type UserUncheckedUpdateWithoutInvitationInput = {
 export type UserCountOutputType = {
   Channel: number
   ChannelJoin: number
+  ChannelMute: number
   CustomEmoji: number
   Inbox: number
   Invitation: number
@@ -1784,6 +2316,7 @@ export type UserCountOutputType = {
   MessageFileAttached: number
   MessageReaction: number
   MessageReadTime: number
+  NotificationDevice: number
   RoleInfo: number
   RoleLink: number
   Token: number
@@ -1792,6 +2325,7 @@ export type UserCountOutputType = {
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   Channel?: boolean | UserCountOutputTypeCountChannelArgs
   ChannelJoin?: boolean | UserCountOutputTypeCountChannelJoinArgs
+  ChannelMute?: boolean | UserCountOutputTypeCountChannelMuteArgs
   CustomEmoji?: boolean | UserCountOutputTypeCountCustomEmojiArgs
   Inbox?: boolean | UserCountOutputTypeCountInboxArgs
   Invitation?: boolean | UserCountOutputTypeCountInvitationArgs
@@ -1799,6 +2333,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   MessageFileAttached?: boolean | UserCountOutputTypeCountMessageFileAttachedArgs
   MessageReaction?: boolean | UserCountOutputTypeCountMessageReactionArgs
   MessageReadTime?: boolean | UserCountOutputTypeCountMessageReadTimeArgs
+  NotificationDevice?: boolean | UserCountOutputTypeCountNotificationDeviceArgs
   RoleInfo?: boolean | UserCountOutputTypeCountRoleInfoArgs
   RoleLink?: boolean | UserCountOutputTypeCountRoleLinkArgs
   Token?: boolean | UserCountOutputTypeCountTokenArgs
@@ -1826,6 +2361,13 @@ export type UserCountOutputTypeCountChannelArgs<ExtArgs extends runtime.Types.Ex
  */
 export type UserCountOutputTypeCountChannelJoinArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ChannelJoinWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountChannelMuteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ChannelMuteWhereInput
 }
 
 /**
@@ -1880,6 +2422,13 @@ export type UserCountOutputTypeCountMessageReadTimeArgs<ExtArgs extends runtime.
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountNotificationDeviceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.NotificationDeviceWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountRoleInfoArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.RoleInfoWhereInput
 }
@@ -1906,6 +2455,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   isBanned?: boolean
   Channel?: boolean | Prisma.User$ChannelArgs<ExtArgs>
   ChannelJoin?: boolean | Prisma.User$ChannelJoinArgs<ExtArgs>
+  ChannelMute?: boolean | Prisma.User$ChannelMuteArgs<ExtArgs>
   CustomEmoji?: boolean | Prisma.User$CustomEmojiArgs<ExtArgs>
   Inbox?: boolean | Prisma.User$InboxArgs<ExtArgs>
   Invitation?: boolean | Prisma.User$InvitationArgs<ExtArgs>
@@ -1913,6 +2463,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   MessageFileAttached?: boolean | Prisma.User$MessageFileAttachedArgs<ExtArgs>
   MessageReaction?: boolean | Prisma.User$MessageReactionArgs<ExtArgs>
   MessageReadTime?: boolean | Prisma.User$MessageReadTimeArgs<ExtArgs>
+  NotificationConfig?: boolean | Prisma.User$NotificationConfigArgs<ExtArgs>
+  NotificationDevice?: boolean | Prisma.User$NotificationDeviceArgs<ExtArgs>
   password?: boolean | Prisma.User$passwordArgs<ExtArgs>
   RoleInfo?: boolean | Prisma.User$RoleInfoArgs<ExtArgs>
   RoleLink?: boolean | Prisma.User$RoleLinkArgs<ExtArgs>
@@ -1945,6 +2497,7 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   Channel?: boolean | Prisma.User$ChannelArgs<ExtArgs>
   ChannelJoin?: boolean | Prisma.User$ChannelJoinArgs<ExtArgs>
+  ChannelMute?: boolean | Prisma.User$ChannelMuteArgs<ExtArgs>
   CustomEmoji?: boolean | Prisma.User$CustomEmojiArgs<ExtArgs>
   Inbox?: boolean | Prisma.User$InboxArgs<ExtArgs>
   Invitation?: boolean | Prisma.User$InvitationArgs<ExtArgs>
@@ -1952,6 +2505,8 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   MessageFileAttached?: boolean | Prisma.User$MessageFileAttachedArgs<ExtArgs>
   MessageReaction?: boolean | Prisma.User$MessageReactionArgs<ExtArgs>
   MessageReadTime?: boolean | Prisma.User$MessageReadTimeArgs<ExtArgs>
+  NotificationConfig?: boolean | Prisma.User$NotificationConfigArgs<ExtArgs>
+  NotificationDevice?: boolean | Prisma.User$NotificationDeviceArgs<ExtArgs>
   password?: boolean | Prisma.User$passwordArgs<ExtArgs>
   RoleInfo?: boolean | Prisma.User$RoleInfoArgs<ExtArgs>
   RoleLink?: boolean | Prisma.User$RoleLinkArgs<ExtArgs>
@@ -1966,6 +2521,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     Channel: Prisma.$ChannelPayload<ExtArgs>[]
     ChannelJoin: Prisma.$ChannelJoinPayload<ExtArgs>[]
+    ChannelMute: Prisma.$ChannelMutePayload<ExtArgs>[]
     CustomEmoji: Prisma.$CustomEmojiPayload<ExtArgs>[]
     Inbox: Prisma.$InboxPayload<ExtArgs>[]
     Invitation: Prisma.$InvitationPayload<ExtArgs>[]
@@ -1973,6 +2529,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     MessageFileAttached: Prisma.$MessageFileAttachedPayload<ExtArgs>[]
     MessageReaction: Prisma.$MessageReactionPayload<ExtArgs>[]
     MessageReadTime: Prisma.$MessageReadTimePayload<ExtArgs>[]
+    NotificationConfig: Prisma.$NotificationConfigPayload<ExtArgs> | null
+    NotificationDevice: Prisma.$NotificationDevicePayload<ExtArgs>[]
     password: Prisma.$PasswordPayload<ExtArgs> | null
     RoleInfo: Prisma.$RoleInfoPayload<ExtArgs>[]
     RoleLink: Prisma.$RoleLinkPayload<ExtArgs>[]
@@ -2379,6 +2937,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   Channel<T extends Prisma.User$ChannelArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ChannelArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   ChannelJoin<T extends Prisma.User$ChannelJoinArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ChannelJoinArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelJoinPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  ChannelMute<T extends Prisma.User$ChannelMuteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ChannelMuteArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChannelMutePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   CustomEmoji<T extends Prisma.User$CustomEmojiArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$CustomEmojiArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CustomEmojiPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   Inbox<T extends Prisma.User$InboxArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$InboxArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InboxPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   Invitation<T extends Prisma.User$InvitationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$InvitationArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvitationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2386,6 +2945,8 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   MessageFileAttached<T extends Prisma.User$MessageFileAttachedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$MessageFileAttachedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessageFileAttachedPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   MessageReaction<T extends Prisma.User$MessageReactionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$MessageReactionArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessageReactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   MessageReadTime<T extends Prisma.User$MessageReadTimeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$MessageReadTimeArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessageReadTimePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  NotificationConfig<T extends Prisma.User$NotificationConfigArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$NotificationConfigArgs<ExtArgs>>): Prisma.Prisma__NotificationConfigClient<runtime.Types.Result.GetResult<Prisma.$NotificationConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  NotificationDevice<T extends Prisma.User$NotificationDeviceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$NotificationDeviceArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   password<T extends Prisma.User$passwordArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$passwordArgs<ExtArgs>>): Prisma.Prisma__PasswordClient<runtime.Types.Result.GetResult<Prisma.$PasswordPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   RoleInfo<T extends Prisma.User$RoleInfoArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$RoleInfoArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleInfoPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   RoleLink<T extends Prisma.User$RoleLinkArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$RoleLinkArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RoleLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2862,6 +3423,30 @@ export type User$ChannelJoinArgs<ExtArgs extends runtime.Types.Extensions.Intern
 }
 
 /**
+ * User.ChannelMute
+ */
+export type User$ChannelMuteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ChannelMute
+   */
+  select?: Prisma.ChannelMuteSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ChannelMute
+   */
+  omit?: Prisma.ChannelMuteOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ChannelMuteInclude<ExtArgs> | null
+  where?: Prisma.ChannelMuteWhereInput
+  orderBy?: Prisma.ChannelMuteOrderByWithRelationInput | Prisma.ChannelMuteOrderByWithRelationInput[]
+  cursor?: Prisma.ChannelMuteWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ChannelMuteScalarFieldEnum | Prisma.ChannelMuteScalarFieldEnum[]
+}
+
+/**
  * User.CustomEmoji
  */
 export type User$CustomEmojiArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3027,6 +3612,49 @@ export type User$MessageReadTimeArgs<ExtArgs extends runtime.Types.Extensions.In
   take?: number
   skip?: number
   distinct?: Prisma.MessageReadTimeScalarFieldEnum | Prisma.MessageReadTimeScalarFieldEnum[]
+}
+
+/**
+ * User.NotificationConfig
+ */
+export type User$NotificationConfigArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the NotificationConfig
+   */
+  select?: Prisma.NotificationConfigSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the NotificationConfig
+   */
+  omit?: Prisma.NotificationConfigOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.NotificationConfigInclude<ExtArgs> | null
+  where?: Prisma.NotificationConfigWhereInput
+}
+
+/**
+ * User.NotificationDevice
+ */
+export type User$NotificationDeviceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the NotificationDevice
+   */
+  select?: Prisma.NotificationDeviceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the NotificationDevice
+   */
+  omit?: Prisma.NotificationDeviceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.NotificationDeviceInclude<ExtArgs> | null
+  where?: Prisma.NotificationDeviceWhereInput
+  orderBy?: Prisma.NotificationDeviceOrderByWithRelationInput | Prisma.NotificationDeviceOrderByWithRelationInput[]
+  cursor?: Prisma.NotificationDeviceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.NotificationDeviceScalarFieldEnum | Prisma.NotificationDeviceScalarFieldEnum[]
 }
 
 /**
