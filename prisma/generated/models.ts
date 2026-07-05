@@ -9,6 +9,9 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/User.js'
+export type * from './models/NotificationDevice.js'
+export type * from './models/NotificationConfig.js'
+export type * from './models/ChannelMute.js'
 export type * from './models/Password.js'
 export type * from './models/Token.js'
 export type * from './models/ChannelViewableRole.js'
