@@ -1,12 +1,11 @@
 import Elysia, { file, t } from "elysia";
 import { db } from "../..";
 import { Middleware } from "../../Middlewares";
-import { ServiceNotification } from "../Notification/notification.service";
+import SendPushNotification from "../../Utils/SendPushNotification";
 import { ServiceMessage } from "./message.service";
 
 export const message = new Elysia({ prefix: "/message" })
   .use(Middleware.CheckToken)
-  .use(Middleware.WebPush)
   .get(
     "/:messageId",
     async ({ params: { messageId }, CheckToken: { _userId } }) => {
@@ -402,7 +401,6 @@ export const message = new Elysia({ prefix: "/message" })
       body: { channelId, message, fileIds, replyingMessageId },
       CheckToken: { _userId },
       server,
-      webpush,
     }) => {
       //メッセージの保存処理
       const { messageSaved, messageReplyingTo, mentionedUserIds } =
@@ -450,7 +448,7 @@ export const message = new Elysia({ prefix: "/message" })
         );
 
         if (mentionedUserId !== _userId) {
-          ServiceNotification.Dispatch(webpush, {
+          SendPushNotification({
             userId: mentionedUserId,
             channelId,
             eventType: "mention",
@@ -495,7 +493,7 @@ export const message = new Elysia({ prefix: "/message" })
           }),
         );
         //プッシュ通知
-        ServiceNotification.Dispatch(webpush, {
+        SendPushNotification({
           userId: replyTargetUserId,
           channelId,
           eventType: "reply",
@@ -522,7 +520,7 @@ export const message = new Elysia({ prefix: "/message" })
       if (replyTargetUserId) excluded.add(replyTargetUserId);
       for (const { userId: memberId } of channelMembers) {
         if (excluded.has(memberId)) continue;
-        ServiceNotification.Dispatch(webpush, {
+        SendPushNotification({
           userId: memberId,
           channelId,
           eventType: "message",

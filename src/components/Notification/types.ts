@@ -16,26 +16,3 @@ export type WebPushKeys = {
   p256dh: string;
   auth: string;
 };
-
-/**
- * WebPush.sendToDevice の戻り値。invalidateToken=true なら Dispatch 側で
- * DB から購読を削除する。
- */
-export type WebPushSendResult = {
-  ok: boolean;
-  invalidateToken: boolean;
-};
-
-/**
- * Middleware.WebPush の decorate 型。
- * ハンドラ引数から `webpush` を型付きで受け取れる。
- */
-export type WebPushClient = {
-  isReady: () => boolean;
-  getPublicKey: () => string;
-  sendToDevice: (
-    endpoint: string,
-    keysJson: string | null,
-    payload: PushPayload,
-  ) => Promise<WebPushSendResult>;
-};
