@@ -24,9 +24,9 @@ bun i
 ```
 
 ## Development 開発用実行
-初回の実行ならDBのプッシュと初期データの挿入を行う。
+初回の実行ならDBのマイグレーション適用と初期データの挿入を行う。
 ```bash
-bunx drizzle-kit push #DB構造の適用
+bunx drizzle-kit migrate #DB構造の適用
 bun ./src/db/seeds.ts #初期データの挿入
 ```
 開発用に実行するなら
@@ -73,6 +73,7 @@ giracle-backend/
 │           ├── user.module.ts
 │           └── user.service.ts
 ├── drizzle.config.ts         # drizzle-kit 設定
+├── drizzle/                  # マイグレーションSQL (drizzle-kit generate の出力)
 └── STORAGE/                  # アップロードファイル保存先
     ├── file/
     ├── icon/
@@ -345,7 +346,7 @@ giracle-backend/
 
 ### 開発・セットアップ
 
-- **初回セットアップの順序を守る。** `bunx drizzle-kit push` → `bun ./src/db/seeds.ts` の順で実行する。シードで `ServerConfig` と `HOST` / `MEMBER` ロールが作られる。これらの投入前はサーバーが正常に動作しない。
+- **初回セットアップの順序を守る。** `bunx drizzle-kit migrate` → `bun ./src/db/seeds.ts` の順で実行する。シードで `ServerConfig` と `HOST` / `MEMBER` ロールが作られる。これらの投入前はサーバーが正常に動作しない。
 - **最初に登録したユーザーが `HOST`（全権限）になる。** セットアップ直後の初回登録は必ず管理者本人が行うこと。
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。

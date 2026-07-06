@@ -6,7 +6,8 @@ Giracle（セルフホスト型チャットサービス）のバックエンド�
 
 ```bash
 bun i                      # 依存インストール（Bun 必須。npm/yarn は使わない）
-bunx drizzle-kit push      # スキーマを DB へ適用（初回・src/db/schema.ts 変更時）
+bunx drizzle-kit generate  # schema.ts 変更時にマイグレーションSQLを drizzle/ へ生成
+bunx drizzle-kit migrate   # マイグレーションを DB へ適用（初回セットアップ必須）
 bun ./src/db/seeds.ts      # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
 bun dev                    # 開発サーバー起動（--watch 付き、ポート 3000 固定）
 bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
@@ -70,7 +71,8 @@ server?.publish(
 ## DB（Drizzle / bun:sqlite）
 
 - スキーマは [src/db/schema.ts](src/db/schema.ts)。主要テーブル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
-- スキーマ変更フロー: `src/db/schema.ts` 編集 → `bunx drizzle-kit push`（開発）。生成物は無い（型は `$inferSelect` / `$inferInsert` で推論）。
+- スキーマ変更フロー: `src/db/schema.ts` 編集 → `bunx drizzle-kit generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bunx drizzle-kit migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
+  - **`drizzle-kit push` は使わないこと。** 複合主キーを持つテーブル（ChannelJoin 等）で既存インデックスを正しく認識できず `index ... already exists` で失敗するバグが drizzle-kit v0.31.10 にある。generate + migrate は DB の現在状態を pull せず履歴ベースで差分適用するためこの問題を踏まない。
 - SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
 - シード（`src/db/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
 

@@ -12,12 +12,13 @@ RUN bun i --prod
 
 COPY .env .
 COPY src ./src
+COPY drizzle ./drizzle
 COPY drizzle.config.ts .
 COPY tsconfig.json .
 
 ENV NODE_ENV production
 
-RUN bunx drizzle-kit push
+RUN bunx drizzle-kit migrate
 
 RUN bun build \
 	--compile \
