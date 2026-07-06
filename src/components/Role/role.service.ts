@@ -1,8 +1,6 @@
 import { status } from "elysia";
 import { db } from "../..";
-import CalculateRoleLevel from "../../Utils/CalculateRoleLevel";
-import CompareRoleLevelToRole from "../../Utils/CompareRoleLevelToRole";
-import getUsersRoleLevel from "../../Utils/getUsersRoleLevel";
+import { Util } from "../../Util";
 
 export namespace ServiceRole {
   export const Search = async (name: string) => {
@@ -29,8 +27,8 @@ export namespace ServiceRole {
     _userId: string,
   ) => {
     //ロールレベルの計算
-    const levelFromThis = CalculateRoleLevel(rolePower);
-    const userRoleLevel = await getUsersRoleLevel(_userId);
+    const levelFromThis = Util.calculateRoleLevel(rolePower);
+    const userRoleLevel = await Util.getUsersRoleLevel(_userId);
     if (userRoleLevel <= levelFromThis) {
       throw status(400, "Role power is too powerful");
     }
@@ -68,12 +66,12 @@ export namespace ServiceRole {
   ) => {
     if (roleId === "HOST") throw status(400, "You cannot update HOST role");
     //事前にロールの存在と送信者のロールレベルが足りるか確認
-    if ((await CompareRoleLevelToRole(_userId, roleId)) === false) {
+    if ((await Util.compareRoleLevelToRole(_userId, roleId)) === false) {
       throw status(400, "Role level not enough or role not found");
     }
     //更新予定のロールレベルが送信者のロールレベルを超えていないか確認
-    const roleLevelIfUpdated = CalculateRoleLevel(roleData);
-    const userRoleLevel = await getUsersRoleLevel(_userId);
+    const roleLevelIfUpdated = Util.calculateRoleLevel(roleData);
+    const userRoleLevel = await Util.getUsersRoleLevel(_userId);
     if (userRoleLevel < roleLevelIfUpdated) {
       throw status(400, "Role power is too powerful");
     }
@@ -107,7 +105,7 @@ export namespace ServiceRole {
     }
 
     //送信者のロールレベルが足りるか確認
-    if (!(await CompareRoleLevelToRole(_userId, roleId))) {
+    if (!(await Util.compareRoleLevelToRole(_userId, roleId))) {
       throw status(400, "Role level not enough or role not found");
     }
 
@@ -176,7 +174,7 @@ export namespace ServiceRole {
     }
 
     //送信者のロールレベルが足りるか確認
-    if (!(await CompareRoleLevelToRole(_userId, roleId))) {
+    if (!(await Util.compareRoleLevelToRole(_userId, roleId))) {
       throw status(400, "Role level not enough or role not found");
     }
 
@@ -197,7 +195,7 @@ export namespace ServiceRole {
 
   export const Delete = async (roleId: string, _userId: string) => {
     //送信者のロールレベルが足りるか確認
-    if (!(await CompareRoleLevelToRole(_userId, roleId))) {
+    if (!(await Util.compareRoleLevelToRole(_userId, roleId))) {
       throw status(400, "Role level not enough or role not found");
     }
 

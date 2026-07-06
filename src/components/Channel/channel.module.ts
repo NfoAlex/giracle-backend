@@ -1,9 +1,8 @@
-import Elysia, { status, t } from "elysia";
-import { db } from "../..";
+import Elysia, { t } from "elysia";
 import { Middleware } from "../../Middlewares";
-import SendSystemMessage from "../../Utils/SendSystemMessage";
 import { WSSubscribe, WSUnsubscribe } from "../../ws";
 import { ServiceChannel } from "./channel.service";
+import { Util } from "../../Util";
 
 export const channel = new Elysia({ prefix: "/channel" })
   .use(Middleware.CheckToken)
@@ -17,7 +16,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       //userWSInstance.get(_userId)?.subscribe(`channel::${channelId}`);
       WSSubscribe(_userId, `channel::${channelId}`);
       //システムメッセージを送信
-      SendSystemMessage(channelId, _userId, "CHANNEL_JOIN", server);
+      Util.sendSystemMessage(channelId, _userId, "CHANNEL_JOIN", server);
 
       //WSでチャンネル参加を通知
       server?.publish(
@@ -67,7 +66,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       //userWSInstance.get(_userId)?.unsubscribe(`channel::${channelId}`);
       WSUnsubscribe(_userId, `channel::${channelId}`);
       //システムメッセージを送信
-      SendSystemMessage(channelId, _userId, "CHANNEL_LEFT", server);
+      Util.sendSystemMessage(channelId, _userId, "CHANNEL_LEFT", server);
 
       //WSでチャンネル退出を通知
       server?.publish(
@@ -205,7 +204,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       WSSubscribe(userId, `channel::${channelId}`);
 
       //システムメッセージを送信
-      SendSystemMessage(channelId, userId, "CHANNEL_INVITED", server);
+      Util.sendSystemMessage(channelId, userId, "CHANNEL_INVITED", server);
 
       //チャンネル参加を本人にWSで通知
       server?.publish(
@@ -244,7 +243,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       WSUnsubscribe(userId, `channel::${channelId}`);
 
       //システムメッセージを送信
-      SendSystemMessage(channelId, userId, "CHANNEL_KICKED", server);
+      Util.sendSystemMessage(channelId, userId, "CHANNEL_KICKED", server);
 
       //チャンネル退出を本人にWSで通知
       server?.publish(

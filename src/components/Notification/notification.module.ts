@@ -1,21 +1,18 @@
 import Elysia, { status, t } from "elysia";
 import { Middleware } from "../../Middlewares";
-import {
-  getVapidPublicKey,
-  isWebPushReady,
-} from "../../Utils/SendPushNotification";
 import { NOTIFICATION_MODES, ServiceNotification } from "./notification.service";
+import { ConstWebPush } from "../..";
 
 export const notification = new Elysia({ prefix: "/notification" })
   .get(
     "/vapid-public-key",
     () => {
-      if (!isWebPushReady()) {
+      if (!ConstWebPush.isWebPushReady) {
         throw status(503, "Web push is not configured on this server");
       }
       return {
         message: "Fetched VAPID public key",
-        data: { publicKey: getVapidPublicKey() },
+        data: { publicKey: ConstWebPush.getVapidPublicKey },
       };
     },
     {

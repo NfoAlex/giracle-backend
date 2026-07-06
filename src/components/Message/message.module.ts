@@ -1,8 +1,8 @@
 import Elysia, { file, t } from "elysia";
 import { db } from "../..";
 import { Middleware } from "../../Middlewares";
-import SendPushNotification from "../../Utils/SendPushNotification";
 import { ServiceMessage } from "./message.service";
+import { Util } from "../../Util";
 
 export const message = new Elysia({ prefix: "/message" })
   .use(Middleware.CheckToken)
@@ -448,7 +448,7 @@ export const message = new Elysia({ prefix: "/message" })
         );
 
         if (mentionedUserId !== _userId) {
-          SendPushNotification({
+          Util.sendPushNotification({
             userId: mentionedUserId,
             channelId,
             eventType: "mention",
@@ -493,7 +493,7 @@ export const message = new Elysia({ prefix: "/message" })
           }),
         );
         //プッシュ通知
-        SendPushNotification({
+        Util.sendPushNotification({
           userId: replyTargetUserId,
           channelId,
           eventType: "reply",
@@ -520,7 +520,7 @@ export const message = new Elysia({ prefix: "/message" })
       if (replyTargetUserId) excluded.add(replyTargetUserId);
       for (const { userId: memberId } of channelMembers) {
         if (excluded.has(memberId)) continue;
-        SendPushNotification({
+        Util.sendPushNotification({
           userId: memberId,
           channelId,
           eventType: "message",

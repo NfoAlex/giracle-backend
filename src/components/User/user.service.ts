@@ -3,10 +3,9 @@ import { unlink } from "node:fs/promises";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
-import CheckChannelVisibility from "../../Utils/CheckChannelVisitiblity";
-import getUsersRoleLevel from "../../Utils/getUsersRoleLevel";
 import { userWSInstance } from "../../ws";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { Util } from "../../Util";
 
 export namespace ServiceUser {
   export const SignUp = async (
@@ -179,7 +178,7 @@ export namespace ServiceUser {
   ) => {
     //チャンネル指定をしているならそれぞれが閲覧可能であるかを調べる
     if (joinedChannel !== undefined) {
-      const canView = await CheckChannelVisibility(joinedChannel, _userId);
+      const canView = await Util.checkChannelVisibility(joinedChannel, _userId);
       if (canView === false) {
         throw status(
           403,
@@ -549,7 +548,7 @@ export namespace ServiceUser {
     }
     //ロールレベルが対象より低いとBANできない
     if (
-      (await getUsersRoleLevel(_userId)) < (await getUsersRoleLevel(userId))
+      (await Util.getUsersRoleLevel(_userId)) < (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't ban higher role level user");
     }
@@ -574,7 +573,7 @@ export namespace ServiceUser {
     }
     //ロールレベルが対象より低いとBAN解除できない
     if (
-      (await getUsersRoleLevel(_userId)) < (await getUsersRoleLevel(userId))
+      (await Util.getUsersRoleLevel(_userId)) < (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't unban higher role level user");
     }

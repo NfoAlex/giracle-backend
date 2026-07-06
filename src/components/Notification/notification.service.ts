@@ -3,9 +3,9 @@ import { db } from "../..";
 import type { WebPushKeys } from "./types";
 
 export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
-export type NotificationMode = (typeof NOTIFICATION_MODES)[number];
+export type TNotificationMode = (typeof NOTIFICATION_MODES)[number];
 
-const isValidMode = (v: string): v is NotificationMode =>
+const isValidMode = (v: string): v is TNotificationMode =>
   (NOTIFICATION_MODES as readonly string[]).includes(v);
 
 export namespace ServiceNotification {
@@ -17,7 +17,7 @@ export namespace ServiceNotification {
       config ?? {
         userId: _userId,
         enabled: true,
-        mode: "mention" as NotificationMode,
+        mode: "mention" as TNotificationMode,
       }
     );
   };
@@ -34,7 +34,7 @@ export namespace ServiceNotification {
       create: {
         userId: _userId,
         enabled: input.enabled ?? true,
-        mode: (input.mode as NotificationMode | undefined) ?? "mention",
+        mode: (input.mode as TNotificationMode | undefined) ?? "mention",
       },
       update: {
         ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
