@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import { $ } from "bun";
 import { eq } from "drizzle-orm";
-import { db, sqlite } from "../src/db";
+import { db } from "../src/db";
 import {
   channelJoins,
   channelViewableRoles,
@@ -31,19 +31,7 @@ export async function INIT() {
   FLAG_INIT_COMPLETED = true;
 
   // --- 01.auth: DBリセット + シード + ユーザー/トークン作成 ---
-  // drizzle-kit push は既存テーブルとの差分検出が不安定 (再実行時に
-  // "index already exists" で落ちることがある) なため、
-  // push 前に全テーブルを削除して毎回まっさらな状態から適用する。
-  sqlite.run("PRAGMA foreign_keys = OFF;");
-  const existingTables = sqlite
-    .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-    .all() as { name: string }[];
-  for (const table of existingTables) {
-    sqlite.run(`DROP TABLE IF EXISTS "${table.name}";`);
-  }
-  sqlite.run("PRAGMA foreign_keys = ON;");
-
-  await $`bunx drizzle-kit push --force`;
+  await $`bunx drizzle-kit migrate`;
 
   await db.delete(tokens);
   await db.delete(passwords);
