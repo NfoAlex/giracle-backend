@@ -1,0 +1,89 @@
+# AGENTS.md — 開発エージェント向けガイド
+
+Giracle（セルフホスト型チャットサービス）のバックエンド。プロジェクト概要・エンドポイント一覧・WS シグナル一覧・環境変数は [README.md](README.md) を参照。このファイルは **コードを書く際に必要なコンテキスト**（アーキテクチャの約束事・落とし穴）をまとめる。
+
+## コマンド
+
+```bash
+bun i                      # 依存インストール（Bun 必須。npm/yarn は使わない）
+bunx prisma db push        # スキーマを DB へ適用（初回・schema.prisma 変更時）
+bun ./prisma/seeds.ts      # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
+bun dev                    # 開発サーバー起動（--watch 付き、ポート 3000 固定）
+bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
+bunx prisma generate       # スキーマ変更後のクライアント再生成
+```
+
+- テストランナーは未整備。`bun test` の対象はなく、`test/*.oldtest.ts` は旧テストの残骸（メンテされていない）。動作確認は `bun dev` + 手動リクエストで行う。
+- Swagger 定義は各ルートの `detail`（tags / description）から生成される。
+
+## アーキテクチャの約束事
+
+### db クライアントは src/index.ts からの import 一択
+
+`PrismaClient` のインスタンスは [src/index.ts](src/index.ts) で生成され `db` として export される。各 module / service / Utils は `import { db } from "../.."` のように **index.ts から相対 import** する（循環 import に見えるが意図された構成）。新しいインスタンスを作らないこと。
+
+- adapter は `@prisma/adapter-libsql`、`timestampFormat: "unixepoch-ms"` 指定。
+- Prisma の型・クライアントは **`prisma/generated/client` から import** する（素の `@prisma/client` ではない）。input 型は `prisma/generated/models` にある。`prisma/generated/` は自動生成物なので手動編集禁止（Biome の ignore 対象でもある）。
+
+### モジュール構成: module（ルーティング）+ service（ロジック）
+
+機能追加は `src/components/<Name>/` に以下のペアで作り、[src/index.ts](src/index.ts) の `app` に `.use()` で登録する。
+
+- **`<name>.module.ts`** — `new Elysia({ prefix: "/<name>" })`。ルート定義・`t.Object` によるバリデーション・`response` スキーマ（成功/エラーの status ごとに定義。エラーは `t.Literal("...")` で文言まで固定）・Swagger 用 `detail` を持つ。レスポンス形式は `{ message: string, data?: ... }` が慣習。
+- **`<name>.service.ts`** — `export namespace Service<Name> { ... }` にビジネスロジックを置く。エラーは Elysia の `throw status(4xx, "メッセージ")` で投げる。**service で投げる status とメッセージは module 側の `response` スキーマと一致させる**（ずれるとバリデーションエラーになる）。
+
+グローバルエラーハンドラは index.ts の `.onError()`。`NODE_ENV=test` のときはエラーログを抑制する分岐がある。
+
+### 認証・権限
+
+- 認証必須ルート: module の先頭で `.use(Middleware.CheckToken)`。ハンドラでは `CheckToken: { _userId }` がコンテキストに注入される。トークンは 5 分キャッシュされる（[src/Middlewares.ts](src/Middlewares.ts)）ため、BAN 反映等に最大 5 分の遅延があり得る。
+- 権限チェック: `.use(Middleware.CheckRoleTerm)` を併用し、ルートオプションに `checkRoleTerm: "manageChannel"` のように指定する（macro 実装）。権限は `manageServer` / `manageChannel` / `manageRole` / `manageUser` / `manageEmoji` の 5 種。`manageServer` は全チェックを通過する。
+- **管理系ルートに `checkRoleTerm` を付け忘れると「ログイン済みなら誰でも実行可」になる。** 追加時は必ず確認。
+
+### WebSocket 通知
+
+リアルタイム通知は Bun の pub/sub を使う。ハンドラのコンテキストにある `server` から publish する:
+
+```ts
+server?.publish(
+  `channel::${channelId}`, // "GLOBAL" | `user::${userId}` | `channel::${channelId}`
+  JSON.stringify({ signal: "message::SendMessage", data: ... }),
+);
+```
+
+- signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
+- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
+- URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
+
+### 通知（Inbox / Web Push）
+
+- メンション・リプライ時の通知は DB の `Inbox` + WS `inbox::Added` + Web Push（[src/Utils/SendPushNotification.ts](src/Utils/SendPushNotification.ts)）の 3 経路。
+- Web Push は VAPID 鍵（環境変数）未設定でも起動する設計。送信前に `isWebPushReady()` で判定する。
+- `/notification` モジュール（デバイス登録・通知設定・チャンネルミュート）は README のエンドポイント表に未記載なので、仕様は [notification.module.ts](src/components/Notification/notification.module.ts) を直接読む。
+
+### Utils
+
+横断的な処理は `src/Utils/` に 1 ファイル 1 関数（default export）で置く。既存: `SendSystemMessage`（システムメッセージ送信＋WS通知）、`SendPushNotification`、`CheckChannelVisitiblity`（※ファイル名の typo はそのまま。import 時注意）、`GetUserViewableChannel`、ロールレベル計算系。チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
+
+## DB（Prisma / libsql）
+
+- スキーマは [prisma/schema.prisma](prisma/schema.prisma)。主要モデル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
+- スキーマ変更フロー: `schema.prisma` 編集 → `bunx prisma db push`（開発）→ 必要なら `bunx prisma generate`。migrations ディレクトリはあるが開発は db push ベース。
+- SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
+- シード（`prisma/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
+
+## コーディング規約
+
+- リンター/フォーマッターは **Biome**（[biome.json](biome.json)）: スペース 2、ダブルクォート、organizeImports 有効。ESLint/Prettier は導入しない。
+- TypeScript strict。型は Prisma 生成型を活用する。
+- コメントは日本語。既存コードのコメント密度（処理ブロックごとに短い説明）に合わせる。
+- `biome-ignore` を使う場合は既存同様に理由を書く（例: WS インスタンスの `any`）。
+- バージョンが新しめな点に注意: **Elysia v1.4**（macro は object 形式、`resolve({ as: "scoped" }, ...)`）、**Prisma v7**（driver adapter 必須、`prisma.config.ts` で設定）。古い API の記憶で書かない。
+
+## 変更時のチェックリスト
+
+1. ルート追加 → `t.Object` バリデーション + `response` スキーマ + `detail` を必ず定義
+2. 認証が必要か → `Middleware.CheckToken`、管理操作か → `checkRoleTerm`
+3. 状態変化をクライアントへ通知するか → `server?.publish` の WS シグナル追加
+4. README のエンドポイント表・WS シグナル表・環境変数表を更新
+5. `bunx biome check --write .` を通す
