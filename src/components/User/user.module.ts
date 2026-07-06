@@ -1,8 +1,8 @@
 import Elysia, { status, t, file } from "elysia";
 import { db } from "../..";
 import { Middleware } from "../../Middlewares";
-import SendSystemMessage from "../../Utils/SendSystemMessage";
 import { ServiceUser } from "./user.service";
+import { Util } from "../../Util";
 
 export const user = new Elysia({ prefix: "/user" })
   .put(
@@ -25,7 +25,7 @@ export const user = new Elysia({ prefix: "/user" })
         serverConfigAnnounceChannelId !== null &&
         serverConfigAnnounceChannelId?.RegisterAnnounceChannelId !== ""
       ) {
-        SendSystemMessage(
+        Util.sendSystemMessage(
           serverConfigAnnounceChannelId.RegisterAnnounceChannelId,
           createdUser.id,
           "WELCOME",
@@ -40,7 +40,7 @@ export const user = new Elysia({ prefix: "/user" })
           },
         });
         if (firstChannel) {
-          SendSystemMessage(firstChannel.id, createdUser.id, "WELCOME", server);
+          Util.sendSystemMessage(firstChannel.id, createdUser.id, "WELCOME", server);
         }
         //それでも無いなら通知しない
       }

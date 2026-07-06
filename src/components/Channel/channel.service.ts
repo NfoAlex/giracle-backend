@@ -2,10 +2,8 @@ import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
 import type { Message } from "../../../prisma/generated/client";
-import CalculateReactionTotal from "../../Utils/CalculateReactionTotal";
-import CheckChannelVisibility from "../../Utils/CheckChannelVisitiblity";
-import GetUserViewableChannel from "../../Utils/GetUserViewableChannel";
 import { WSUnsubscribe } from "../../ws";
+import { Util } from "../../Util";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
@@ -32,7 +30,7 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
     //チャンネルを見られないようなユーザーだと存在しないとしてエラーを出す
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 
@@ -80,7 +78,7 @@ export namespace ServiceChannel {
 
   export const GetInfo = async (channelId: string, _userId: string) => {
     //チャンネルを見られないようなユーザーだと存在しないとしてエラーを出す
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 
@@ -196,7 +194,7 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
     //チャンネルへのアクセス権限があるか調べる
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 
@@ -396,7 +394,7 @@ export namespace ServiceChannel {
 
     //最後にメッセージごとにリアクションの合計数をそれぞれ格納する
     for (const index in history) {
-      const emojiTotalJson = await CalculateReactionTotal(
+      const emojiTotalJson = await Util.calculateReactionTotal(
         history[index].id,
         _userId,
       );
@@ -419,7 +417,7 @@ export namespace ServiceChannel {
 
   export const Search = async (query: string, _userId: string) => {
     //閲覧できるチャンネルをId配列で取得
-    const channelViewable = await GetUserViewableChannel(_userId);
+    const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
     //チャンネル検索
@@ -542,7 +540,7 @@ export namespace ServiceChannel {
     }
 
     //チャンネルへのアクセス権限があるか調べる
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 
@@ -675,7 +673,7 @@ export namespace ServiceChannel {
     }
 
     //チャンネルへのアクセス権限があるか調べる
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Channel not found");
     }
 

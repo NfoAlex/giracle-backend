@@ -5,8 +5,7 @@ import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
 import type { Message } from "../../../prisma/generated/client";
-import CheckChannelVisibility from "../../Utils/CheckChannelVisitiblity";
-import GetUserViewableChannel from "../../Utils/GetUserViewableChannel";
+import { Util } from "../../Util";
 
 export namespace ServiceMessage {
   export const Get = async (messageId: string, _userId: string) => {
@@ -25,7 +24,7 @@ export namespace ServiceMessage {
     }
 
     //チャンネルの閲覧制限があるか確認してから返す
-    if (!(await CheckChannelVisibility(messageData.channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(messageData.channelId, _userId))) {
       throw status(404, "Message not found");
     }
 
@@ -163,11 +162,11 @@ export namespace ServiceMessage {
     //チャンネル指定があるなら閲覧制限を確認する、無いならユーザーが閲覧できるチャンネルを取得
     if (channelId) {
       //チャンネルの閲覧制限があるか確認
-      if (!(await CheckChannelVisibility(channelId, _userId))) {
+      if (!(await Util.checkChannelVisibility(channelId, _userId))) {
         throw status(403, "You are not allowed to view this channel");
       }
     } else {
-      const viewableChannels = await GetUserViewableChannel(_userId, false);
+      const viewableChannels = await Util.getUserViewableChannel(_userId, false);
       viewableChannelIds = viewableChannels.map((channel) => channel.id);
     }
 
@@ -305,7 +304,7 @@ export namespace ServiceMessage {
       throw status(404, "File not found");
     }
 
-    const canView = await CheckChannelVisibility(fileData?.channelId, _userId);
+    const canView = await Util.checkChannelVisibility(fileData?.channelId, _userId);
     if (!canView) {
       throw status(400, "This file is hidden in private channel");
     }
@@ -445,7 +444,7 @@ export namespace ServiceMessage {
     _userId: string,
   ) => {
     //チャンネルの閲覧制限があるか確認する
-    if (!(await CheckChannelVisibility(channelId, _userId))) {
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
       throw status(404, "Message not found");
     }
 
@@ -524,7 +523,7 @@ export namespace ServiceMessage {
     }
 
     //チャンネルの閲覧制限があるか確認
-    const viewable = await CheckChannelVisibility(message.channelId, _userId);
+    const viewable = await Util.checkChannelVisibility(message.channelId, _userId);
     if (!viewable) {
       throw status(400, "Message not found or is private");
     }

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { FETCH, INIT } from "./util";
 import { db } from "../src";
-import SendPushNotification from "../src/Utils/SendPushNotification";
+import { Util } from "../src/Util";
 
 // web-push の sendNotification をモック化: 実際のFCMは叩かない
 // setVapidDetails は .env.test の実VAPIDキーで通るのでモック不要
@@ -320,7 +320,7 @@ describe("SendPushNotification :: 分岐", () => {
       update: { enabled: false, mode: "all" },
     });
 
-    await SendPushNotification({
+    await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
       eventType: "mention",
@@ -337,7 +337,7 @@ describe("SendPushNotification :: 分岐", () => {
       data: { enabled: true, mode: "mention" },
     });
 
-    await SendPushNotification({
+    await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
       eventType: "message",
@@ -350,7 +350,7 @@ describe("SendPushNotification :: 分岐", () => {
     sendNotificationMock.mockClear();
     await setupDevice();
 
-    await SendPushNotification({
+    await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
       eventType: "mention",
@@ -370,7 +370,7 @@ describe("SendPushNotification :: 分岐", () => {
       update: {},
     });
 
-    await SendPushNotification({
+    await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
       eventType: "mention",
@@ -394,7 +394,7 @@ describe("SendPushNotification :: 分岐", () => {
       throw goneError;
     });
 
-    await SendPushNotification({
+    await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
       eventType: "mention",

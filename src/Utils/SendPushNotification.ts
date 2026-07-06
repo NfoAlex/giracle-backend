@@ -1,34 +1,10 @@
 import webpush from "web-push";
-import { db } from "..";
+import { ConstWebPush, db } from "..";
 import type {
   NotificationPlatform,
   PushPayload,
   WebPushKeys,
 } from "../components/Notification/types";
-
-//Web Push (VAPID) 初期化
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
-let vapidReady = false;
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    vapidReady = true;
-  } catch (e) {
-    console.warn(
-      "SendPushNotification :: VAPID setVapidDetails failed, web push disabled:",
-      e,
-    );
-  }
-} else {
-  console.warn(
-    "SendPushNotification :: VAPID keys are not set. Web push is disabled.",
-  );
-}
-
-export const isWebPushReady = (): boolean => vapidReady;
-export const getVapidPublicKey = (): string => VAPID_PUBLIC_KEY;
 
 export type NotifyEventType = "mention" | "reply" | "message";
 
@@ -40,7 +16,7 @@ async function sendToWebDevice(
   keysJson: string | null,
   payload: PushPayload,
 ): Promise<{ ok: boolean; invalidateToken: boolean }> {
-  if (!vapidReady) return { ok: false, invalidateToken: false };
+  if (!ConstWebPush.isWebPushReady) return { ok: false, invalidateToken: false };
   if (!keysJson) return { ok: false, invalidateToken: true };
 
   let keys: WebPushKeys;
