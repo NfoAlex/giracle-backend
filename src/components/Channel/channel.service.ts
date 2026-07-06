@@ -338,18 +338,16 @@ export namespace ServiceChannel {
       }
     }
 
-    //最後にメッセージごとにリアクションの合計数をそれぞれ格納する
+    //最後にメッセージごとにリアクションの合計数をそれぞれ格納する（並列実行）
+    const reactionSummaries = await Promise.all(
+      history.map((m) => Util.calculateReactionTotal(m.id, _userId)),
+    );
     for (const index in history) {
-      const emojiTotalJson = await Util.calculateReactionTotal(
-        history[index].id,
-        _userId,
-      );
-
       //結果をこのメッセージ部分に格納する
       history[index] = {
         ...history[index],
         // @ts-ignore - reactionSummaryの追加
-        reactionSummary: emojiTotalJson,
+        reactionSummary: reactionSummaries[index],
       };
     }
 
