@@ -204,6 +204,31 @@ describe("/channel/list", async () => {
 });
 
 describe("/channel/get-history/:channelId", async () => {
+  //firstMessageOfChannel/latestMessageOfChannelの判定を検証するため、
+  //TESTCHANNEL1に既存のTESTMESSAGE1(最古)へ加えて新規メッセージを2件追加投入しておく
+  let TEST__HISTORY_MSG_A = "";
+  let TEST__HISTORY_MSG_B = "";
+
+  it("準備 :: 検証用メッセージを2件追加投入", async () => {
+    const resA = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "history test message A" },
+    });
+    const jA = await resA.json();
+    expect(resA.ok).toBe(true);
+    TEST__HISTORY_MSG_A = jA.data.id;
+
+    const resB = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "history test message B" },
+    });
+    const jB = await resB.json();
+    expect(resB.ok).toBe(true);
+    TEST__HISTORY_MSG_B = jB.data.id;
+  });
+
   it("正常", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL1",
@@ -219,6 +244,21 @@ describe("/channel/get-history/:channelId", async () => {
     expect(j.data.history[0].channelId).toBe("TESTCHANNEL1");
   });
 
+  it("正常 :: 基準指定無し(fetchDirection省略=older扱い) :: 最新まで取得済みでlatestMessageOfChannelと一致しatEnd=true", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        userId: "TESTUSER",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.history[0].id).toBe(TEST__HISTORY_MSG_B);
+    expect(j.data.atEnd).toBeTrue();
+    expect(j.data.atTop).toBeTrue();
+  });
+
   it("正常 :: 違うポジションから", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL1",
@@ -231,6 +271,59 @@ describe("/channel/get-history/:channelId", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.history[0].content).toBe("Welcome to the General channel!");
+    // TESTMESSAGE1(最古)基準のolder取得なので、latestMessageOfChannel(MSG_B)とは一致せずatEnd=false
+    expect(j.data.atEnd).toBeFalse();
+    expect(j.data.atTop).toBeTrue();
+  });
+
+  it("正常 :: 最新メッセージ基準でolder方向 :: latestMessageOfChannelと一致しatEnd=true", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        userId: "TESTUSER",
+        messageIdFrom: TEST__HISTORY_MSG_B,
+        fetchDirection: "older",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.history[0].id).toBe(TEST__HISTORY_MSG_B);
+    expect(j.data.atEnd).toBeTrue();
+  });
+
+  it("正常 :: 最古メッセージ基準でnewer方向 :: firstMessageOfChannelと一致しatTop=true", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        userId: "TESTUSER",
+        messageIdFrom: "TESTMESSAGE1",
+        fetchDirection: "newer",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    // 最古のTESTMESSAGE1以降を新しい方向へ辿ると全件(TESTMESSAGE1, MSG_A, MSG_B)取得できる
+    expect(j.data.history.at(-1).id).toBe("TESTMESSAGE1");
+    expect(j.data.atTop).toBeTrue();
+  });
+
+  it("正常 :: 最新メッセージ基準でnewer方向 :: firstMessageOfChannelと不一致でatTop=false", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        userId: "TESTUSER",
+        messageIdFrom: TEST__HISTORY_MSG_B,
+        fetchDirection: "newer",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.history.length).toBe(1);
+    expect(j.data.history[0].id).toBe(TEST__HISTORY_MSG_B);
+    expect(j.data.atTop).toBeFalse();
   });
 
   it("過去を取得してみる", async () => {
