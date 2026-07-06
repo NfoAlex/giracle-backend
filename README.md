@@ -279,16 +279,20 @@ giracle-backend/
 
 ## ユーティリティ (`src/Utils/`)
 
-| ファイル | 概要 |
-|----------|------|
-| `SendSystemMessage.ts` | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
-| `SendPushNotification.ts` | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除） |
-| `CalculateReactionTotal.ts` | リアクション集計 |
-| `CalculateRoleLevel.ts` | ロールレベル計算 |
-| `CheckChannelVisitiblity.ts` | チャンネル閲覧権限チェック |
-| `CompareRoleLevelToRole.ts` | ロールレベル比較 |
-| `GetUserViewableChannel.ts` | ユーザーが閲覧可能なチャンネル一覧取得 |
-| `getUsersRoleLevel.ts` | ユーザーのロールレベル取得 |
+各ファイルは `src/Util.ts` の `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.xxx(...)`）。個々のファイルへの直接 import は行わない。
+
+| ファイル | `Util.` プロパティ名 | 概要 |
+|----------|----------------------|------|
+| `SendSystemMessage.ts` | `sendSystemMessage` | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
+| `SendPushNotification.ts` | `sendPushNotification` | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除） |
+| `CalculateReactionTotal.ts` | `calculateReactionTotal` | リアクション集計 |
+| `CalculateRoleLevel.ts` | `calculateRoleLevel` | ロールレベル計算 |
+| `CheckChannelVisitiblity.ts` | `checkChannelVisibility` | チャンネル閲覧権限チェック（※ファイル名は typo のまま、namespace 経由の名前は正しいスペル） |
+| `CompareRoleLevelToRole.ts` | `compareRoleLevelToRole` | ロールレベル比較 |
+| `GetUserViewableChannel.ts` | `getUserViewableChannel` | ユーザーが閲覧可能なチャンネル一覧取得 |
+| `getUsersRoleLevel.ts` | `getUsersRoleLevel` | ユーザーのロールレベル取得 |
+
+新しい Utils ファイルを追加した場合は `src/Util.ts` に import と namespace export を追記する。
 
 ---
 

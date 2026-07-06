@@ -65,6 +65,8 @@ server?.publish(
 
 横断的な処理は `src/Utils/` に 1 ファイル 1 関数（default export）で置く。既存: `SendSystemMessage`（システムメッセージ送信＋WS通知）、`SendPushNotification`、`CheckChannelVisitiblity`（※ファイル名の typo はそのまま。import 時注意）、`GetUserViewableChannel`、ロールレベル計算系。チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
 
+呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisitiblity` → `Util.checkChannelVisibility`、typo も解消される）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
+
 ## DB（Prisma / libsql）
 
 - スキーマは [prisma/schema.prisma](prisma/schema.prisma)。主要モデル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
