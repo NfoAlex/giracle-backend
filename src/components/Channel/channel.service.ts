@@ -221,6 +221,7 @@ export namespace ServiceChannel {
         //指定時間以降の最初のメッセージを取得
         const messageTakingFrom = await db.query.messages.findMany({
           where: and(eq(messages.channelId, channelId), gte(messages.createdAt, messageDataFrom.createdAt)),
+          columns: { createdAt: true },
           orderBy: (t, { asc }) => asc(t.createdAt),
           limit: fetchLength,
         });
@@ -242,6 +243,7 @@ export namespace ServiceChannel {
         //指定時間以降の最初のメッセージを取得
         const messageTakingFrom = await db.query.messages.findMany({
           where: and(eq(messages.channelId, channelId), gte(messages.createdAt, new Date(messageTimeFrom))),
+          columns: { createdAt: true },
           orderBy: (t, { asc }) => asc(t.createdAt),
           limit: fetchLength,
         });
@@ -265,21 +267,23 @@ export namespace ServiceChannel {
       orderBy: (t, { desc }) => desc(t.createdAt),
     });
 
-    //履歴の最新まで取ったかどうかを判別するために最初と最後のメッセージを取得
-    const firstMessageOfChannel = await db.query.messages.findFirst({
-      columns: {
-        id: true,
-      },
-      where: eq(messages.channelId, channelId),
-      orderBy: (t, { asc }) => asc(t.createdAt),
-    });
-    const latestMessageOfChannel = await db.query.messages.findFirst({
-      columns: {
-        id: true,
-      },
-      where: eq(messages.channelId, channelId),
-      orderBy: (t, { desc }) => desc(t.createdAt),
-    });
+    //履歴の最新・最初まで取得したかどうかを判別するため、取得方向に必要な側のみ取得
+    const firstMessageOfChannel =
+      fetchDirection === "newer"
+        ? await db.query.messages.findFirst({
+            columns: { id: true },
+            where: eq(messages.channelId, channelId),
+            orderBy: (t, { asc }) => asc(t.createdAt),
+          })
+        : undefined;
+    const latestMessageOfChannel =
+      fetchDirection !== "newer"
+        ? await db.query.messages.findFirst({
+            columns: { id: true },
+            where: eq(messages.channelId, channelId),
+            orderBy: (t, { desc }) => desc(t.createdAt),
+          })
+        : undefined;
 
     //取得した履歴が最新まで取得したか、または最初まで取得したかを判別
     let atEnd = false;
