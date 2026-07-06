@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import { db } from "..";
+import { roleInfos } from "../db/schema";
 import getUsersRoleLevel from "./getUsersRoleLevel";
 
 const levelIndex = {
@@ -23,13 +25,11 @@ export default async function CompareRoleLevelToRole(
   if (_roleId === "HOST") return false;
 
   //対象のロール情報を取得
-  const role = await db.roleInfo.findUnique({
-    where: {
-      id: _roleId,
-    },
+  const role = await db.query.roleInfos.findFirst({
+    where: eq(roleInfos.id, _roleId),
   });
   //対象ロールが見つからなかったらfalseを返す
-  if (role === null) return false;
+  if (role === undefined) return false;
 
   const userRoleLevel = await getUsersRoleLevel(_userId);
 

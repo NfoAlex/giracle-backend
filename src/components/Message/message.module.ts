@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import Elysia, { file, t } from "elysia";
 import { db } from "../..";
+import { channelJoins, inboxes, users } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
 import { ServiceMessage } from "./message.service";
 import { Util } from "../../Util";
@@ -422,9 +424,9 @@ export const message = new Elysia({ prefix: "/message" })
       );
 
       //プッシュ通知用のメタ情報 (送信者名 / 本文プレビュー)
-      const senderInfo = await db.user.findUnique({
-        where: { id: _userId },
-        select: { name: true },
+      const senderInfo = await db.query.users.findFirst({
+        where: eq(users.id, _userId),
+        columns: { name: true },
       });
       const senderName = senderInfo?.name ?? "誰か";
       const bodyPreview =
@@ -474,12 +476,10 @@ export const message = new Elysia({ prefix: "/message" })
           ? messageReplyingTo.userId
           : null;
       if (replyTargetUserId) {
-        await db.inbox.create({
-          data: {
-            userId: replyTargetUserId,
-            messageId: messageSaved.id,
-            type: "reply",
-          },
+        await db.insert(inboxes).values({
+          userId: replyTargetUserId,
+          messageId: messageSaved.id,
+          type: "reply",
         });
         //WS通知
         server?.publish(
@@ -512,9 +512,9 @@ export const message = new Elysia({ prefix: "/message" })
 
       //「全通知」モードのユーザー向け: チャンネル参加者へ配信
       //  除外対象: 送信者本人 / mention 済 / reply 対象 (二重通知防止)
-      const channelMembers = await db.channelJoin.findMany({
-        where: { channelId },
-        select: { userId: true },
+      const channelMembers = await db.query.channelJoins.findMany({
+        where: eq(channelJoins.channelId, channelId),
+        columns: { userId: true },
       });
       const excluded = new Set<string>([_userId, ...mentionedSet]);
       if (replyTargetUserId) excluded.add(replyTargetUserId);

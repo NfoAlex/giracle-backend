@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import { db } from "..";
+import { messageReactions } from "../db/schema";
 
 /**
  * メッセージのリアクション総数を自分のがあるかを調べつつ計算する
@@ -17,13 +19,9 @@ export default async function CalculateReactionTotal(
   }[]
 > {
   //全リアクションを取得し、集計・自分判定
-  const allReactions = await db.messageReaction.findMany({
-    where: {
-      messageId: messageId,
-    },
-    orderBy: {
-      reactedAt: "asc",
-    },
+  const allReactions = await db.query.messageReactions.findMany({
+    where: eq(messageReactions.messageId, messageId),
+    orderBy: (t, { asc }) => asc(t.reactedAt),
   });
 
   //emojiCodeごとにカウントと自分のリアクション有無をまとめる

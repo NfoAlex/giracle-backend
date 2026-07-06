@@ -15,14 +15,14 @@ export const user = new Elysia({ prefix: "/user" })
       );
 
       //新規登録を通知するチャンネルId
-      const serverConfigAnnounceChannelId = await db.serverConfig.findFirst({
-        select: {
+      const serverConfigAnnounceChannelId = await db.query.serverConfigs.findFirst({
+        columns: {
           RegisterAnnounceChannelId: true,
         },
       });
       //登録通知用チャンネルIdが登録されているならそこへ通知、ないなら他を探して通知
       if (
-        serverConfigAnnounceChannelId !== null &&
+        serverConfigAnnounceChannelId !== undefined &&
         serverConfigAnnounceChannelId?.RegisterAnnounceChannelId !== ""
       ) {
         Util.sendSystemMessage(
@@ -34,8 +34,8 @@ export const user = new Elysia({ prefix: "/user" })
       } else {
         //通知チャンネルが無いなら...
         //最初のチャンネルを探して通知
-        const firstChannel = await db.channel.findFirst({
-          select: {
+        const firstChannel = await db.query.channels.findFirst({
+          columns: {
             id: true,
           },
         });

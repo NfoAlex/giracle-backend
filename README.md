@@ -1,6 +1,6 @@
 # giracle-backend
 
-Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun) + [Prisma](https://www.prisma.io/) (libsql/SQLite) 構成。
+Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun) + [Drizzle ORM](https://orm.drizzle.team/) (bun:sqlite) 構成。
 
 ---
 
@@ -10,8 +10,8 @@ Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun
 |------|------|
 | ランタイム | Bun |
 | フレームワーク | Elysia v1.4 |
-| ORM | Prisma v7 (adapter: libsql) |
-| DB | SQLite (libsql) |
+| ORM | Drizzle ORM |
+| DB | SQLite (`bun:sqlite`) |
 | リンター | Biome |
 
 ---
@@ -26,8 +26,8 @@ bun i
 ## Development 開発用実行
 初回の実行ならDBのプッシュと初期データの挿入を行う。
 ```bash
-bunx prisma db push #DB構造の適用
-bun ./prisma/seeds.ts #初期データの挿入
+bunx drizzle-kit push #DB構造の適用
+bun ./src/db/seeds.ts #初期データの挿入
 ```
 開発用に実行するなら
 
@@ -48,6 +48,10 @@ giracle-backend/
 │   ├── ws.ts                 # WebSocket ハンドラ
 │   ├── Middlewares.ts        # ミドルウェア定義
 │   ├── Utils/                # 共通ユーティリティ
+│   ├── db/                   # DB接続・スキーマ・シード (Drizzle)
+│   │   ├── index.ts          # bun:sqlite + drizzle() インスタンス
+│   │   ├── schema.ts         # テーブル定義 + relations + 型export
+│   │   └── seeds.ts          # 初期データ投入
 │   └── components/           # 機能モジュール
 │       ├── Channel/
 │       │   ├── channel.module.ts   # ルーティング
@@ -68,10 +72,7 @@ giracle-backend/
 │       └── User/
 │           ├── user.module.ts
 │           └── user.service.ts
-├── prisma/
-│   ├── schema.prisma         # DBスキーマ定義
-│   ├── seeds.ts              # シードデータ
-│   └── generated/            # Prisma 生成クライアント
+├── drizzle.config.ts         # drizzle-kit 設定
 └── STORAGE/                  # アップロードファイル保存先
     ├── file/
     ├── icon/
@@ -300,7 +301,7 @@ giracle-backend/
 
 | 変数名 | デフォルト | 概要 |
 |--------|-----------|------|
-| `DATABASE_URL` | `file:./dev.db` | DB 接続 URL |
+| `DATABASE_URL` | `file:./dev.db` | ローカル SQLite ファイルパス(`file:` プレフィックス付き。`bun:sqlite` 採用のためリモート libsql 接続は不可) |
 | `CORS_ORIGIN` | - | CORS 許可オリジン |
 | `RATE_LIMIT_ENABLED` | - | `"true"` でレート制限有効化 |
 | `RATE_LIMIT_ANONYMOUS_COUNT` | `25` | 未認証の制限リクエスト数 |
@@ -344,7 +345,7 @@ giracle-backend/
 
 ### 開発・セットアップ
 
-- **初回セットアップの順序を守る。** `bunx prisma db push` → `bun ./prisma/seeds.ts` の順で実行する。シードで `ServerConfig` と `HOST` / `MEMBER` ロールが作られる。これらの投入前はサーバーが正常に動作しない。
+- **初回セットアップの順序を守る。** `bunx drizzle-kit push` → `bun ./src/db/seeds.ts` の順で実行する。シードで `ServerConfig` と `HOST` / `MEMBER` ロールが作られる。これらの投入前はサーバーが正常に動作しない。
 - **最初に登録したユーザーが `HOST`（全権限）になる。** セットアップ直後の初回登録は必ず管理者本人が行うこと。
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
