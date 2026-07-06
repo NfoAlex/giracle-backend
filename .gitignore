@@ -43,10 +43,11 @@ yarn-error.log*
 package-lock.json
 **/*.bun
 
-# Prisma
-/prisma/.env
+# SQLite (Drizzle)
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 /.idea
 
 # ユーザーのアップロード

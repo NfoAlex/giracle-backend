@@ -1,6 +1,8 @@
+import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { FETCH, INIT } from "./util";
 import { db } from "../src";
+import { channelMutes, notificationConfigs, notificationDevices } from "../src/db/schema";
 import { Util } from "../src/Util";
 
 // web-push の sendNotification をモック化: 実際のFCMは叩かない
@@ -299,26 +301,30 @@ describe("SendPushNotification :: 分岐", () => {
   const testDeviceKeys = JSON.stringify({ p256dh: "x", auth: "y" });
 
   const setupDevice = async () => {
-    await db.notificationDevice.upsert({
-      where: { token: testDeviceToken },
-      create: {
+    await db
+      .insert(notificationDevices)
+      .values({
         token: testDeviceToken,
         platform: "web",
         keys: testDeviceKeys,
         userId: testUser,
-      },
-      update: { keys: testDeviceKeys, platform: "web", userId: testUser },
-    });
+      })
+      .onConflictDoUpdate({
+        target: notificationDevices.token,
+        set: { keys: testDeviceKeys, platform: "web", userId: testUser },
+      });
   };
 
   it("enabled=false ならスキップ", async () => {
     sendNotificationMock.mockClear();
     await setupDevice();
-    await db.notificationConfig.upsert({
-      where: { userId: testUser },
-      create: { userId: testUser, enabled: false, mode: "all" },
-      update: { enabled: false, mode: "all" },
-    });
+    await db
+      .insert(notificationConfigs)
+      .values({ userId: testUser, enabled: false, mode: "all" })
+      .onConflictDoUpdate({
+        target: notificationConfigs.userId,
+        set: { enabled: false, mode: "all" },
+      });
 
     await Util.sendPushNotification({
       userId: testUser,
@@ -332,10 +338,10 @@ describe("SendPushNotification :: 分岐", () => {
   it("mode=mention のとき message はスキップ", async () => {
     sendNotificationMock.mockClear();
     await setupDevice();
-    await db.notificationConfig.update({
-      where: { userId: testUser },
-      data: { enabled: true, mode: "mention" },
-    });
+    await db
+      .update(notificationConfigs)
+      .set({ enabled: true, mode: "mention" })
+      .where(eq(notificationConfigs.userId, testUser));
 
     await Util.sendPushNotification({
       userId: testUser,
@@ -362,13 +368,12 @@ describe("SendPushNotification :: 分岐", () => {
   it("ChannelMute があるとスキップ", async () => {
     sendNotificationMock.mockClear();
     await setupDevice();
-    await db.channelMute.upsert({
-      where: {
-        userId_channelId: { userId: testUser, channelId: testChannel },
-      },
-      create: { userId: testUser, channelId: testChannel },
-      update: {},
+    const existingMute = await db.query.channelMutes.findFirst({
+      where: and(eq(channelMutes.userId, testUser), eq(channelMutes.channelId, testChannel)),
     });
+    if (existingMute === undefined) {
+      await db.insert(channelMutes).values({ userId: testUser, channelId: testChannel });
+    }
 
     await Util.sendPushNotification({
       userId: testUser,
@@ -379,11 +384,9 @@ describe("SendPushNotification :: 分岐", () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
 
     // クリーンアップ
-    await db.channelMute.delete({
-      where: {
-        userId_channelId: { userId: testUser, channelId: testChannel },
-      },
-    });
+    await db
+      .delete(channelMutes)
+      .where(and(eq(channelMutes.userId, testUser), eq(channelMutes.channelId, testChannel)));
   });
 
   it("410 Gone なら DB から購読削除", async () => {
@@ -401,9 +404,9 @@ describe("SendPushNotification :: 分岐", () => {
       payload: { title: "t", body: "b" },
     });
 
-    const remain = await db.notificationDevice.findUnique({
-      where: { token: testDeviceToken },
+    const remain = await db.query.notificationDevices.findFirst({
+      where: eq(notificationDevices.token, testDeviceToken),
     });
-    expect(remain).toBeNull();
+    expect(remain).toBeUndefined();
   });
 });

@@ -1,22 +1,28 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
+import { eq } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
+import {
+  channelJoinOnDefaults,
+  customEmojis,
+  invitations,
+  serverConfigs,
+  users,
+} from "../../db/schema";
 
 export namespace ServiceServer {
   export const Config = async () => {
     //サーバーの情報取得
-    const config = await db.serverConfig.findFirst();
+    const config = await db.query.serverConfigs.findFirst();
     //最初のユーザーになるかどうか
-    const firstUser = await db.user.findFirst({
-      skip: 1,
-    });
-    const isFirstUser = firstUser === null;
+    const firstUser = await db.select().from(users).offset(1).limit(1).get();
+    const isFirstUser = firstUser === undefined;
     //デフォルトで参加するチャンネル
-    const defaultJoinChannelFetched = await db.channelJoinOnDefault.findMany({
-      select: {
+    const defaultJoinChannelFetched = await db.query.channelJoinOnDefaults.findMany({
+      with: {
         channel: true,
       },
     });
@@ -48,43 +54,41 @@ export namespace ServiceServer {
   };
 
   export const GetInvite = async () => {
-    const invites = await db.invitation.findMany();
+    const invites = await db.query.invitations.findMany();
     return invites;
   };
 
   export const CreateInvite = async (inviteCode: string, _userId: string) => {
-    const newInvite = await db.invitation.create({
-      data: {
+    const [newInvite] = await db
+      .insert(invitations)
+      .values({
         inviteCode,
         createdUserId: _userId,
-      },
-    });
+      })
+      .returning();
 
     return newInvite;
   };
 
   export const DeleteInvite = async (inviteId: number) => {
-    await db.invitation.delete({
-      where: {
-        id: inviteId,
-      },
-    });
+    await db.delete(invitations).where(eq(invitations.id, inviteId));
 
     return;
   };
 
   export const ChangeInfo = async (name: string, introduction: string) => {
-    const serverinfo = await db.serverConfig.updateManyAndReturn({
-      data: {
+    const [serverinfo] = await db
+      .update(serverConfigs)
+      .set({
         name,
         introduction,
-      },
-    });
+      })
+      .returning();
 
     //ここでデータ取得失敗したら500エラー
-    if (serverinfo === null) throw status(500, "Server config not found");
+    if (serverinfo === undefined) throw status(500, "Server config not found");
 
-    return serverinfo[0];
+    return serverinfo;
   };
 
   export const ChangeConfig = async (
@@ -95,34 +99,33 @@ export namespace ServiceServer {
     MessageMaxFileSize?: number,
     DefaultJoinChannel?: string[],
   ) => {
-    const serverinfo = await db.serverConfig.updateManyAndReturn({
-      data: {
+    const [serverinfo] = await db
+      .update(serverConfigs)
+      .set({
         RegisterAvailable,
         RegisterInviteOnly,
         RegisterAnnounceChannelId,
         MessageMaxLength,
         MessageMaxFileSize,
-      },
-    });
+      })
+      .returning();
 
     //ここでデータ取得
-    if (serverinfo === null) throw status(500, "Server config not found");
+    if (serverinfo === undefined) throw status(500, "Server config not found");
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
-      //デフォルト参加チャンネル全部削除
-      await db.channelJoinOnDefault.deleteMany({});
-      const defaultChannelIdsPushing: { channelId: string }[] = [];
-      //渡されたチャンネルIdをDBへ追加
-      for (const channelId of DefaultJoinChannel) {
-        defaultChannelIdsPushing.push({ channelId });
-      }
-      await db.channelJoinOnDefault.createMany({
-        data: defaultChannelIdsPushing,
+      //デフォルト参加チャンネル全部削除して渡されたチャンネルIdを挿入(1トランザクションで)
+      const defaultChannelIdsPushing = DefaultJoinChannel.map((channelId) => ({ channelId }));
+      db.transaction((tx) => {
+        tx.delete(channelJoinOnDefaults).run();
+        if (defaultChannelIdsPushing.length > 0) {
+          tx.insert(channelJoinOnDefaults).values(defaultChannelIdsPushing).run();
+        }
       });
     }
 
-    return serverinfo[0];
+    return serverinfo;
   };
 
   export const ChangeBanner = async (banner: File) => {
@@ -153,12 +156,10 @@ export namespace ServiceServer {
 
   export const GetCustomEmoji = async (code: string) => {
     //絵文字データを取得、無ければエラー
-    const emoji = await db.customEmoji.findFirst({
-      where: {
-        code,
-      },
+    const emoji = await db.query.customEmojis.findFirst({
+      where: eq(customEmojis.code, code),
     });
-    if (emoji === null) throw status(404, "Custom emoji not found");
+    if (emoji === undefined) throw status(404, "Custom emoji not found");
 
     //アイコン読み取り、存在確認して返す
     const emojiGif = Bun.file(`./STORAGE/custom-emoji/${emoji.id}.gif`);
@@ -172,7 +173,7 @@ export namespace ServiceServer {
   };
 
   export const GetCustomEmojis = async () => {
-    const emojis = await db.customEmoji.findMany();
+    const emojis = await db.query.customEmojis.findMany();
     return emojis;
   };
 
@@ -195,24 +196,23 @@ export namespace ServiceServer {
     //絵文字コードのバリデーション
     if (emojiCode.includes(" "))
       throw status(400, "Emoji code cannot contain spaces");
-    if (/[^\u0020-\u007E]/.test(emojiCode))
+    if (/[^ -~]/.test(emojiCode))
       throw status(400, "Emoji code cannot contain full-width characters");
 
     //絵文字コードが既に存在するか確認
-    const emojiExist = await db.customEmoji.findFirst({
-      where: {
-        code: emojiCode,
-      },
+    const emojiExist = await db.query.customEmojis.findFirst({
+      where: eq(customEmojis.code, emojiCode),
     });
-    if (emojiExist !== null) throw status(400, "Emoji code already exists");
+    if (emojiExist !== undefined) throw status(400, "Emoji code already exists");
 
     //DBに登録
-    const emojiUploaded = await db.customEmoji.create({
-      data: {
+    const [emojiUploaded] = await db
+      .insert(customEmojis)
+      .values({
         code: emojiCode,
         uploadedUserId: _userId,
-      },
-    });
+      })
+      .returning();
 
     //拡張子取得
     const ext = emoji.type.split("/")[1];
@@ -239,11 +239,10 @@ export namespace ServiceServer {
 
   export const DeleteCustomEmoji = async (emojiCode: string) => {
     //絵文字を削除しデータ取得
-    const emojiDeleted = await db.customEmoji.delete({
-      where: {
-        code: emojiCode,
-      },
-    });
+    const [emojiDeleted] = await db
+      .delete(customEmojis)
+      .where(eq(customEmojis.code, emojiCode))
+      .returning();
 
     //絵文字の画像ファイルを削除
     await unlink(`./STORAGE/custom-emoji/${emojiDeleted.id}.png`).catch(

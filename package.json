@@ -7,28 +7,27 @@
     "dev": "bun run --watch src/index.ts",
     "build-win": "bun build --compile --minify-whitespace --minify-syntax --target bun --outfile ./dist/server ./src/index.ts",
     "build-linux": "bun build --compile --minify-whitespace --minify-syntax --target=bun-linux-x64-modern --outfile ./dist/server ./src/index.ts",
-    "build-node-js": "bun build --minify-whitespace --minify-syntax --target=node --outfile ./dist/server-node.js ./src/index.ts",
-    "build-bun-js": "bun build --minify-whitespace --minify-syntax --target=bun --outfile ./dist/server-bun.js ./src/index.ts"
-  },
-  "prisma": {
-    "seed": "bun ./prisma/seeds.ts"
+    "build-bun-js": "bun build --minify-whitespace --minify-syntax --target=bun --outfile ./dist/server-bun.js ./src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:baseline": "bun ./src/db/baseline.ts",
+    "db:seed": "bun ./src/db/seeds.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
     "@elysiajs/swagger": "^1.3.1",
-    "@prisma/adapter-libsql": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.29",
     "image-size": "^2.0.2",
     "open-graph-scraper": "^6.12.0",
-    "prisma": "^7.8.0",
     "sharp": "^0.35.3",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
     "@types/web-push": "^3.6.4",
-    "bun-types": "^1.3.14"
+    "bun-types": "^1.3.14",
+    "drizzle-kit": "^0.31.10"
   },
   "module": "src/index.js"
 }

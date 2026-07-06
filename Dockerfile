@@ -12,13 +12,13 @@ RUN bun i --prod
 
 COPY .env .
 COPY src ./src
-COPY prisma ./prisma
+COPY drizzle ./drizzle
+COPY drizzle.config.ts .
 COPY tsconfig.json .
 
 ENV NODE_ENV production
 
-RUN bunx prisma db push
-RUN bunx prisma generate
+RUN bunx drizzle-kit migrate
 
 RUN bun build \
 	--compile \

@@ -1,5 +1,7 @@
+import { and, eq, exists } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { db } from ".";
+import { tokens, users } from "./db/schema";
 import { ServerWebSocket } from "elysia/ws/bun";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
@@ -41,15 +43,11 @@ export const wsHandler = new Elysia().ws("/ws", {
       return;
     }
 
-    const user = await db.user.findFirst({
-      where: {
-        Token: {
-          some: {
-            token: token,
-          },
-        },
-      },
-      include: {
+    const user = await db.query.users.findFirst({
+      where: exists(
+        db.select().from(tokens).where(and(eq(tokens.userId, users.id), eq(tokens.token, token as string))),
+      ),
+      with: {
         ChannelJoin: true,
       },
     });
@@ -94,10 +92,8 @@ export const wsHandler = new Elysia().ws("/ws", {
       return;
     }
 
-    const userToken = await db.token.findFirst({
-      where: {
-        token: token,
-      },
+    const userToken = await db.query.tokens.findFirst({
+      where: eq(tokens.token, token as string),
     });
     if (!userToken) {
       return;

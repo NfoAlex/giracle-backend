@@ -1,32 +1,37 @@
+import { and, eq, exists, gte, inArray, like, lte, notExists, or, type SQL } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
-import type { Message } from "../../../prisma/generated/client";
-import { WSUnsubscribe } from "../../ws";
+import {
+  channelJoinOnDefaults,
+  channelJoins,
+  channelViewableRoles,
+  channels,
+  messageReadTimes,
+  messages,
+  users,
+} from "../../db/schema";
+import type { Message } from "../../db/schema";
 import { Util } from "../../Util";
+import { WSUnsubscribe } from "../../ws";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoined = await db.channelJoin.findFirst({
-      where: {
-        userId: _userId,
-        channelId,
-      },
+    const channelJoined = await db.query.channelJoins.findFirst({
+      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
     });
     //既に参加している
-    if (channelJoined !== null) {
+    if (channelJoined !== undefined) {
       throw status(400, "Already joined");
     }
 
     //チャンネルが存在するか確認
-    const channelData = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
+    const channelData = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
     });
     //チャンネルが存在しない
-    if (channelData === null) {
+    if (channelData === undefined) {
       throw status(404, "Channel not found");
     }
     //チャンネルを見られないようなユーザーだと存在しないとしてエラーを出す
@@ -34,11 +39,9 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
 
-    await db.channelJoin.create({
-      data: {
-        userId: _userId,
-        channelId,
-      },
+    await db.insert(channelJoins).values({
+      userId: _userId,
+      channelId,
     });
 
     return;
@@ -46,34 +49,21 @@ export namespace ServiceChannel {
 
   export const Leave = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoinData = await db.channelJoin.findFirst({
-      where: {
-        userId: _userId,
-        channelId,
-      },
+    const channelJoinData = await db.query.channelJoins.findFirst({
+      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
     });
-    if (channelJoinData === null) {
+    if (channelJoinData === undefined) {
       throw status(404, "You are not joined this channel");
     }
 
     //既読時間データを削除
-    await db.messageReadTime
-      .delete({
-        where: {
-          channelId_userId: {
-            channelId,
-            userId: _userId,
-          },
-        },
-      })
-      .catch(() => { });
+    await db
+      .delete(messageReadTimes)
+      .where(and(eq(messageReadTimes.channelId, channelId), eq(messageReadTimes.userId, _userId)));
     //チャンネル参加データを削除
-    await db.channelJoin.deleteMany({
-      where: {
-        userId: _userId,
-        channelId,
-      },
-    });
+    await db
+      .delete(channelJoins)
+      .where(and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)));
   };
 
   export const GetInfo = async (channelId: string, _userId: string) => {
@@ -82,20 +72,18 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
 
-    const channelData = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
-      include: {
+    const channelData = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+      with: {
         ChannelViewableRole: {
-          select: {
+          columns: {
             roleId: true,
           },
         },
       },
     });
 
-    if (channelData === null) {
+    if (channelData === undefined) {
       throw status(404, "Channel not found");
     }
 
@@ -104,20 +92,19 @@ export namespace ServiceChannel {
 
   export const List = async (_userId: string) => {
     //ロール閲覧制限のないチャンネルリストから取得
-    const channelList = await db.channel.findMany({
-      where: {
-        ChannelViewableRole: {
-          none: {},
-        },
-      },
-    });
+    const channelList = await db
+      .select()
+      .from(channels)
+      .where(
+        notExists(
+          db.select().from(channelViewableRoles).where(eq(channelViewableRoles.channelId, channels.id)),
+        ),
+      );
 
     //ユーザーのロールを取得
-    const user = await db.user.findUnique({
-      where: {
-        id: _userId,
-      },
-      include: {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, _userId),
+      with: {
         RoleLink: true,
       },
     });
@@ -128,37 +115,39 @@ export namespace ServiceChannel {
     const roleIds = user.RoleLink.map((roleLink) => roleLink.roleId);
     //HOSTロールがあるなら全チャンネルを取得
     if (roleIds.includes("HOST")) {
-      return await db.channel.findMany();
+      return await db.select().from(channels);
     }
 
-    const channelsLimited = await db.channel.findMany({
-      where: {
-        OR: [
-          {
-            //閲覧制限があり、自分がそのロールに所属している
-            ChannelViewableRole: {
-              some: {
-                roleId: {
-                  in: roleIds,
-                },
-              },
-            },
-          },
-          {
-            //自分が作成した
-            createdUserId: _userId,
-          },
-          {
-            //自分が参加している
-            ChannelJoin: {
-              some: {
-                userId: _userId,
-              },
-            },
-          },
-        ],
-      },
-    });
+    const channelsLimited = await db
+      .select()
+      .from(channels)
+      .where(
+        or(
+          //閲覧制限があり、自分がそのロールに所属している
+          roleIds.length > 0
+            ? exists(
+                db
+                  .select()
+                  .from(channelViewableRoles)
+                  .where(
+                    and(
+                      eq(channelViewableRoles.channelId, channels.id),
+                      inArray(channelViewableRoles.roleId, roleIds),
+                    ),
+                  ),
+              )
+            : undefined,
+          //自分が作成した
+          eq(channels.createdUserId, _userId),
+          //自分が参加している
+          exists(
+            db
+              .select()
+              .from(channelJoins)
+              .where(and(eq(channelJoins.channelId, channels.id), eq(channelJoins.userId, _userId))),
+          ),
+        ),
+      );
 
     //重複を取り除く
     const mergedChannels = [...channelList, ...channelsLimited];
@@ -184,13 +173,11 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //チャンネルの存在確認
-    const channel = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
-      select: { id: true },
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+      columns: { id: true },
     });
-    if (channel === null) {
+    if (channel === undefined) {
       throw status(404, "Channel not found");
     }
     //チャンネルへのアクセス権限があるか調べる
@@ -208,14 +195,12 @@ export namespace ServiceChannel {
       }
     }
 
-    let messageDataFrom: Message | null = null;
+    let messageDataFrom: Message | undefined = undefined;
     //基準位置になるメッセージIdが指定されているなら
     if (messageIdFrom !== undefined) {
       //取得、格納
-      messageDataFrom = await db.message.findUnique({
-        where: {
-          id: messageIdFrom,
-        },
+      messageDataFrom = await db.query.messages.findFirst({
+        where: eq(messages.id, messageIdFrom),
       });
       //無ければエラー
       if (!messageDataFrom) {
@@ -224,115 +209,76 @@ export namespace ServiceChannel {
     }
 
     //基準のメッセージIdか時間指定があるなら時間を取得、取得設定として設定
-    let optionDate: { createdAt: { lte: Date } | { gte: Date } } | null = null;
-    if (messageDataFrom !== null) {
+    let dateCondition: SQL | undefined = undefined;
+    if (messageDataFrom !== undefined) {
       //基準のメッセージIdによる取得データがあるなら
       //取得時間方向に合わせて設定を指定
       if (fetchDirection === "older") {
         //古い方向に取得する場合
-        optionDate = {
-          createdAt: {
-            lte: messageDataFrom.createdAt,
-          },
-        };
+        dateCondition = lte(messages.createdAt, messageDataFrom.createdAt);
       } else {
         //新しい方向に取得する場合
         //指定時間以降の最初のメッセージを取得
-        const messageTakingFrom = await db.message.findMany({
-          where: {
-            channelId: channelId,
-            createdAt: {
-              gte: messageDataFrom.createdAt,
-            },
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-          take: fetchLength,
+        const messageTakingFrom = await db.query.messages.findMany({
+          where: and(eq(messages.channelId, channelId), gte(messages.createdAt, messageDataFrom.createdAt)),
+          orderBy: (t, { asc }) => asc(t.createdAt),
+          limit: fetchLength,
         });
-        const optionLte =
-          messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
+        const optionLte = messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
         //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
-        optionDate = {
-          createdAt: {
-            lte: optionLte,
-            gte: messageDataFrom.createdAt,
-          },
-        };
+        dateCondition =
+          optionLte !== undefined
+            ? and(lte(messages.createdAt, optionLte), gte(messages.createdAt, messageDataFrom.createdAt))
+            : gte(messages.createdAt, messageDataFrom.createdAt);
       }
     } else if (messageTimeFrom !== undefined) {
       //メッセージId指定がない場合、時間指定を使う
       //取得時間方向に合わせて設定を指定
       if (fetchDirection === "older") {
         //古い方向に取得する場合
-        optionDate = {
-          createdAt: {
-            lte: new Date(messageTimeFrom),
-          },
-        };
+        dateCondition = lte(messages.createdAt, new Date(messageTimeFrom));
       } else {
         //新しい方向に取得する場合
         //指定時間以降の最初のメッセージを取得
-        const messageTakingFrom = await db.message.findMany({
-          where: {
-            channelId: channelId,
-            createdAt: {
-              gte: new Date(messageTimeFrom),
-            },
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-          take: fetchLength,
+        const messageTakingFrom = await db.query.messages.findMany({
+          where: and(eq(messages.channelId, channelId), gte(messages.createdAt, new Date(messageTimeFrom))),
+          orderBy: (t, { asc }) => asc(t.createdAt),
+          limit: fetchLength,
         });
+        const optionLte = messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
         //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
-        optionDate = {
-          createdAt: {
-            lte:
-              messageTakingFrom[messageTakingFrom.length - 1]?.createdAt ||
-              undefined,
-            gte: new Date(messageTimeFrom),
-          },
-        };
+        dateCondition =
+          optionLte !== undefined
+            ? and(lte(messages.createdAt, optionLte), gte(messages.createdAt, new Date(messageTimeFrom)))
+            : gte(messages.createdAt, new Date(messageTimeFrom));
       }
     }
 
     //履歴を取得する
-    const history = await db.message.findMany({
-      where: {
-        channelId: channelId,
-        ...optionDate,
-      },
-      include: {
+    const history = await db.query.messages.findMany({
+      where: dateCondition !== undefined ? and(eq(messages.channelId, channelId), dateCondition) : eq(messages.channelId, channelId),
+      with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
       },
-      take: fetchLength,
-      orderBy: { createdAt: "desc" },
+      limit: fetchLength,
+      orderBy: (t, { desc }) => desc(t.createdAt),
     });
 
     //履歴の最新まで取ったかどうかを判別するために最初と最後のメッセージを取得
-    const firstMessageOfChannel = await db.message.findFirst({
-      select: {
+    const firstMessageOfChannel = await db.query.messages.findFirst({
+      columns: {
         id: true,
       },
-      where: {
-        channelId: channelId,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
+      where: eq(messages.channelId, channelId),
+      orderBy: (t, { asc }) => asc(t.createdAt),
     });
-    const latestMessageOfChannel = await db.message.findFirst({
-      select: {
+    const latestMessageOfChannel = await db.query.messages.findFirst({
+      columns: {
         id: true,
       },
-      where: {
-        channelId: channelId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+      where: eq(messages.channelId, channelId),
+      orderBy: (t, { desc }) => desc(t.createdAt),
     });
 
     //取得した履歴が最新まで取得したか、または最初まで取得したかを判別
@@ -340,10 +286,10 @@ export namespace ServiceChannel {
     let atTop = false;
     //取得方向によって判別方法が異なる
     if (fetchDirection === "newer") {
-      if (history.length === 0 && firstMessageOfChannel !== null) {
+      if (history.length === 0 && firstMessageOfChannel !== undefined) {
         //取得した履歴が空だけど最古のメッセージが存在する場合
         atTop = false;
-      } else if (history[0] !== undefined && firstMessageOfChannel !== null) {
+      } else if (history[0] !== undefined && firstMessageOfChannel !== undefined) {
         //取得した履歴がある場合
         atTop = firstMessageOfChannel?.id === history.at(-1)?.id;
       } else {
@@ -352,10 +298,10 @@ export namespace ServiceChannel {
       }
       atEnd = history.length < (fetchLength || 30);
     } else {
-      if (history.length === 0 && latestMessageOfChannel !== null) {
+      if (history.length === 0 && latestMessageOfChannel !== undefined) {
         //取得した履歴が空だけど最新のメッセージが存在する場合
         atEnd = false;
-      } else if (history[0] !== undefined && latestMessageOfChannel !== null) {
+      } else if (history[0] !== undefined && latestMessageOfChannel !== undefined) {
         //取得した履歴がある場合
         atEnd = latestMessageOfChannel?.id === history[0].id;
       } else {
@@ -421,16 +367,11 @@ export namespace ServiceChannel {
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
     //チャンネル検索
-    const channelInfos = await db.channel.findMany({
-      where: {
-        name: {
-          contains: query,
-        },
-        id: {
-          in: channelIdsViewable,
-        },
-      },
-    });
+    if (channelIdsViewable.length === 0) return [];
+    const channelInfos = await db
+      .select()
+      .from(channels)
+      .where(and(like(channels.name, `%${query}%`), inArray(channels.id, channelIdsViewable)));
 
     return channelInfos;
   };
@@ -441,12 +382,9 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかをチャンネル情報と共に確認
-    const requestedUsersChannelJoin = await db.channelJoin.findFirst({
-      where: {
-        userId: _userId,
-        channelId,
-      },
-      include: {
+    const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
+      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      with: {
         channel: true,
       },
     });
@@ -455,16 +393,12 @@ export namespace ServiceChannel {
     }
 
     //対象ユーザーの存在を参加情報とともに確認
-    const user = await db.user.findUnique({
-      where: {
-        id: targetUserId,
-      },
-      include: {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, targetUserId),
+      with: {
         ChannelJoin: {
-          where: {
-            channelId,
-          },
-          select: {
+          where: eq(channelJoins.channelId, channelId),
+          columns: {
             userId: true,
           },
         },
@@ -479,11 +413,9 @@ export namespace ServiceChannel {
     }
 
     //チャンネル参加させる
-    await db.channelJoin.create({
-      data: {
-        userId: targetUserId,
-        channelId,
-      },
+    await db.insert(channelJoins).values({
+      userId: targetUserId,
+      channelId,
     });
 
     return;
@@ -500,23 +432,17 @@ export namespace ServiceChannel {
     }
 
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかを確認
-    const requestedUsersChannelJoin = await db.channelJoin.findFirst({
-      where: {
-        userId: _userId,
-        channelId,
-      },
+    const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
+      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
     });
     if (!requestedUsersChannelJoin) {
       throw status(403, "You are not joined this channel");
     }
 
     //チャンネル参加データを削除(退出させる)
-    await db.channelJoin.deleteMany({
-      where: {
-        userId: targetUserId,
-        channelId,
-      },
-    });
+    await db
+      .delete(channelJoins)
+      .where(and(eq(channelJoins.userId, targetUserId), eq(channelJoins.channelId, channelId)));
 
     return;
   };
@@ -530,12 +456,10 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //チャンネルの存在を確認
-    const channel = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
     });
-    if (channel === null) {
+    if (channel === undefined) {
       throw status(404, "Channel not found");
     }
 
@@ -567,71 +491,44 @@ export namespace ServiceChannel {
     if (isArchived !== undefined) updatingValues.isArchived = isArchived;
 
     //チャンネルデータを更新する
-    await db.channel.update({
-      where: {
-        id: channelId,
-      },
-      data: {
-        ...updatingValues,
-      },
-    });
+    if (Object.keys(updatingValues).length > 0) {
+      await db.update(channels).set(updatingValues).where(eq(channels.id, channelId));
+    }
 
     //チャンネル閲覧ロールを更新
     if (viewableRole !== undefined) {
       // 既存のroleIdを取得
-      const existingRoles = await db.channelViewableRole.findMany({
-        where: {
-          channelId: channelId,
-        },
-        select: {
-          roleId: true,
-        },
-      });
+      const existingRoles = await db
+        .select({ roleId: channelViewableRoles.roleId })
+        .from(channelViewableRoles)
+        .where(eq(channelViewableRoles.channelId, channelId));
 
       // 既存のroleIdをセットに変換
-      //const existingRoleIds = new Set(existingRoles.map(role => role.roleId));
-      const _existingRoleIds = existingRoles.map((role) => role.roleId);
-      const existingRoleIds = new Set(_existingRoleIds);
+      const existingRoleIds = new Set(existingRoles.map((role) => role.roleId));
 
       // 新しいroleIdをフィルタリング
       const newRoleIds = viewableRole.filter(
         (roleId) => !existingRoleIds.has(roleId),
       );
 
-      //現在の閲覧可能roleIdを削除
-      await db.channelViewableRole.deleteMany({
-        where: {
-          channelId,
-        },
-      });
+      //現在の閲覧可能roleIdを削除、新しいroleIdを挿入(1トランザクションにまとめて中間状態を無くす)
+      db.transaction((tx) => {
+        tx.delete(channelViewableRoles).where(eq(channelViewableRoles.channelId, channelId)).run();
 
-      // 新しいroleIdを挿入
-      if (newRoleIds.length > 0) {
-        await db.channel.update({
-          where: {
-            id: channelId,
-          },
-          data: {
-            ChannelViewableRole: {
-              createMany: {
-                data: newRoleIds.map((roleId) => ({
-                  roleId,
-                })),
-              },
-            },
-          },
-        });
-      }
+        if (newRoleIds.length > 0) {
+          tx.insert(channelViewableRoles)
+            .values(newRoleIds.map((roleId) => ({ channelId, roleId })))
+            .run();
+        }
+      });
     }
 
     //更新後のデータを取得
-    const channelDataUpdated = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
-      include: {
+    const channelDataUpdated = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+      with: {
         ChannelViewableRole: {
-          select: {
+          columns: {
             roleId: true,
           },
         },
@@ -646,29 +543,24 @@ export namespace ServiceChannel {
     description: string,
     _userId: string,
   ) => {
-    const newChannel = await db.channel.create({
-      data: {
+    const [newChannel] = await db
+      .insert(channels)
+      .values({
         name: channelName,
         description: description,
-        user: {
-          connect: {
-            id: _userId,
-          },
-        },
-      },
-    });
+        createdUserId: _userId,
+      })
+      .returning();
 
     return newChannel;
   };
 
   export const Delete = async (channelId: string, _userId: string, server: Bun.Server<unknown> | null) => {
     //チャンネルの存在を確認
-    const channel = await db.channel.findUnique({
-      where: {
-        id: channelId,
-      },
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
     });
-    if (channel === null) {
+    if (channel === undefined) {
       throw status(404, "Channel not found");
     }
 
@@ -688,50 +580,20 @@ export namespace ServiceChannel {
       }),
     );
     //チャンネルに参加しているユーザーのWS登録を解除
-    await db.channelJoin
-      .findMany({
-        where: {
-          channelId,
-        },
-      })
-      .then((data) => {
-        for (const channelJoinData of data) {
-          //userWSInstance.get(channelJoinData.userId)?.unsubscribe(`channel::${channelId}`);
-          WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
-        }
-      });
+    const joinedUsers = await db.query.channelJoins.findMany({
+      where: eq(channelJoins.channelId, channelId),
+    });
+    for (const channelJoinData of joinedUsers) {
+      WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
+    }
 
-    //メッセージデータを削除
-    const delMessage = db.message.deleteMany({
-      where: {
-        channelId,
-      },
+    //メッセージ・チャンネル参加データ・デフォルト参加データ・チャンネル本体を1トランザクションで削除
+    db.transaction((tx) => {
+      tx.delete(messages).where(eq(messages.channelId, channelId)).run();
+      tx.delete(channelJoins).where(eq(channelJoins.channelId, channelId)).run();
+      tx.delete(channelJoinOnDefaults).where(eq(channelJoinOnDefaults.channelId, channelId)).run();
+      tx.delete(channels).where(eq(channels.id, channelId)).run();
     });
-    //チャンネル参加データを削除
-    const delChannelJoin = db.channelJoin.deleteMany({
-      where: {
-        channelId,
-      },
-    });
-    //チャンネルデフォルト参加データを削除
-    const delJoinOnDefault = db.channelJoinOnDefault.deleteMany({
-      where: {
-        channelId,
-      },
-    });
-    //チャンネルデータを削除
-    const delChannel = db.channel.delete({
-      where: {
-        id: channelId,
-      },
-    });
-
-    await db.$transaction([
-      delMessage,
-      delChannelJoin,
-      delJoinOnDefault,
-      delChannel,
-    ]);
 
     return;
   };

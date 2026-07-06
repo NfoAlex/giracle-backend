@@ -1,4 +1,6 @@
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "..";
+import { channelJoins, channelViewableRoles, roleInfos, roleLinks } from "../db/schema";
 
 /**
  * 指定のユーザーIdが指定のチャンネルにアクセス可能かどうかを確認する
@@ -10,33 +12,27 @@ export default async function CheckChannelVisibility(
   _userId: string,
 ): Promise<boolean> {
   //チャンネルの閲覧制限があるか確認
-  const roleViewable = await db.channelViewableRole.findMany({
-    where: {
-      channelId: _channelId,
-    },
-    select: {
-      roleId: true,
-    },
-  });
+  const roleViewable = await db
+    .select({ roleId: channelViewableRoles.roleId })
+    .from(channelViewableRoles)
+    .where(eq(channelViewableRoles.channelId, _channelId));
 
   if (roleViewable.length > 0) {
     // チャンネルに参加しているか調べる
-    const channelJoined = await db.channelJoin.findUnique({
-      where: {
-        userId_channelId: {
-          userId: _userId,
-          channelId: _channelId,
-        },
-      },
+    const channelJoined = await db.query.channelJoins.findFirst({
+      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, _channelId)),
     });
 
     // チャンネルに参加していないならロールで調べる
     if (!channelJoined) {
-      const hasViewableRole = await db.roleLink.findFirst({
-        where: {
-          userId: _userId,
-          roleId: { in: roleViewable.map((role) => role.roleId) },
-        },
+      const hasViewableRole = await db.query.roleLinks.findFirst({
+        where: and(
+          eq(roleLinks.userId, _userId),
+          inArray(
+            roleLinks.roleId,
+            roleViewable.map((role) => role.roleId),
+          ),
+        ),
       });
 
       // ロールを持っていれば閲覧可能
@@ -45,12 +41,12 @@ export default async function CheckChannelVisibility(
       }
 
       // サーバー管理者の場合は閲覧可能
-      const userAdminRole = await db.roleLink.findFirst({
-        where: {
-          userId: _userId,
-          role: { manageServer: true },
-        },
-      });
+      const userAdminRole = await db
+        .select({ userId: roleLinks.userId })
+        .from(roleLinks)
+        .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
+        .where(and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)))
+        .get();
 
       if (userAdminRole) {
         return true;

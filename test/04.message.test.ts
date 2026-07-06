@@ -1,6 +1,8 @@
+import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { FETCH, INIT } from "./util";
 import { db } from "../src";
+import { channelJoins } from "../src/db/schema";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 mock.module("open-graph-scraper", () => ({
@@ -332,11 +334,9 @@ describe("/message/file/get", async () => {
     j = null;
 
     // TESTCHANNEL3はTESTUSERも参加していないためファイルアップロードするためにわざわざ参加
-    await db.channelJoin.create({
-      data: {
-        userId: "TESTUSER",
-        channelId: "TESTCHANNEL3"
-      }
+    await db.insert(channelJoins).values({
+      userId: "TESTUSER",
+      channelId: "TESTCHANNEL3",
     });
     const formData2 = new FormData();
     formData2.append("channelId", "TESTCHANNEL3"); //プライベートであるTESTCHANNEL3指定
@@ -348,14 +348,9 @@ describe("/message/file/get", async () => {
     });
     j = await res2.json();
     TEST_FILEID_FOR_PRIVATE_CHANNEL = j.data.fileId.id;
-    await db.channelJoin.delete({
-      where: {
-        userId_channelId: {
-          userId: "TESTUSER",
-          channelId: "TESTCHANNEL3"
-        }
-      }
-    });
+    await db
+      .delete(channelJoins)
+      .where(and(eq(channelJoins.userId, "TESTUSER"), eq(channelJoins.channelId, "TESTCHANNEL3")));
   });
 
   it("正常", async () => {

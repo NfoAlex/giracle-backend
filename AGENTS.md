@@ -6,11 +6,11 @@ Giracle（セルフホスト型チャットサービス）のバックエンド�
 
 ```bash
 bun i                      # 依存インストール（Bun 必須。npm/yarn は使わない）
-bunx prisma db push        # スキーマを DB へ適用（初回・schema.prisma 変更時）
-bun ./prisma/seeds.ts      # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
+bunx drizzle-kit generate  # schema.ts 変更時にマイグレーションSQLを drizzle/ へ生成
+bunx drizzle-kit migrate   # マイグレーションを DB へ適用（初回セットアップ必須）
+bun ./src/db/seeds.ts      # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
 bun dev                    # 開発サーバー起動（--watch 付き、ポート 3000 固定）
 bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
-bunx prisma generate       # スキーマ変更後のクライアント再生成
 ```
 
 - テストランナーは未整備。`bun test` の対象はなく、`test/*.oldtest.ts` は旧テストの残骸（メンテされていない）。動作確認は `bun dev` + 手動リクエストで行う。
@@ -20,10 +20,11 @@ bunx prisma generate       # スキーマ変更後のクライアント再生成
 
 ### db クライアントは src/index.ts からの import 一択
 
-`PrismaClient` のインスタンスは [src/index.ts](src/index.ts) で生成され `db` として export される。各 module / service / Utils は `import { db } from "../.."` のように **index.ts から相対 import** する（循環 import に見えるが意図された構成）。新しいインスタンスを作らないこと。
+`db` インスタンスは [src/db/index.ts](src/db/index.ts) で `bun:sqlite` + `drizzle-orm/bun-sqlite` を使い生成され、[src/index.ts](src/index.ts) から re-export される。各 module / service / Utils は `import { db } from "../.."` のように **index.ts から相対 import** する（循環 import に見えるが意図された構成）。新しいインスタンスを作らないこと。
 
-- adapter は `@prisma/adapter-libsql`、`timestampFormat: "unixepoch-ms"` 指定。
-- Prisma の型・クライアントは **`prisma/generated/client` から import** する（素の `@prisma/client` ではない）。input 型は `prisma/generated/models` にある。`prisma/generated/` は自動生成物なので手動編集禁止（Biome の ignore 対象でもある）。
+- 接続直後に `PRAGMA foreign_keys = ON;` を実行している（onDelete: cascade の動作に必須）。
+- テーブル定義・relations・型 export は [src/db/schema.ts](src/db/schema.ts) にまとめてある。relational query (`db.query.<table>.findFirst/findMany`) を使うため `drizzle(sqlite, { schema })` で初期化されている。
+- `db.query.*.findFirst` は該当なしで `undefined` を返す（Prisma の `null` とは異なるので `!== undefined` で判定する）。`update`/`delete` は対象0件でも例外を投げない（事前 `findFirst` か `.returning()` の行数で判定する）。
 
 ### モジュール構成: module（ルーティング）+ service（ロジック）
 
@@ -67,20 +68,21 @@ server?.publish(
 
 呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisitiblity` → `Util.checkChannelVisibility`、typo も解消される）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
 
-## DB（Prisma / libsql）
+## DB（Drizzle / bun:sqlite）
 
-- スキーマは [prisma/schema.prisma](prisma/schema.prisma)。主要モデル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
-- スキーマ変更フロー: `schema.prisma` 編集 → `bunx prisma db push`（開発）→ 必要なら `bunx prisma generate`。migrations ディレクトリはあるが開発は db push ベース。
+- スキーマは [src/db/schema.ts](src/db/schema.ts)。主要テーブル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
+- スキーマ変更フロー: `src/db/schema.ts` 編集 → `bunx drizzle-kit generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bunx drizzle-kit migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
+  - **`drizzle-kit push` は使わないこと。** 複合主キーを持つテーブル（ChannelJoin 等）で既存インデックスを正しく認識できず `index ... already exists` で失敗するバグが drizzle-kit v0.31.10 にある。generate + migrate は DB の現在状態を pull せず履歴ベースで差分適用するためこの問題を踏まない。
 - SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
-- シード（`prisma/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
+- シード（`src/db/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
 
 ## コーディング規約
 
 - リンター/フォーマッターは **Biome**（[biome.json](biome.json)）: スペース 2、ダブルクォート、organizeImports 有効。ESLint/Prettier は導入しない。
-- TypeScript strict。型は Prisma 生成型を活用する。
+- TypeScript strict。型は Drizzle の `$inferSelect` / `$inferInsert` を活用する。
 - コメントは日本語。既存コードのコメント密度（処理ブロックごとに短い説明）に合わせる。
 - `biome-ignore` を使う場合は既存同様に理由を書く（例: WS インスタンスの `any`）。
-- バージョンが新しめな点に注意: **Elysia v1.4**（macro は object 形式、`resolve({ as: "scoped" }, ...)`）、**Prisma v7**（driver adapter 必須、`prisma.config.ts` で設定）。古い API の記憶で書かない。
+- バージョンが新しめな点に注意: **Elysia v1.4**（macro は object 形式、`resolve({ as: "scoped" }, ...)`）、**Drizzle ORM**（`drizzle-orm/bun-sqlite` は同期ドライバ。クエリは thenable なので `await` は可、`db.transaction()` のコールバック内では `await` 不可）。古い API の記憶で書かない。
 
 ## 変更時のチェックリスト
 

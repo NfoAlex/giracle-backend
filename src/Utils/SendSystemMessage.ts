@@ -1,5 +1,6 @@
 import type { Server } from "bun";
 import { db } from "..";
+import { messages } from "../db/schema";
 
 /**
  * システムメッセージを記録、送信する
@@ -21,14 +22,15 @@ export default async function SendSystemMessage(
       messageTerm: _messageTerm,
     };
     //DBに記録、JSONは文字列化して保存
-    const msg = await db.message.create({
-      data: {
+    const [msg] = await db
+      .insert(messages)
+      .values({
         channelId: _channelId,
         userId: "SYSTEM",
         isSystemMessage: true,
         content: JSON.stringify(contentJson),
-      },
-    });
+      })
+      .returning();
 
     //Serverインスタンスが渡されて有効ならWSで通知
     if (_server) {

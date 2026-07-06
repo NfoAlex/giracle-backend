@@ -1,8 +1,16 @@
+import { and, eq, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
 import { db } from ".";
-import type { Message } from "../prisma/generated/client";
-import { MessageUrlPreviewCreateManyMessageInput } from "../prisma/generated/models";
+import {
+  blockedIPAddresses,
+  messageUrlPreviews,
+  messages,
+  roleInfos,
+  roleLinks,
+  tokens,
+} from "./db/schema";
+import type { Message, NewMessageUrlPreview } from "./db/schema";
 
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<string, { userId: string; isBanned: boolean; cachedAt: number }>();
@@ -69,14 +77,14 @@ export namespace Middleware {
       }
 
       //トークンがDBにあるか確認
-      const tokenData = await db.token.findUnique({
-        where: {
-          token: tokenValue,
-        },
-        select: {
+      const tokenData = await db.query.tokens.findFirst({
+        where: eq(tokens.token, tokenValue),
+        columns: {
           userId: true,
+        },
+        with: {
           user: {
-            select: {
+            columns: {
               isBanned: true,
             },
           },
@@ -84,7 +92,7 @@ export namespace Middleware {
       });
 
       //トークンが無効ならエラー
-      if (tokenData === null) {
+      if (tokenData === undefined) {
         return status(401, "Invalid token");
       }
 
@@ -112,23 +120,24 @@ export namespace Middleware {
             if (CheckToken === undefined) return status(401, "Unauthorized");
             const _userId = CheckToken._userId;
 
+            // biome-ignore lint/suspicious/noExplicitAny: roleTermはルート定義から渡される動的なカラム名のため
+            const roleTermColumn = (roleInfos as any)[roleTerm];
+
             //該当権限を持つロール付与情報あるいはサーバー管理権限を検索
-            const roleLink = await db.roleLink.findFirst({
-              where: {
-                userId: _userId,
-                OR: [
-                  {
-                    role: { [roleTerm]: true },
-                  },
-                  {
-                    role: { manageServer: true },
-                  },
-                ],
-              },
-            });
+            const roleLink = await db
+              .select({ userId: roleLinks.userId })
+              .from(roleLinks)
+              .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
+              .where(
+                and(
+                  eq(roleLinks.userId, _userId),
+                  sql`(${roleTermColumn} = 1 OR ${roleInfos.manageServer} = 1)`,
+                ),
+              )
+              .get();
 
             //該当権限を持つロール付与情報が無いなら停止
-            if (roleLink === null) {
+            if (roleLink === undefined) {
               return status(401, "Role level not enough");
             }
           },
@@ -153,22 +162,17 @@ export namespace Middleware {
         key = socketAddress.address;
 
         //IPアドレスが既にブロックされているか確認
-        const blockedIP = await db.blockedIPAddress.findUnique({
-          where: {
-            address: key,
-          },
+        const blockedIP = await db.query.blockedIPAddresses.findFirst({
+          where: eq(blockedIPAddresses.address, key),
         });
         if (blockedIP) {
           //ブロックされている場合はカウントを増加させて429を返す
-          db.blockedIPAddress.update({
-            where: {
-              address: key,
-            },
-            data: {
+          db.update(blockedIPAddresses)
+            .set({
               blockedCount: blockedIP.blockedCount + 1,
               latestAccess: new Date(),
-            },
-          });
+            })
+            .where(eq(blockedIPAddresses.address, key));
           return status(429, "Too Many Requests");
         }
       }
@@ -194,30 +198,20 @@ export namespace Middleware {
 
         //認証済みで制限を超えたならトークンを無効化
         if (!isAnonymous) {
-          db.token.delete({
-            where: {
-              token: key,
-            },
-          });
+          db.delete(tokens).where(eq(tokens.token, key));
         } else {
           //匿名の場合の処理
           //カウントがプラス10を超過している場合はIPアドレスでブロック
           if (bucket.count > configUsing.limit + 10) {
-            db.blockedIPAddress.upsert({
-              where: {
-                address: key,
-              },
-              create: {
-                address: key,
-                blockedCount: 1,
-              },
-              update: {
-                blockedCount: {
-                  increment: 1,
+            db.insert(blockedIPAddresses)
+              .values({ address: key, blockedCount: 1 })
+              .onConflictDoUpdate({
+                target: blockedIPAddresses.address,
+                set: {
+                  blockedCount: sql`${blockedIPAddresses.blockedCount} + 1`,
+                  latestAccess: new Date(),
                 },
-                latestAccess: new Date(),
-              },
-            });
+              });
           }
         }
 
@@ -252,7 +246,7 @@ export namespace Middleware {
             const messageId = messageData.id;
 
             const urlRegex: RegExp =
-              /https?:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#\u3000-\u30FE\u4E00-\u9FA0\uFF01-\uFFE3]+/g;
+              /https?:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#　-ヾ一-龠！-￣]+/g;
 
             // 重複したURLを排除（同じURLのOGPを何度も取得しないようにする）
             let urlMatched = [...new Set(messageData.content?.match(urlRegex) ?? [])];
@@ -280,9 +274,7 @@ export namespace Middleware {
             });
 
             // 編集された時用に現在のURLプレビュー情報を削除
-            await db.messageUrlPreview.deleteMany({
-              where: { messageId },
-            });
+            await db.delete(messageUrlPreviews).where(eq(messageUrlPreviews.messageId, messageId));
 
             // URLリストから不正なもの（ローカルIPなど）を事前にフィルタリング
             const validUrls = urlMatched.filter((urlStr) => {
@@ -315,7 +307,7 @@ export namespace Middleware {
             const results = await Promise.allSettled(fetchPromises);
 
             // 成功した結果だけをDB保存用のフォーマットに変換
-            const creatingPreviewDataArr: MessageUrlPreviewCreateManyMessageInput[] = results
+            const creatingPreviewDataArr: Omit<NewMessageUrlPreview, "id" | "messageId">[] = results
               .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
               .map((result) => {
                 const res = result.value;
@@ -333,27 +325,28 @@ export namespace Middleware {
 
             // OGPデータが存在する場合、または編集によってURLがすべて消えた場合のみ更新・通知
             if (creatingPreviewDataArr.length > 0 || messageData.isEdited) {
-              const messageUpdated = await db.message.update({
-                where: { id: messageId },
-                data: {
-                  MessageUrlPreview: {
-                    createMany: {
-                      data: creatingPreviewDataArr,
-                    },
-                  },
-                },
-                include: {
+              if (creatingPreviewDataArr.length > 0) {
+                await db.insert(messageUrlPreviews).values(
+                  creatingPreviewDataArr.map((p) => ({ ...p, messageId })),
+                );
+              }
+
+              const messageUpdated = await db.query.messages.findFirst({
+                where: eq(messages.id, messageId),
+                with: {
                   MessageUrlPreview: true,
                 },
               });
 
-              server?.publish(
-                `channel::${messageUpdated.channelId}`,
-                JSON.stringify({
-                  signal: "message::UpdateMessage",
-                  data: messageUpdated,
-                }),
-              );
+              if (messageUpdated) {
+                server?.publish(
+                  `channel::${messageUpdated.channelId}`,
+                  JSON.stringify({
+                    signal: "message::UpdateMessage",
+                    data: messageUpdated,
+                  }),
+                );
+              }
             }
           },
         };

@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import { db } from "..";
+import { users } from "../db/schema";
 
 /**
  * ユーザーのロールレベルを取得する関数
@@ -8,20 +10,18 @@ export default async function getUsersRoleLevel(
   _userId: string,
 ): Promise<number> {
   //ユーザー情報を付与されたロールと同時に取得
-  const userWithRoles = await db.user.findUnique({
-    where: {
-      id: _userId,
-    },
-    include: {
+  const userWithRoles = await db.query.users.findFirst({
+    where: eq(users.id, _userId),
+    with: {
       RoleLink: {
-        include: {
+        with: {
           role: true,
         },
       },
     },
   });
   //ユーザーが存在しない場合はfalseを返す
-  if (userWithRoles === null) return 0;
+  if (userWithRoles === undefined) return 0;
 
   //送信者のロールレベル用変数
   let userRoleLevel = 0;

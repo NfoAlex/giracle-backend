@@ -1,11 +1,21 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
+import { and, eq, exists, like } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
-import { userWSInstance } from "../../ws";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import {
+  channelJoinOnDefaults,
+  channelJoins,
+  invitations,
+  passwords,
+  roleLinks,
+  serverConfigs,
+  tokens,
+  users,
+} from "../../db/schema";
 import { Util } from "../../Util";
+import { userWSInstance } from "../../ws";
 
 export namespace ServiceUser {
   export const SignUp = async (
@@ -16,7 +26,7 @@ export namespace ServiceUser {
     //初めてのユーザーかどうか
     let flagFirstUser = false;
     //ユーザー数を取得して最初ならtrue
-    const num = await db.user.count();
+    const num = await db.$count(users);
     if (num === 1) {
       flagFirstUser = true;
     }
@@ -24,7 +34,7 @@ export namespace ServiceUser {
     //最初のユーザーなら招待条件を確認しない
     if (!flagFirstUser) {
       //サーバーの設定を取得して招待関連の条件を確認
-      const serverConfig = await db.serverConfig.findFirst();
+      const serverConfig = await db.query.serverConfigs.findFirst();
       if (!serverConfig?.RegisterAvailable) {
         throw status(400, {
           message: "Registration is disabled",
@@ -37,28 +47,28 @@ export namespace ServiceUser {
           });
         }
         //招待コードが有効か確認
-        const Invite = await db.invitation.findUnique({
-          where: { inviteCode: inviteCode },
+        const Invite = await db.query.invitations.findFirst({
+          where: eq(invitations.inviteCode, inviteCode),
         });
         //招待コードが無効な場合
-        if (Invite === null) {
+        if (Invite === undefined) {
           throw status(400, {
             message: "Invite code is invalid",
           });
         }
         //---------------------------------------
         //使用回数を加算
-        await db.invitation.update({
-          where: { inviteCode: inviteCode },
-          data: {
+        await db
+          .update(invitations)
+          .set({
             usedCount: Invite.usedCount + 1,
-          },
-        });
+          })
+          .where(eq(invitations.inviteCode, inviteCode));
       }
     }
 
-    const user = await db.user.findUnique({
-      where: { name: username },
+    const user = await db.query.users.findFirst({
+      where: eq(users.name, username),
     });
     if (user) {
       throw status(400, {
@@ -69,27 +79,37 @@ export namespace ServiceUser {
     //ソルト生成、パスワードのハッシュ化
     const salt = crypto.randomBytes(16).toString("hex");
     const passwordHashed = await Bun.password.hash(password + salt);
-    //DBへユーザー情報を登録
-    const createdUser = await db.user.create({
-      data: {
-        name: username,
-        selfIntroduction: `こんにちは、${username}です。`,
-        password: {
-          create: {
-            password: passwordHashed,
-            salt: salt,
-          },
-        },
-        RoleLink: {
-          create: {
-            roleId: flagFirstUser ? "HOST" : "MEMBER",
-          },
-        },
-      },
+    //DBへユーザー情報を登録(ユーザー・パスワード・ロール付与を1トランザクションで)
+    const createdUser = db.transaction((tx) => {
+      const newUser = tx
+        .insert(users)
+        .values({
+          name: username,
+          selfIntroduction: `こんにちは、${username}です。`,
+        })
+        .returning()
+        .get();
+
+      tx.insert(passwords)
+        .values({
+          userId: newUser.id,
+          password: passwordHashed,
+          salt: salt,
+        })
+        .run();
+
+      tx.insert(roleLinks)
+        .values({
+          userId: newUser.id,
+          roleId: flagFirstUser ? "HOST" : "MEMBER",
+        })
+        .run();
+
+      return newUser;
     });
 
     //デフォルトで参加するチャンネルに参加させる
-    const channelJoinOnDefault = await db.channelJoinOnDefault.findMany({});
+    const channelJoinOnDefault = await db.query.channelJoinOnDefaults.findMany();
     const joiningData: { userId: string; channelId: string }[] = [];
     for (const channelIdJson of channelJoinOnDefault) {
       joiningData.push({
@@ -98,18 +118,18 @@ export namespace ServiceUser {
       });
     }
     //DBへ挿入
-    await db.channelJoin.createMany({
-      data: joiningData,
-    });
+    if (joiningData.length > 0) {
+      await db.insert(channelJoins).values(joiningData);
+    }
 
     return { createdUser };
   };
 
   export const SignIn = async (username: string, password: string) => {
     //ユーザー情報取得
-    const user = await db.user.findUnique({
-      where: { name: username },
-      include: {
+    const user = await db.query.users.findFirst({
+      where: eq(users.name, username),
+      with: {
         password: true,
       },
     });
@@ -147,16 +167,13 @@ export namespace ServiceUser {
     }
 
     //トークンを生成
-    const tokenGenerated = await db.token.create({
-      data: {
+    const [tokenGenerated] = await db
+      .insert(tokens)
+      .values({
         token: crypto.randomBytes(16).toString("hex"),
-        user: {
-          connect: {
-            name: username,
-          },
-        },
-      },
-    });
+        userId: user.id,
+      })
+      .returning();
 
     return tokenGenerated;
   };
@@ -187,35 +204,46 @@ export namespace ServiceUser {
       }
     }
 
+    //検索条件を組み立て
+    const conditions = [];
+    if (username !== undefined) {
+      conditions.push(like(users.name, `%${username}%`));
+    }
+    if (joinedChannel !== undefined) {
+      conditions.push(
+        exists(
+          db
+            .select()
+            .from(channelJoins)
+            .where(
+              joinedChannel === ""
+                ? eq(channelJoins.userId, users.id)
+                : and(eq(channelJoins.userId, users.id), eq(channelJoins.channelId, joinedChannel)),
+            ),
+        ),
+      );
+    }
+
     //ユーザーを検索
-    const users = await db.user.findMany({
-      take: 30,
-      skip: cursor * 30,
-      where: {
-        name: {
-          contains: username,
-        },
+    const usersFound = await db.query.users.findMany({
+      limit: 30,
+      offset: cursor * 30,
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
         ChannelJoin: {
-          some: {
-            channelId: joinedChannel === "" ? undefined : joinedChannel,
-          },
-        },
-      },
-      include: {
-        ChannelJoin: {
-          select: {
+          columns: {
             channelId: true,
           },
         },
         RoleLink: {
-          select: {
+          columns: {
             roleId: true,
           },
         },
       },
     });
 
-    return users;
+    return usersFound;
   };
 
   export const GetUserIcon = async (userId: string) => {
@@ -347,16 +375,14 @@ export namespace ServiceUser {
     _userId: string,
   ) => {
     //ユーザー情報取得
-    const userdata = await db.user.findFirst({
-      where: {
-        id: _userId,
-      },
-      include: {
+    const userdata = await db.query.users.findFirst({
+      where: eq(users.id, _userId),
+      with: {
         password: true,
       },
     });
     //ユーザー情報、またはその中のパスワードが取得できない場合
-    if (userdata === null || userdata.password === null) {
+    if (userdata === undefined || userdata.password === null) {
       throw status(500, "Internal Server Error");
     }
 
@@ -373,14 +399,12 @@ export namespace ServiceUser {
     }
 
     //新しいパスワードをハッシュ化してDBに保存
-    await db.password.update({
-      where: {
-        userId: userdata.id,
-      },
-      data: {
+    await db
+      .update(passwords)
+      .set({
         password: await Bun.password.hash(newPassword + userdata.password.salt),
-      },
-    });
+      })
+      .where(eq(passwords.userId, userdata.id));
 
     return;
   };
@@ -391,10 +415,8 @@ export namespace ServiceUser {
     selfIntroduction?: string,
   ) => {
     //ユーザー情報取得
-    const user = await db.user.findUnique({
-      where: {
-        id: _userId,
-      },
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, _userId),
     });
     //ユーザーが存在しない場合
     if (!user) {
@@ -411,24 +433,21 @@ export namespace ServiceUser {
     }
 
     //データ更新
-    const userUpdated = await db.user.update({
-      where: {
-        id: user.id,
-      },
-      data: updatingValue,
-    });
+    const [userUpdated] = await db
+      .update(users)
+      .set(updatingValue)
+      .where(eq(users.id, user.id))
+      .returning();
 
     return userUpdated;
   };
 
   export const GetSessions = async (userId: string, tokenMarking: string, cursor: number = 1) => {
     const skipAmount = (cursor - 1) * 30;
-    const sessions = await db.token.findMany({
-      where: {
-        userId
-      },
-      take: 30,
-      skip: skipAmount
+    const sessions = await db.query.tokens.findMany({
+      where: eq(tokens.userId, userId),
+      limit: 30,
+      offset: skipAmount,
     });
 
     return sessions.map((session) => ({
@@ -439,42 +458,32 @@ export namespace ServiceUser {
   };
 
   export const ChangeSessionName = async (userId: string, sessionId: number, newName: string) => {
-    const newSession = await db.token.update({
-      where: {
-        id: sessionId,
-        userId
-      },
-      data: {
-        name: newName
-      }
-    }).catch((e) => {
-      if (e instanceof PrismaClientKnownRequestError) {
-        // P2025 は「対象のレコードが見つからなかった」際のエラーコード
-        if (e.code === "P2025") {
-          throw status(404, "Session not found");
-        }
-      }
-      throw status(500, "Something went wrong");
-    });
+    const [newSession] = await db
+      .update(tokens)
+      .set({ name: newName })
+      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, userId)))
+      .returning()
+      .catch(() => {
+        throw status(500, "Something went wrong");
+      });
+
+    //対象0件 = セッションが存在しないか自分のセッションではない
+    if (newSession === undefined) {
+      throw status(404, "Session not found");
+    }
 
     return { ...newSession, token: undefined };
   };
 
   export const RemoveSession = async (userId: string, sessionId: number, activeToken: string) => {
-    const targetToken = await db.token.findUnique({
-      where: {
-        id: sessionId
-      }
+    const targetToken = await db.query.tokens.findFirst({
+      where: eq(tokens.id, sessionId),
     });
 
-    if (targetToken === null) throw status(404, "Session not found");
+    if (targetToken === undefined) throw status(404, "Session not found");
     if (targetToken.token === activeToken) throw status(400, "You cannot delete your active session");
 
-    await db.token.delete({
-      where: {
-        id: sessionId
-      }
-    }).catch(() => {
+    await db.delete(tokens).where(eq(tokens.id, sessionId)).catch(() => {
       throw status(500, "Something went wrong");
     });
 
@@ -483,28 +492,22 @@ export namespace ServiceUser {
 
   export const SignOut = async (token: string) => {
     //トークン削除
-    await db.token.delete({
-      where: {
-        token: token,
-      },
-    });
+    await db.delete(tokens).where(eq(tokens.token, token));
 
     return;
   };
 
   export const GetUserInfo = async (userId: string) => {
-    const user = await db.user.findFirst({
-      where: {
-        id: userId,
-      },
-      include: {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      with: {
         ChannelJoin: {
-          select: {
+          columns: {
             channelId: true,
           },
         },
         RoleLink: {
-          select: {
+          columns: {
             roleId: true,
           },
         },
@@ -519,22 +522,22 @@ export namespace ServiceUser {
   };
 
   export const GetUserList = async () => {
-    const users = await db.user.findMany({
-      include: {
+    const usersFound = await db.query.users.findMany({
+      with: {
         ChannelJoin: {
-          select: {
+          columns: {
             channelId: true,
           },
         },
         RoleLink: {
-          select: {
+          columns: {
             roleId: true,
           },
         },
       },
     });
 
-    return users;
+    return usersFound;
   };
 
   export const Ban = async (userId: string, _userId: string) => {
@@ -554,14 +557,11 @@ export namespace ServiceUser {
     }
 
     //BANする
-    const userBanned = await db.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        isBanned: true,
-      },
-    });
+    const [userBanned] = await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(eq(users.id, userId))
+      .returning();
 
     return userBanned;
   };
@@ -579,14 +579,11 @@ export namespace ServiceUser {
     }
 
     //BANを解除
-    const userUnbanned = await db.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        isBanned: false,
-      },
-    });
+    const [userUnbanned] = await db
+      .update(users)
+      .set({ isBanned: false })
+      .where(eq(users.id, userId))
+      .returning();
 
     return userUnbanned;
   };
