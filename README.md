@@ -55,6 +55,10 @@ giracle-backend/
 │       ├── Message/
 │       │   ├── message.module.ts
 │       │   └── message.service.ts
+│       ├── Notification/
+│       │   ├── notification.module.ts
+│       │   ├── notification.service.ts
+│       │   └── types.ts
 │       ├── Role/
 │       │   ├── role.module.ts
 │       │   └── role.service.ts
@@ -185,6 +189,21 @@ giracle-backend/
 
 ---
 
+### Notification モジュール (`/notification`)
+
+| メソッド | パス | 認証 | 権限 | 概要 |
+|----------|------|------|------|------|
+| GET | `/notification/vapid-public-key` | ❌ | - | Web Push 用 VAPID 公開鍵取得（未設定時は 503） |
+| GET | `/notification/config` | ✅ | - | 自分の通知設定取得 |
+| POST | `/notification/config` | ✅ | - | 自分の通知設定更新（enabled / mode） |
+| POST | `/notification/device/register` | ✅ | - | プッシュ通知端末の登録（platform: web / android / ios） |
+| POST | `/notification/device/unregister` | ✅ | - | プッシュ通知端末の解除 |
+| GET | `/notification/muted-channels` | ✅ | - | ミュート中チャンネル一覧取得 |
+| POST | `/notification/mute-channel` | ✅ | - | チャンネルをミュート |
+| POST | `/notification/unmute-channel` | ✅ | - | チャンネルのミュート解除 |
+
+---
+
 ## WebSocket (`/ws`)
 
 接続時に Cookie または `?token` クエリパラメータでトークン認証。
@@ -263,6 +282,7 @@ giracle-backend/
 | ファイル | 概要 |
 |----------|------|
 | `SendSystemMessage.ts` | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
+| `SendPushNotification.ts` | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除） |
 | `CalculateReactionTotal.ts` | リアクション集計 |
 | `CalculateRoleLevel.ts` | ロールレベル計算 |
 | `CheckChannelVisitiblity.ts` | チャンネル閲覧権限チェック |
