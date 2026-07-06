@@ -10,6 +10,7 @@
     "build-bun-js": "bun build --minify-whitespace --minify-syntax --target=bun --outfile ./dist/server-bun.js ./src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:baseline": "bun ./src/db/baseline.ts",
     "db:seed": "bun ./src/db/seeds.ts"
   },
   "dependencies": {
