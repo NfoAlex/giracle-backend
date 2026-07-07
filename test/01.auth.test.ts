@@ -133,8 +133,8 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: sessionIdRemoving,
-          name: "新しいセッション名"
-        })
+          name: "新しいセッション名",
+        }),
       }),
     );
     expect(responseChangingName.ok).toBe(true);
@@ -154,8 +154,8 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: sessionIdRemoving,
-          name: ""
-        })
+          name: "",
+        }),
       }),
     );
     expect(responseChangingName.ok).toBe(false);
@@ -172,8 +172,8 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: 999999,
-          name: "新しいセッション名2"
-        })
+          name: "新しいセッション名2",
+        }),
       }),
     );
     expect(responseChangingName.ok).toBe(false);
@@ -208,7 +208,7 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: 999999, //存在しないセッションID
-        })
+        }),
       }),
     );
     const t = await response.text();
@@ -226,7 +226,7 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: sessionIdRemoving,
-        })
+        }),
       }),
     );
     const t = await response.text();
@@ -244,7 +244,7 @@ describe("/user", () => {
         },
         body: JSON.stringify({
           sessionId: sessionIdRemoving,
-        })
+        }),
       }),
     );
     const j = await response.json();

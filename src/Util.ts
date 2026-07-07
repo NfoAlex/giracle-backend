@@ -3,9 +3,9 @@ import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisitiblity";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
+import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
-import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;

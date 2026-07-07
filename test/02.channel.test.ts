@@ -63,7 +63,7 @@ describe("/channel/join", async () => {
         userId: "TESTUSER",
         channelId: "TESTCHANNEL3",
       },
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
@@ -156,7 +156,7 @@ describe("/channel/get-info/:channelId", async () => {
     const res = await FETCH({
       path: "/channel/get-info/TESTCHANNEL3",
       method: "GET",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
@@ -174,9 +174,15 @@ describe("/channel/list", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(3);
-    const channelOne = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL1");
-    const channelTwo = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL2");
-    const channelThree = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL3");
+    const channelOne = j.data.find(
+      (channel: { id: string }) => channel.id === "TESTCHANNEL1",
+    );
+    const channelTwo = j.data.find(
+      (channel: { id: string }) => channel.id === "TESTCHANNEL2",
+    );
+    const channelThree = j.data.find(
+      (channel: { id: string }) => channel.id === "TESTCHANNEL3",
+    );
     expect(channelOne?.id).toBe("TESTCHANNEL1");
     expect(channelOne?.name).toBe("General");
     expect(channelTwo?.id).toBe("TESTCHANNEL2");
@@ -189,13 +195,17 @@ describe("/channel/list", async () => {
     const res = await FETCH({
       path: "/channel/list",
       method: "GET",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(2);
-    const channelOne = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL1");
-    const channelTwo = j.data.find((channel: { id: string; }) => channel.id === "TESTCHANNEL2");
+    const channelOne = j.data.find(
+      (channel: { id: string }) => channel.id === "TESTCHANNEL1",
+    );
+    const channelTwo = j.data.find(
+      (channel: { id: string }) => channel.id === "TESTCHANNEL2",
+    );
     expect(channelOne?.id).toBe("TESTCHANNEL1");
     expect(channelOne?.name).toBe("General");
     expect(channelTwo?.id).toBe("TESTCHANNEL2");
@@ -206,7 +216,7 @@ describe("/channel/list", async () => {
 describe("/channel/get-history/:channelId", async () => {
   //firstMessageOfChannel/latestMessageOfChannelの判定を検証するため、
   //TESTCHANNEL1に既存のTESTMESSAGE1(最古)へ加えて新規メッセージを2件追加投入しておく
-  let TEST__HISTORY_MSG_A = "";
+  //let TEST__HISTORY_MSG_A = "";
   let TEST__HISTORY_MSG_B = "";
 
   it("準備 :: 検証用メッセージを2件追加投入", async () => {
@@ -215,9 +225,9 @@ describe("/channel/get-history/:channelId", async () => {
       method: "POST",
       body: { channelId: "TESTCHANNEL1", message: "history test message A" },
     });
-    const jA = await resA.json();
+    //const _jA = await resA.json();
     expect(resA.ok).toBe(true);
-    TEST__HISTORY_MSG_A = jA.data.id;
+    //TEST__HISTORY_MSG_A = jA.data.id;
 
     const resB = await FETCH({
       path: "/message/send",
@@ -333,7 +343,7 @@ describe("/channel/get-history/:channelId", async () => {
       body: {
         userId: "TESTUSER",
         messageTimeFrom: "2001-01-01",
-        fetchDirection: "older"
+        fetchDirection: "older",
       },
     });
     const j = await res.json();
@@ -349,7 +359,7 @@ describe("/channel/get-history/:channelId", async () => {
       body: {
         userId: "TESTUSER",
         messageTimeFrom: "2099-01-01",
-        fetchDirection: "newer"
+        fetchDirection: "newer",
       },
     });
     const j = await res.json();
@@ -373,7 +383,7 @@ describe("/channel/get-history/:channelId", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL3",
       method: "POST",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
@@ -427,7 +437,7 @@ describe("/channel/search", async () => {
     const res = await FETCH({
       path: "/channel/search/?query=Private",
       method: "GET",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);

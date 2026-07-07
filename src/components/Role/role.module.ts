@@ -29,7 +29,11 @@ export const role = new Elysia({ prefix: "/role" })
 
   .put(
     "/create",
-    async ({ body: { roleName, rolePower }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { roleName, rolePower },
+      CheckToken: { _userId },
+      server,
+    }) => {
       const newRole = await ServiceRole.Create(roleName, rolePower, _userId);
 
       //WSで通知

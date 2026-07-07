@@ -8,13 +8,11 @@
     // Path is relative to the devcontainer.json file.
     "dockerfile": "Dockerfile"
   },
-"features": {
+  "features": {
     //"ghcr.io/devcontainers-extra/features/bun:1": {},
     "ghcr.io/devcontainers/features/sshd:1": {}
   },
-  "runArgs": [
-    "--network=network-giracle"
-  ],
+  "runArgs": ["--network=network-giracle"],
   "mounts": [
     // ${localEnv:HOME} (Linux/mac) または ${localEnv:USERPROFILE} (Windows) の .ssh を
     // コンテナ内の /home/vscode/.ssh に、読み取り専用でマウントする

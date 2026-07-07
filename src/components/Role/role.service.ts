@@ -41,7 +41,10 @@ export namespace ServiceRole {
       })
       .returning()
       .catch((e) => {
-        if (e instanceof Error && e.message.includes("UNIQUE constraint failed")) {
+        if (
+          e instanceof Error &&
+          e.message.includes("UNIQUE constraint failed")
+        ) {
           throw status(400, "Role name already exists");
         }
         throw status(500, "Database error");
@@ -129,6 +132,7 @@ export namespace ServiceRole {
         roleId,
       })
       .catch((e) => {
+        console.error("role.service :: Link(db ロール付与処理) : ", { e });
         throw status(500, "Database error");
       });
 

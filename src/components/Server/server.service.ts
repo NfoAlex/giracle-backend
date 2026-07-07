@@ -21,11 +21,12 @@ export namespace ServiceServer {
     const firstUser = await db.select().from(users).offset(1).limit(1).get();
     const isFirstUser = firstUser === undefined;
     //デフォルトで参加するチャンネル
-    const defaultJoinChannelFetched = await db.query.channelJoinOnDefaults.findMany({
-      with: {
-        channel: true,
-      },
-    });
+    const defaultJoinChannelFetched =
+      await db.query.channelJoinOnDefaults.findMany({
+        with: {
+          channel: true,
+        },
+      });
     const defaultJoinChannel = defaultJoinChannelFetched.map((c) => c.channel);
 
     return {
@@ -116,11 +117,15 @@ export namespace ServiceServer {
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
       //デフォルト参加チャンネル全部削除して渡されたチャンネルIdを挿入(1トランザクションで)
-      const defaultChannelIdsPushing = DefaultJoinChannel.map((channelId) => ({ channelId }));
+      const defaultChannelIdsPushing = DefaultJoinChannel.map((channelId) => ({
+        channelId,
+      }));
       db.transaction((tx) => {
         tx.delete(channelJoinOnDefaults).run();
         if (defaultChannelIdsPushing.length > 0) {
-          tx.insert(channelJoinOnDefaults).values(defaultChannelIdsPushing).run();
+          tx.insert(channelJoinOnDefaults)
+            .values(defaultChannelIdsPushing)
+            .run();
         }
       });
     }
@@ -203,7 +208,8 @@ export namespace ServiceServer {
     const emojiExist = await db.query.customEmojis.findFirst({
       where: eq(customEmojis.code, emojiCode),
     });
-    if (emojiExist !== undefined) throw status(400, "Emoji code already exists");
+    if (emojiExist !== undefined)
+      throw status(400, "Emoji code already exists");
 
     //DBに登録
     const [emojiUploaded] = await db

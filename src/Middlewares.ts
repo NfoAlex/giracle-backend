@@ -2,18 +2,21 @@ import { and, eq, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
 import { db } from ".";
+import type { Message, NewMessageUrlPreview } from "./db/schema";
 import {
   blockedIPAddresses,
-  messageUrlPreviews,
   messages,
+  messageUrlPreviews,
   roleInfos,
   roleLinks,
   tokens,
 } from "./db/schema";
-import type { Message, NewMessageUrlPreview } from "./db/schema";
 
 // トークンキャッシュ (5分間有効)
-const tokenCache = new Map<string, { userId: string; isBanned: boolean; cachedAt: number }>();
+const tokenCache = new Map<
+  string,
+  { userId: string; isBanned: boolean; cachedAt: number }
+>();
 
 const ONE_MINUITE = 60 * 1000;
 // 古いキャッシュを定期削除 (1分毎)
@@ -29,14 +32,14 @@ setInterval(() => {
 //制限設定
 const limitConfig = {
   anonymous: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25"),
+    limit: Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60") * 1000,
+      Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) * 1000,
   },
   authenticated: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200"),
+    limit: Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60") * 1000,
+      Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
   },
 };
 //レート制限用クライアントごとのバケット管理
@@ -52,7 +55,6 @@ setInterval(() => {
 }, ONE_MINUITE);
 
 export namespace Middleware {
-
   export const CheckToken = new Elysia({ name: "CheckToken" })
     .guard({
       cookie: t.Object({ token: t.String({ minLength: 1 }) }),
@@ -97,7 +99,11 @@ export namespace Middleware {
       }
 
       // キャッシュに保存
-      tokenCache.set(tokenValue, { userId: tokenData.userId, isBanned: tokenData.user.isBanned, cachedAt: now });
+      tokenCache.set(tokenValue, {
+        userId: tokenData.userId,
+        isBanned: tokenData.user.isBanned,
+        cachedAt: now,
+      });
 
       //BAN確認
       if (tokenData.user.isBanned) {
@@ -145,8 +151,9 @@ export namespace Middleware {
       },
     });
 
-  export const RateLimiter = new Elysia({ name: "rateLimiter" })
-    .resolve({ as: "scoped" }, async ({ request, cookie: { token }, server }) => {
+  export const RateLimiter = new Elysia({ name: "rateLimiter" }).resolve(
+    { as: "scoped" },
+    async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
       //識別キー
@@ -220,7 +227,8 @@ export namespace Middleware {
 
       //カウント増加
       bucket.count += 1;
-    });
+    },
+  );
 
   export const UrlPreviewControl = new Elysia({ name: "urlPreviewControl" })
     .guard({
@@ -246,10 +254,12 @@ export namespace Middleware {
             const messageId = messageData.id;
 
             const urlRegex: RegExp =
-              /https?:\/\/[-_.!~*\'()a-zA-Z0-9;\/?:\@&=+\$,%#　-ヾ一-龠！-￣]+/g;
+              /https?:\/\/[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#　-ヾ一-龠！-￣]+/g;
 
             // 重複したURLを排除（同じURLのOGPを何度も取得しないようにする）
-            let urlMatched = [...new Set(messageData.content?.match(urlRegex) ?? [])];
+            let urlMatched = [
+              ...new Set(messageData.content?.match(urlRegex) ?? []),
+            ];
 
             if (urlMatched.length === 0 && !messageData.isEdited) return;
 
@@ -274,7 +284,9 @@ export namespace Middleware {
             });
 
             // 編集された時用に現在のURLプレビュー情報を削除
-            await db.delete(messageUrlPreviews).where(eq(messageUrlPreviews.messageId, messageId));
+            await db
+              .delete(messageUrlPreviews)
+              .where(eq(messageUrlPreviews.messageId, messageId));
 
             // URLリストから不正なもの（ローカルIPなど）を事前にフィルタリング
             const validUrls = urlMatched.filter((urlStr) => {
@@ -283,10 +295,13 @@ export namespace Middleware {
                 const hostname = parsedUrl.hostname;
 
                 // 基本的なSSRF対策（より強固にするならDNS名前解決の結果をチェックする必要があります）
-                if (hostname === "localhost" || hostname === "127.0.0.1") return false;
+                if (hostname === "localhost" || hostname === "127.0.0.1")
+                  return false;
                 if (hostname.includes("169.254.")) return false; // クラウドのメタデータサーバー
 
-                const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
+                const isIpAddress =
+                  /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                  hostname.includes(":");
                 if (isIpAddress) return false;
 
                 return true;
@@ -307,8 +322,15 @@ export namespace Middleware {
             const results = await Promise.allSettled(fetchPromises);
 
             // 成功した結果だけをDB保存用のフォーマットに変換
-            const creatingPreviewDataArr: Omit<NewMessageUrlPreview, "id" | "messageId">[] = results
-              .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
+            const creatingPreviewDataArr: Omit<
+              NewMessageUrlPreview,
+              "id" | "messageId"
+            >[] = results
+              .filter(
+                // biome-ignore lint/suspicious/noExplicitAny: すべてのパターンを受け付ける
+                (result): result is PromiseFulfilledResult<any> =>
+                  result.status === "fulfilled",
+              )
               .map((result) => {
                 const res = result.value;
                 return {
@@ -326,9 +348,11 @@ export namespace Middleware {
             // OGPデータが存在する場合、または編集によってURLがすべて消えた場合のみ更新・通知
             if (creatingPreviewDataArr.length > 0 || messageData.isEdited) {
               if (creatingPreviewDataArr.length > 0) {
-                await db.insert(messageUrlPreviews).values(
-                  creatingPreviewDataArr.map((p) => ({ ...p, messageId })),
-                );
+                await db
+                  .insert(messageUrlPreviews)
+                  .values(
+                    creatingPreviewDataArr.map((p) => ({ ...p, messageId })),
+                  );
               }
 
               const messageUpdated = await db.query.messages.findFirst({
@@ -352,5 +376,4 @@ export namespace Middleware {
         };
       },
     });
-
-};
+}

@@ -1,7 +1,10 @@
 import Elysia, { status, t } from "elysia";
-import { Middleware } from "../../Middlewares";
-import { NOTIFICATION_MODES, ServiceNotification } from "./notification.service";
 import { ConstWebPush } from "../..";
+import { Middleware } from "../../Middlewares";
+import {
+  NOTIFICATION_MODES,
+  ServiceNotification,
+} from "./notification.service";
 
 export const notification = new Elysia({ prefix: "/notification" })
   .get(
@@ -51,9 +54,7 @@ export const notification = new Elysia({ prefix: "/notification" })
     {
       body: t.Object({
         enabled: t.Optional(t.Boolean()),
-        mode: t.Optional(
-          t.Union(NOTIFICATION_MODES.map((m) => t.Literal(m))),
-        ),
+        mode: t.Optional(t.Union(NOTIFICATION_MODES.map((m) => t.Literal(m)))),
       }),
       detail: {
         description: "自分の通知設定を更新します",

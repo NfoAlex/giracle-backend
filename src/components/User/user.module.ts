@@ -1,8 +1,8 @@
-import Elysia, { status, t, file } from "elysia";
+import Elysia, { file, status, t } from "elysia";
 import { db } from "../..";
 import { Middleware } from "../../Middlewares";
-import { ServiceUser } from "./user.service";
 import { Util } from "../../Util";
+import { ServiceUser } from "./user.service";
 
 export const user = new Elysia({ prefix: "/user" })
   .put(
@@ -15,11 +15,12 @@ export const user = new Elysia({ prefix: "/user" })
       );
 
       //新規登録を通知するチャンネルId
-      const serverConfigAnnounceChannelId = await db.query.serverConfigs.findFirst({
-        columns: {
-          RegisterAnnounceChannelId: true,
-        },
-      });
+      const serverConfigAnnounceChannelId =
+        await db.query.serverConfigs.findFirst({
+          columns: {
+            RegisterAnnounceChannelId: true,
+          },
+        });
       //登録通知用チャンネルIdが登録されているならそこへ通知、ないなら他を探して通知
       if (
         serverConfigAnnounceChannelId !== undefined &&
@@ -40,7 +41,12 @@ export const user = new Elysia({ prefix: "/user" })
           },
         });
         if (firstChannel) {
-          Util.sendSystemMessage(firstChannel.id, createdUser.id, "WELCOME", server);
+          Util.sendSystemMessage(
+            firstChannel.id,
+            createdUser.id,
+            "WELCOME",
+            server,
+          );
         }
         //それでも無いなら通知しない
       }
@@ -113,7 +119,10 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/search",
-    async ({ query: { username, joinedChannel, cursor }, CheckToken: { _userId } }) => {
+    async ({
+      query: { username, joinedChannel, cursor },
+      CheckToken: { _userId },
+    }) => {
       const users = await ServiceUser.Search(
         _userId,
         username,
@@ -222,7 +231,10 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/change-password",
-    async ({ body: { currentPassword, newPassword }, CheckToken: { _userId } }) => {
+    async ({
+      body: { currentPassword, newPassword },
+      CheckToken: { _userId },
+    }) => {
       await ServiceUser.ChangePassword(currentPassword, newPassword, _userId);
 
       return {
@@ -243,7 +255,11 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/profile-update",
-    async ({ body: { name, selfIntroduction }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { name, selfIntroduction },
+      CheckToken: { _userId },
+      server,
+    }) => {
       const userUpdated = await ServiceUser.UpdateProfile(
         _userId,
         name,
@@ -277,8 +293,16 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/session",
-    async ({ CheckToken: { _userId }, query: { cursor }, cookie: { token } }) => {
-      const sessions = await ServiceUser.GetSessions(_userId, token.value, cursor);
+    async ({
+      CheckToken: { _userId },
+      query: { cursor },
+      cookie: { token },
+    }) => {
+      const sessions = await ServiceUser.GetSessions(
+        _userId,
+        token.value,
+        cursor,
+      );
 
       return {
         message: "Fetched your sessions",
@@ -290,37 +314,41 @@ export const user = new Elysia({ prefix: "/user" })
         cursor: t.Optional(t.Number({ default: 1 })),
       }),
       cookie: t.Cookie({
-        token: t.String()
-      })
-    }
+        token: t.String(),
+      }),
+    },
   )
   .post(
     "/change-session-name",
     async ({ CheckToken: { _userId }, body: { sessionId, name } }) => {
-      const updatedSession = await ServiceUser.ChangeSessionName(_userId, sessionId, name);
+      const updatedSession = await ServiceUser.ChangeSessionName(
+        _userId,
+        sessionId,
+        name,
+      );
 
       return {
         message: "Session name updated",
-        data: updatedSession
+        data: updatedSession,
       };
     },
     {
       body: t.Object({
         sessionId: t.Number(),
-        name: t.String({ minLength: 1 })
-      })
-    }
+        name: t.String({ minLength: 1 }),
+      }),
+    },
   )
   .delete(
     "/session",
-    async ({ body: { sessionId }, cookie: { token }, CheckToken: { _userId } }) => {
-      await ServiceUser.RemoveSession(_userId, sessionId, token.value);
+    async ({ body: { sessionId }, cookie: { token } }) => {
+      await ServiceUser.RemoveSession(sessionId, token.value);
 
       return {
         message: "Session removed",
         data: {
           sessionId,
-        }
+        },
       };
     },
     {
@@ -328,9 +356,9 @@ export const user = new Elysia({ prefix: "/user" })
         sessionId: t.Number({ minLength: 1 }),
       }),
       cookie: t.Cookie({
-        token: t.String()
-      })
-    }
+        token: t.String(),
+      }),
+    },
   )
   .get(
     "/sign-out",

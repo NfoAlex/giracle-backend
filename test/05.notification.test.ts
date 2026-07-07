@@ -1,9 +1,13 @@
-import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, mock } from "bun:test";
-import { FETCH, INIT } from "./util";
+import { and, eq } from "drizzle-orm";
 import { db } from "../src";
-import { channelMutes, notificationConfigs, notificationDevices } from "../src/db/schema";
+import {
+  channelMutes,
+  notificationConfigs,
+  notificationDevices,
+} from "../src/db/schema";
 import { Util } from "../src/Util";
+import { FETCH, INIT } from "./util";
 
 // web-push の sendNotification をモック化: 実際のFCMは叩かない
 // setVapidDetails は .env.test の実VAPIDキーで通るのでモック不要
@@ -369,10 +373,15 @@ describe("SendPushNotification :: 分岐", () => {
     sendNotificationMock.mockClear();
     await setupDevice();
     const existingMute = await db.query.channelMutes.findFirst({
-      where: and(eq(channelMutes.userId, testUser), eq(channelMutes.channelId, testChannel)),
+      where: and(
+        eq(channelMutes.userId, testUser),
+        eq(channelMutes.channelId, testChannel),
+      ),
     });
     if (existingMute === undefined) {
-      await db.insert(channelMutes).values({ userId: testUser, channelId: testChannel });
+      await db
+        .insert(channelMutes)
+        .values({ userId: testUser, channelId: testChannel });
     }
 
     await Util.sendPushNotification({
@@ -386,7 +395,12 @@ describe("SendPushNotification :: 分岐", () => {
     // クリーンアップ
     await db
       .delete(channelMutes)
-      .where(and(eq(channelMutes.userId, testUser), eq(channelMutes.channelId, testChannel)));
+      .where(
+        and(
+          eq(channelMutes.userId, testUser),
+          eq(channelMutes.channelId, testChannel),
+        ),
+      );
   });
 
   it("410 Gone なら DB から購読削除", async () => {

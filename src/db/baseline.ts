@@ -11,7 +11,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const dbPath = (process.env.DATABASE_URL || "file:./dev.db").replace(/^file:/, "");
+const dbPath = (process.env.DATABASE_URL || "file:./dev.db").replace(
+  /^file:/,
+  "",
+);
 const drizzleDir = join(import.meta.dir, "..", "..", "drizzle");
 
 const sqlite = new Database(dbPath, { create: true });
@@ -24,12 +27,18 @@ sqlite.run(`
   )
 `);
 
-const journal = JSON.parse(readFileSync(join(drizzleDir, "meta", "_journal.json"), "utf8")) as {
+const journal = JSON.parse(
+  readFileSync(join(drizzleDir, "meta", "_journal.json"), "utf8"),
+) as {
   entries: { tag: string; when: number }[];
 };
 
 const appliedHashes = new Set(
-  sqlite.query("SELECT hash FROM __drizzle_migrations").all().map((row: any) => row.hash),
+  sqlite
+    .query("SELECT hash FROM __drizzle_migrations")
+    .all()
+    // biome-ignore lint/suspicious/noExplicitAny: accepts any line
+    .map((row: any) => row.hash),
 );
 
 for (const entry of journal.entries) {
@@ -42,7 +51,10 @@ for (const entry of journal.entries) {
     continue;
   }
 
-  sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", [hash, entry.when]);
+  sqlite.run(
+    "INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)",
+    [hash, entry.when],
+  );
   console.log(`baselined: ${entry.tag}`);
 }
 

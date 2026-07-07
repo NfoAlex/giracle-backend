@@ -1,17 +1,28 @@
-import { and, eq, exists, gte, inArray, like, lte, notExists, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  eq,
+  exists,
+  gte,
+  inArray,
+  like,
+  lte,
+  notExists,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
+import type { Message } from "../../db/schema";
 import {
   channelJoinOnDefaults,
   channelJoins,
-  channelViewableRoles,
   channels,
+  channelViewableRoles,
   messageReadTimes,
   messages,
   users,
 } from "../../db/schema";
-import type { Message } from "../../db/schema";
 import { Util } from "../../Util";
 import { WSUnsubscribe } from "../../ws";
 
@@ -19,7 +30,10 @@ export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
     const channelJoined = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
     });
     //既に参加している
     if (channelJoined !== undefined) {
@@ -50,7 +64,10 @@ export namespace ServiceChannel {
   export const Leave = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
     const channelJoinData = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
     });
     if (channelJoinData === undefined) {
       throw status(404, "You are not joined this channel");
@@ -59,11 +76,21 @@ export namespace ServiceChannel {
     //既読時間データを削除
     await db
       .delete(messageReadTimes)
-      .where(and(eq(messageReadTimes.channelId, channelId), eq(messageReadTimes.userId, _userId)));
+      .where(
+        and(
+          eq(messageReadTimes.channelId, channelId),
+          eq(messageReadTimes.userId, _userId),
+        ),
+      );
     //チャンネル参加データを削除
     await db
       .delete(channelJoins)
-      .where(and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)));
+      .where(
+        and(
+          eq(channelJoins.userId, _userId),
+          eq(channelJoins.channelId, channelId),
+        ),
+      );
   };
 
   export const GetInfo = async (channelId: string, _userId: string) => {
@@ -97,7 +124,10 @@ export namespace ServiceChannel {
       .from(channels)
       .where(
         notExists(
-          db.select().from(channelViewableRoles).where(eq(channelViewableRoles.channelId, channels.id)),
+          db
+            .select()
+            .from(channelViewableRoles)
+            .where(eq(channelViewableRoles.channelId, channels.id)),
         ),
       );
 
@@ -144,7 +174,12 @@ export namespace ServiceChannel {
             db
               .select()
               .from(channelJoins)
-              .where(and(eq(channelJoins.channelId, channels.id), eq(channelJoins.userId, _userId))),
+              .where(
+                and(
+                  eq(channelJoins.channelId, channels.id),
+                  eq(channelJoins.userId, _userId),
+                ),
+              ),
           ),
         ),
       );
@@ -195,7 +230,7 @@ export namespace ServiceChannel {
       }
     }
 
-    let messageDataFrom: Message | undefined = undefined;
+    let messageDataFrom: Message | undefined;
     //基準位置になるメッセージIdが指定されているなら
     if (messageIdFrom !== undefined) {
       //取得、格納
@@ -209,7 +244,7 @@ export namespace ServiceChannel {
     }
 
     //基準のメッセージIdか時間指定があるなら時間を取得、取得設定として設定
-    let dateCondition: SQL | undefined = undefined;
+    let dateCondition: SQL | undefined;
     if (messageDataFrom !== undefined) {
       //基準のメッセージIdによる取得データがあるなら
       //取得時間方向に合わせて設定を指定
@@ -220,16 +255,23 @@ export namespace ServiceChannel {
         //新しい方向に取得する場合
         //指定時間以降の最初のメッセージを取得
         const messageTakingFrom = await db.query.messages.findMany({
-          where: and(eq(messages.channelId, channelId), gte(messages.createdAt, messageDataFrom.createdAt)),
+          where: and(
+            eq(messages.channelId, channelId),
+            gte(messages.createdAt, messageDataFrom.createdAt),
+          ),
           columns: { createdAt: true },
           orderBy: (t, { asc }) => asc(t.createdAt),
           limit: fetchLength,
         });
-        const optionLte = messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
+        const optionLte =
+          messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
         //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
         dateCondition =
           optionLte !== undefined
-            ? and(lte(messages.createdAt, optionLte), gte(messages.createdAt, messageDataFrom.createdAt))
+            ? and(
+                lte(messages.createdAt, optionLte),
+                gte(messages.createdAt, messageDataFrom.createdAt),
+              )
             : gte(messages.createdAt, messageDataFrom.createdAt);
       }
     } else if (messageTimeFrom !== undefined) {
@@ -242,23 +284,33 @@ export namespace ServiceChannel {
         //新しい方向に取得する場合
         //指定時間以降の最初のメッセージを取得
         const messageTakingFrom = await db.query.messages.findMany({
-          where: and(eq(messages.channelId, channelId), gte(messages.createdAt, new Date(messageTimeFrom))),
+          where: and(
+            eq(messages.channelId, channelId),
+            gte(messages.createdAt, new Date(messageTimeFrom)),
+          ),
           columns: { createdAt: true },
           orderBy: (t, { asc }) => asc(t.createdAt),
           limit: fetchLength,
         });
-        const optionLte = messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
+        const optionLte =
+          messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
         //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
         dateCondition =
           optionLte !== undefined
-            ? and(lte(messages.createdAt, optionLte), gte(messages.createdAt, new Date(messageTimeFrom)))
+            ? and(
+                lte(messages.createdAt, optionLte),
+                gte(messages.createdAt, new Date(messageTimeFrom)),
+              )
             : gte(messages.createdAt, new Date(messageTimeFrom));
       }
     }
 
     //履歴を取得する
     const history = await db.query.messages.findMany({
-      where: dateCondition !== undefined ? and(eq(messages.channelId, channelId), dateCondition) : eq(messages.channelId, channelId),
+      where:
+        dateCondition !== undefined
+          ? and(eq(messages.channelId, channelId), dateCondition)
+          : eq(messages.channelId, channelId),
       with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
@@ -293,7 +345,10 @@ export namespace ServiceChannel {
       if (history.length === 0 && firstMessageOfChannel !== undefined) {
         //取得した履歴が空だけど最古のメッセージが存在する場合
         atTop = false;
-      } else if (history[0] !== undefined && firstMessageOfChannel !== undefined) {
+      } else if (
+        history[0] !== undefined &&
+        firstMessageOfChannel !== undefined
+      ) {
         //取得した履歴がある場合
         atTop = firstMessageOfChannel?.id === history.at(-1)?.id;
       } else {
@@ -305,7 +360,10 @@ export namespace ServiceChannel {
       if (history.length === 0 && latestMessageOfChannel !== undefined) {
         //取得した履歴が空だけど最新のメッセージが存在する場合
         atEnd = false;
-      } else if (history[0] !== undefined && latestMessageOfChannel !== undefined) {
+      } else if (
+        history[0] !== undefined &&
+        latestMessageOfChannel !== undefined
+      ) {
         //取得した履歴がある場合
         atEnd = latestMessageOfChannel?.id === history[0].id;
       } else {
@@ -337,7 +395,11 @@ export namespace ServiceChannel {
                 width,
               };
             }
-          } catch (e) { }
+          } catch (e) {
+            console.error("channel.service :: GetHistory : 画像取得で失敗", {
+              e,
+            });
+          }
         }
       }
     }
@@ -350,7 +412,7 @@ export namespace ServiceChannel {
       //結果をこのメッセージ部分に格納する
       history[index] = {
         ...history[index],
-        // @ts-ignore - reactionSummaryの追加
+        // @ts-expect-error - reactionSummaryの追加
         reactionSummary: reactionSummaries[index],
       };
     }
@@ -373,7 +435,12 @@ export namespace ServiceChannel {
     const channelInfos = await db
       .select()
       .from(channels)
-      .where(and(like(channels.name, `%${query}%`), inArray(channels.id, channelIdsViewable)));
+      .where(
+        and(
+          like(channels.name, `%${query}%`),
+          inArray(channels.id, channelIdsViewable),
+        ),
+      );
 
     return channelInfos;
   };
@@ -385,12 +452,15 @@ export namespace ServiceChannel {
   ) => {
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかをチャンネル情報と共に確認
     const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
       with: {
         channel: true,
       },
     });
-    if (!requestedUsersChannelJoin || !requestedUsersChannelJoin.channel) {
+    if (!requestedUsersChannelJoin?.channel) {
       throw status(403, "You are not joined this channel or channel not found");
     }
 
@@ -435,7 +505,10 @@ export namespace ServiceChannel {
 
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかを確認
     const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
     });
     if (!requestedUsersChannelJoin) {
       throw status(403, "You are not joined this channel");
@@ -444,7 +517,12 @@ export namespace ServiceChannel {
     //チャンネル参加データを削除(退出させる)
     await db
       .delete(channelJoins)
-      .where(and(eq(channelJoins.userId, targetUserId), eq(channelJoins.channelId, channelId)));
+      .where(
+        and(
+          eq(channelJoins.userId, targetUserId),
+          eq(channelJoins.channelId, channelId),
+        ),
+      );
 
     return;
   };
@@ -494,7 +572,10 @@ export namespace ServiceChannel {
 
     //チャンネルデータを更新する
     if (Object.keys(updatingValues).length > 0) {
-      await db.update(channels).set(updatingValues).where(eq(channels.id, channelId));
+      await db
+        .update(channels)
+        .set(updatingValues)
+        .where(eq(channels.id, channelId));
     }
 
     //チャンネル閲覧ロールを更新
@@ -515,7 +596,9 @@ export namespace ServiceChannel {
 
       //現在の閲覧可能roleIdを削除、新しいroleIdを挿入(1トランザクションにまとめて中間状態を無くす)
       db.transaction((tx) => {
-        tx.delete(channelViewableRoles).where(eq(channelViewableRoles.channelId, channelId)).run();
+        tx.delete(channelViewableRoles)
+          .where(eq(channelViewableRoles.channelId, channelId))
+          .run();
 
         if (newRoleIds.length > 0) {
           tx.insert(channelViewableRoles)
@@ -557,7 +640,11 @@ export namespace ServiceChannel {
     return newChannel;
   };
 
-  export const Delete = async (channelId: string, _userId: string, server: Bun.Server<unknown> | null) => {
+  export const Delete = async (
+    channelId: string,
+    _userId: string,
+    server: Bun.Server<unknown> | null,
+  ) => {
     //チャンネルの存在を確認
     const channel = await db.query.channels.findFirst({
       where: eq(channels.id, channelId),
@@ -592,8 +679,12 @@ export namespace ServiceChannel {
     //メッセージ・チャンネル参加データ・デフォルト参加データ・チャンネル本体を1トランザクションで削除
     db.transaction((tx) => {
       tx.delete(messages).where(eq(messages.channelId, channelId)).run();
-      tx.delete(channelJoins).where(eq(channelJoins.channelId, channelId)).run();
-      tx.delete(channelJoinOnDefaults).where(eq(channelJoinOnDefaults.channelId, channelId)).run();
+      tx.delete(channelJoins)
+        .where(eq(channelJoins.channelId, channelId))
+        .run();
+      tx.delete(channelJoinOnDefaults)
+        .where(eq(channelJoinOnDefaults.channelId, channelId))
+        .run();
       tx.delete(channels).where(eq(channels.id, channelId)).run();
     });
 

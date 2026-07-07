@@ -1,8 +1,8 @@
 import Elysia, { t } from "elysia";
 import { Middleware } from "../../Middlewares";
+import { Util } from "../../Util";
 import { WSSubscribe, WSUnsubscribe } from "../../ws";
 import { ServiceChannel } from "./channel.service";
-import { Util } from "../../Util";
 
 export const channel = new Elysia({ prefix: "/channel" })
   .use(Middleware.CheckToken)
@@ -196,7 +196,11 @@ export const channel = new Elysia({ prefix: "/channel" })
 
   .post(
     "/invite",
-    async ({ body: { channelId, userId }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { channelId, userId },
+      CheckToken: { _userId },
+      server,
+    }) => {
       //招待処理
       await ServiceChannel.Invite(channelId, userId, _userId);
 
@@ -235,7 +239,11 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .post(
     "/kick",
-    async ({ body: { channelId, userId }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { channelId, userId },
+      CheckToken: { _userId },
+      server,
+    }) => {
       //キック処理
       await ServiceChannel.Kick(channelId, userId, _userId);
 
@@ -277,7 +285,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     async ({
       body: { name, description, isArchived, channelId, viewableRole },
       server,
-      CheckToken: { _userId }
+      CheckToken: { _userId },
     }) => {
       const channelDataUpdated = await ServiceChannel.Update(
         channelId,
@@ -319,7 +327,10 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .put(
     "/create",
-    async ({ body: { channelName, description = "" }, CheckToken: { _userId } }) => {
+    async ({
+      body: { channelName, description = "" },
+      CheckToken: { _userId },
+    }) => {
       const newChannel = await ServiceChannel.Create(
         channelName,
         description,

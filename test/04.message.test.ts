@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, mock } from "bun:test";
-import { FETCH, INIT } from "./util";
+import { and, eq } from "drizzle-orm";
 import { db } from "../src";
 import { channelJoins } from "../src/db/schema";
+import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 mock.module("open-graph-scraper", () => ({
@@ -53,14 +53,13 @@ mock.module("open-graph-scraper", () => ({
         ogImage: [{ url: "https://example.com/image.png" }],
         ogVideo: undefined,
       },
-    }
+    };
   },
 }));
 
 beforeAll(async () => {
   await INIT();
 });
-
 
 describe("/message/:messageId", async () => {
   it("正常", async () => {
@@ -241,7 +240,6 @@ describe("/message/search", async () => {
 });
 
 describe("/message/file/upload", async () => {
-
   it("存在しないファイル", async () => {
     const res = await FETCH({
       path: "/message/file/upload",
@@ -262,12 +260,15 @@ describe("/message/file/upload", async () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
     const pngBuffer = Buffer.from(pngBase64, "base64");
     formData.append("channelId", "TESTCHANNEL1");
-    formData.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    formData.append(
+      "file",
+      new File([pngBuffer], "test.png", { type: "image/png" }),
+    );
 
     const res = await FETCH({
       path: "/message/file/upload",
       method: "POST",
-      body: formData
+      body: formData,
     });
     const j = await res.json();
     expect(j.message).toBe("File uploaded");
@@ -280,12 +281,15 @@ describe("/message/file/upload", async () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
     const pngBuffer = Buffer.from(pngBase64, "base64");
     formData.append("channelId", "TESTCHANNEL1");
-    formData.append("file", new File([pngBuffer], "testあ/test_xss.png", { type: "image/png" }));
+    formData.append(
+      "file",
+      new File([pngBuffer], "testあ/test_xss.png", { type: "image/png" }),
+    );
 
     const res = await FETCH({
       path: "/message/file/upload",
       method: "POST",
-      body: formData
+      body: formData,
     });
     const j = await res.json();
     expect(j.message).toBe("File uploaded");
@@ -299,13 +303,16 @@ describe("/message/file/upload", async () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
     const pngBuffer = Buffer.from(pngBase64, "base64");
     formData.append("channelId", "TESTCHANNEL1");
-    formData.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    formData.append(
+      "file",
+      new File([pngBuffer], "test.png", { type: "image/png" }),
+    );
 
     const res = await FETCH({
       path: "/message/file/upload",
       method: "POST",
       body: formData,
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
   });
@@ -316,18 +323,21 @@ describe("/message/file/get", async () => {
   let TEST_FILEID_FOR_PRIVATE_CHANNEL = "";
   beforeAll(async () => {
     const pngBase64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
     const pngBuffer = Buffer.from(pngBase64, "base64");
 
     let j = null;
 
     const formData1 = new FormData();
     formData1.append("channelId", "TESTCHANNEL1");
-    formData1.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    formData1.append(
+      "file",
+      new File([pngBuffer], "test.png", { type: "image/png" }),
+    );
     const res1 = await FETCH({
       path: "/message/file/upload",
       method: "POST",
-      body: formData1
+      body: formData1,
     });
     j = await res1.json();
     TEST_FILEID_FOR_GET = j.data.fileId.id;
@@ -340,17 +350,25 @@ describe("/message/file/get", async () => {
     });
     const formData2 = new FormData();
     formData2.append("channelId", "TESTCHANNEL3"); //プライベートであるTESTCHANNEL3指定
-    formData2.append("file", new File([pngBuffer], "test.png", { type: "image/png" }));
+    formData2.append(
+      "file",
+      new File([pngBuffer], "test.png", { type: "image/png" }),
+    );
     const res2 = await FETCH({
       path: "/message/file/upload",
       method: "POST",
-      body: formData2
+      body: formData2,
     });
     j = await res2.json();
     TEST_FILEID_FOR_PRIVATE_CHANNEL = j.data.fileId.id;
     await db
       .delete(channelJoins)
-      .where(and(eq(channelJoins.userId, "TESTUSER"), eq(channelJoins.channelId, "TESTCHANNEL3")));
+      .where(
+        and(
+          eq(channelJoins.userId, "TESTUSER"),
+          eq(channelJoins.channelId, "TESTCHANNEL3"),
+        ),
+      );
   });
 
   it("正常", async () => {
@@ -367,7 +385,7 @@ describe("/message/file/get", async () => {
     const res = await FETCH({
       path: `/message/file/${TEST_FILEID_FOR_GET}`,
       method: "GET",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBeTrue();
   });
@@ -376,7 +394,7 @@ describe("/message/file/get", async () => {
     const res = await FETCH({
       path: `/message/file/${TEST_FILEID_FOR_PRIVATE_CHANNEL}`,
       method: "GET",
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
   });
@@ -763,7 +781,9 @@ describe("/message/send", async () => {
     expect(j.message).toBe("Fetched message");
     expect(j.data.MessageUrlPreview).toBeArray();
     expect(j.data.MessageUrlPreview.length).toBe(1);
-    expect(j.data.MessageUrlPreview[0].url).toBe("https://fxtwitter.com/TEST/status/00000000");
+    expect(j.data.MessageUrlPreview[0].url).toBe(
+      "https://fxtwitter.com/TEST/status/00000000",
+    );
   });
 
   it("複数URL含むメッセージ送信 1/2 : 送信", async () => {
@@ -987,7 +1007,8 @@ describe("/message/send", async () => {
       method: "POST",
       body: {
         channelId: "TESTCHANNEL1",
-        message: "https://twitter.com/TEST/status/00000000 http://1.2.3.4 https://example.com",
+        message:
+          "https://twitter.com/TEST/status/00000000 http://1.2.3.4 https://example.com",
       },
     });
     const j = await res.json();
@@ -1044,7 +1065,9 @@ describe("/message/edit", async () => {
     expect(j.data).toContainKey("id");
     expect(j.data).toContainKey("channelId");
     expect(j.data).toContainKey("content");
-    expect(j.data.content).toBe("Hello, world! https://example.com (edited with link)");
+    expect(j.data.content).toBe(
+      "Hello, world! https://example.com (edited with link)",
+    );
     expect(j.data.isEdited).toBeTrue();
   });
 

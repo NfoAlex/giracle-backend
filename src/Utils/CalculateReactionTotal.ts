@@ -40,10 +40,12 @@ export default async function CalculateReactionTotal(
     }
   }
 
-  const emojiTotalJson = Array.from(emojiMap.entries()).map(([emojiCode, data]) => ({
-    emojiCode,
-    ...data,
-  }));
+  const emojiTotalJson = Array.from(emojiMap.entries()).map(
+    ([emojiCode, data]) => ({
+      emojiCode,
+      ...data,
+    }),
+  );
 
   return emojiTotalJson;
 }

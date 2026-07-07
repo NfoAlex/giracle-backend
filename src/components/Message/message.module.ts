@@ -3,8 +3,8 @@ import Elysia, { file, t } from "elysia";
 import { db } from "../..";
 import { channelJoins, inboxes, users } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
-import { ServiceMessage } from "./message.service";
 import { Util } from "../../Util";
+import { ServiceMessage } from "./message.service";
 
 export const message = new Elysia({ prefix: "/message" })
   .use(Middleware.CheckToken)
@@ -64,7 +64,11 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/read-time/update",
-    async ({ CheckToken: { _userId }, body: { channelId, readTime }, server }) => {
+    async ({
+      CheckToken: { _userId },
+      body: { channelId, readTime },
+      server,
+    }) => {
       const readTimeUpdated = await ServiceMessage.UpdateReadTime(
         channelId,
         readTime,
@@ -297,7 +301,11 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/emoji-reaction",
-    async ({ body: { messageId, channelId, emojiCode }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { messageId, channelId, emojiCode },
+      CheckToken: { _userId },
+      server,
+    }) => {
       const reaction = await ServiceMessage.Reaction(
         messageId,
         channelId,
@@ -333,7 +341,10 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/who-reacted",
-    async ({ query: { messageId, emojiCode, cursor }, CheckToken: { _userId } }) => {
+    async ({
+      query: { messageId, emojiCode, cursor },
+      CheckToken: { _userId },
+    }) => {
       //リアクションしたユーザーを取得
       const messageWithReactions = await ServiceMessage.GetWhoReacted(
         messageId,
@@ -361,7 +372,11 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/delete-emoji-reaction",
-    async ({ body: { messageId, channelId, emojiCode }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { messageId, channelId, emojiCode },
+      CheckToken: { _userId },
+      server,
+    }) => {
       const reactionDeleted = await ServiceMessage.DeleteEmojiReaction(
         messageId,
         emojiCode,
@@ -558,7 +573,11 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/edit",
-    async ({ body: { messageId, message }, CheckToken: { _userId }, server }) => {
+    async ({
+      body: { messageId, message },
+      CheckToken: { _userId },
+      server,
+    }) => {
       const messageEditing = await ServiceMessage.Edit(
         messageId,
         message,
