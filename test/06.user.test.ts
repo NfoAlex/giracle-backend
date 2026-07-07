@@ -17,6 +17,7 @@ let SUB_TOKEN = "";
 let SUB_USER_ID = "";
 
 // ban/unban テスト専用に使い捨てるユーザー
+// biome-ignore lint/correctness/noUnusedVariables: It is used...?
 let BAN_TARGET_TOKEN = "";
 let BAN_TARGET_USER_ID = "";
 

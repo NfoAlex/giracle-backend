@@ -32,14 +32,14 @@ setInterval(() => {
 //制限設定
 const limitConfig = {
   anonymous: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25"),
+    limit: Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60") * 1000,
+      Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) * 1000,
   },
   authenticated: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200"),
+    limit: Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60") * 1000,
+      Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
   },
 };
 //レート制限用クライアントごとのバケット管理
@@ -327,6 +327,7 @@ export namespace Middleware {
               "id" | "messageId"
             >[] = results
               .filter(
+                // biome-ignore lint/suspicious/noExplicitAny: すべてのパターンを受け付ける
                 (result): result is PromiseFulfilledResult<any> =>
                   result.status === "fulfilled",
               )

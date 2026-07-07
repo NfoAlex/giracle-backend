@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import type { ServerWebSocket } from "elysia/ws/bun";
 import { db } from ".";
-import { user } from "./components/User/user.module";
 import { tokens } from "./db/schema";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
@@ -69,7 +68,7 @@ export const wsHandler = new Elysia().ws("/ws", {
         throw new Error("ws :: 想定外のエラーが発生しました");
       });
 
-    if (!tokenWithUser || !tokenWithUser?.user) {
+    if (!tokenWithUser?.user) {
       ws.send({
         signal: "ERROR",
         data: "token not valid",

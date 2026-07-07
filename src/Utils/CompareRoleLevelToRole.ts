@@ -3,13 +3,13 @@ import { db } from "..";
 import { roleInfos } from "../db/schema";
 import getUsersRoleLevel from "./getUsersRoleLevel";
 
-const levelIndex = {
-  manageServer: 5,
-  manageRole: 4,
-  manageUser: 3,
-  manageChannel: 2,
-  manageEmoji: 1,
-};
+// const levelIndex = {
+//   manageServer: 5,
+//   manageRole: 4,
+//   manageUser: 3,
+//   manageChannel: 2,
+//   manageEmoji: 1,
+// };
 
 /**
  * 操作者と対象のロールレベルを比較する関数

@@ -216,7 +216,7 @@ describe("/channel/list", async () => {
 describe("/channel/get-history/:channelId", async () => {
   //firstMessageOfChannel/latestMessageOfChannelの判定を検証するため、
   //TESTCHANNEL1に既存のTESTMESSAGE1(最古)へ加えて新規メッセージを2件追加投入しておく
-  let TEST__HISTORY_MSG_A = "";
+  //let TEST__HISTORY_MSG_A = "";
   let TEST__HISTORY_MSG_B = "";
 
   it("準備 :: 検証用メッセージを2件追加投入", async () => {
@@ -225,9 +225,9 @@ describe("/channel/get-history/:channelId", async () => {
       method: "POST",
       body: { channelId: "TESTCHANNEL1", message: "history test message A" },
     });
-    const jA = await resA.json();
+    //const _jA = await resA.json();
     expect(resA.ok).toBe(true);
-    TEST__HISTORY_MSG_A = jA.data.id;
+    //TEST__HISTORY_MSG_A = jA.data.id;
 
     const resB = await FETCH({
       path: "/message/send",

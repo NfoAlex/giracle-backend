@@ -11,11 +11,11 @@ import { user } from "./components/User/user.module";
 import { Middleware } from "./Middlewares";
 import { wsHandler } from "./ws";
 
-await mkdir("./STORAGE", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/file", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/icon", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/banner", { recursive: true }).catch((e) => {});
-await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((e) => {});
+await mkdir("./STORAGE", { recursive: true }).catch((_) => {});
+await mkdir("./STORAGE/file", { recursive: true }).catch((_) => {});
+await mkdir("./STORAGE/icon", { recursive: true }).catch((_) => {});
+await mkdir("./STORAGE/banner", { recursive: true }).catch((_) => {});
+await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((_) => {});
 
 //DB設定 (Drizzle)
 export { db } from "./db";

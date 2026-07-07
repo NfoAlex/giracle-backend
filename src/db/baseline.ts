@@ -37,6 +37,7 @@ const appliedHashes = new Set(
   sqlite
     .query("SELECT hash FROM __drizzle_migrations")
     .all()
+    // biome-ignore lint/suspicious/noExplicitAny: accepts any line
     .map((row: any) => row.hash),
 );
 

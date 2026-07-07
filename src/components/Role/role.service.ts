@@ -132,6 +132,7 @@ export namespace ServiceRole {
         roleId,
       })
       .catch((e) => {
+        console.error("role.service :: Link(db ロール付与処理) : ", { e });
         throw status(500, "Database error");
       });
 

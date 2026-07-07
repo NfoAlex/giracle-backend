@@ -4,7 +4,6 @@ import {
   and,
   eq,
   exists,
-  gte,
   inArray,
   like,
   max,
@@ -27,7 +26,6 @@ import {
   messageUrlPreviews,
   roleInfos,
   roleLinks,
-  serverConfigs,
 } from "../../db/schema";
 import { Util } from "../../Util";
 
@@ -571,7 +569,6 @@ export namespace ServiceMessage {
   export const Send = async (
     channelId: string,
     message: string,
-    // biome-ignore lint/style/useDefaultParameterLast: 許して
     fileIds: string[] = [],
     replyingMessageId: string | undefined,
     _userId: string,

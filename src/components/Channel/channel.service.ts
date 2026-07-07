@@ -395,7 +395,11 @@ export namespace ServiceChannel {
                 width,
               };
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error("channel.service :: GetHistory : 画像取得で失敗", {
+              e,
+            });
+          }
         }
       }
     }
@@ -456,7 +460,7 @@ export namespace ServiceChannel {
         channel: true,
       },
     });
-    if (!requestedUsersChannelJoin || !requestedUsersChannelJoin.channel) {
+    if (!requestedUsersChannelJoin?.channel) {
       throw status(403, "You are not joined this channel or channel not found");
     }
 

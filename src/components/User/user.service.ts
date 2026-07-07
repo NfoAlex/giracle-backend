@@ -486,7 +486,6 @@ export namespace ServiceUser {
   };
 
   export const RemoveSession = async (
-    userId: string,
     sessionId: number,
     activeToken: string,
   ) => {
