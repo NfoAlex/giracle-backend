@@ -111,6 +111,28 @@ describe("/user/search", () => {
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(false);
   });
 
+  it("正常 :: 複合検索", async () => {
+    const res = await FETCH({
+      path: "/user/search?joinedChannel=TESTCHANNEL2&username=testsys",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    // console.log("06.user.test :: /user/search : j", j);
+    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(true);
+    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER1")).toBe(false);
+  });
+
+  it("% injection 検索", async () => {
+    const res = await FETCH({
+      path: "/user/search?username=%user2",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
   it("権限がないチャンネルで検索", async () => {
     const res = await FETCH({
       path: "/user/search?joinedChannel=TESTCHANNEL4",
