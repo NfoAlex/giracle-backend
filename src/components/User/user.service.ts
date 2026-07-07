@@ -1,16 +1,14 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, eq, exists, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
 import {
-  channelJoinOnDefaults,
   channelJoins,
   invitations,
   passwords,
   roleLinks,
-  serverConfigs,
   tokens,
   users,
 } from "../../db/schema";
@@ -193,8 +191,8 @@ export namespace ServiceUser {
     joinedChannel?: string,
     cursor = 0,
   ) => {
-    //チャンネル指定をしているならそれぞれが閲覧可能であるかを調べる
-    if (joinedChannel !== undefined) {
+    //チャンネル指定をしているならそれぞれが閲覧可能であるかを調べる(空文字は全チャンネル参加者指定のため対象外)
+    if (joinedChannel !== undefined && joinedChannel !== "") {
       const canView = await Util.checkChannelVisibility(joinedChannel, _userId);
       if (canView === false) {
         throw status(
@@ -207,18 +205,21 @@ export namespace ServiceUser {
     //検索条件を組み立て
     const conditions = [];
     if (username !== undefined) {
-      conditions.push(like(users.name, `%${username}%`));
+      const query = username.replaceAll("%", "");
+      conditions.push(like(users.name, `${query}%`));
     }
     if (joinedChannel !== undefined) {
+      //指定チャンネルへ参加しているユーザーIdをサブクエリで絞る(空文字ならいずれかのチャンネルへ参加しているユーザー)
       conditions.push(
-        exists(
+        inArray(
+          users.id,
           db
-            .select()
+            .select({ userId: channelJoins.userId })
             .from(channelJoins)
             .where(
-              joinedChannel === ""
-                ? eq(channelJoins.userId, users.id)
-                : and(eq(channelJoins.userId, users.id), eq(channelJoins.channelId, joinedChannel)),
+              joinedChannel !== ""
+                ? eq(channelJoins.channelId, joinedChannel)
+                : undefined,
             ),
         ),
       );
