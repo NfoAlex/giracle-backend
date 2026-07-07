@@ -102,10 +102,9 @@ describe("/user/search", () => {
 
   it("正常 :: joinedChannel検索", async () => {
     const res = await FETCH({
-      path: "/user/search?joinedChannel=",
+      path: "/user/search?joinedChannel=TESTCHANNEL1",
       method: "GET",
     });
-    console.log("DEBUG status", res.status, await res.clone().text());
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER")).toBe(true);
@@ -187,10 +186,10 @@ describe("/user/change-password", () => {
       method: "POST",
       body: { currentPassword: "wrongpassword", newPassword: "newpassword" },
     });
-    const t = await res.text();
+    const j = await res.json();
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
-    expect(t).toBe("Current password is incorrect");
+    expect(j.message).toBe("Current password is incorrect");
   });
 
   it("正常", async () => {
@@ -301,10 +300,10 @@ describe("/user/ban & /user/unban", () => {
         body: JSON.stringify({ username: "usertestbantarget", password: "usertestbantarget" }),
       }),
     );
-    const t = await signInRes.text();
+    const j = await signInRes.json();
     expect(signInRes.ok).toBe(false);
     expect(signInRes.status).toBe(401);
-    expect(t).toBe("User is banned");
+    expect(j.message).toBe("User is banned");
   });
 
   it("正常 :: UNBANしてサインインできるようになることを確認", async () => {
