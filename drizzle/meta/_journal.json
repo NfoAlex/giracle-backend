@@ -15,6 +15,13 @@
       "when": 1783442484391,
       "tag": "0001_chemical_miracleman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783442653558,
+      "tag": "0002_overrated_firebrand",
+      "breakpoints": true
     }
   ]
 }
