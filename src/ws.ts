@@ -1,8 +1,9 @@
-import { and, eq, exists } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
+import type { ServerWebSocket } from "elysia/ws/bun";
 import { db } from ".";
-import { tokens, users } from "./db/schema";
-import { ServerWebSocket } from "elysia/ws/bun";
+import { user } from "./components/User/user.module";
+import { tokens } from "./db/schema";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
 // biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
@@ -33,8 +34,8 @@ export const wsHandler = new Elysia().ws("/ws", {
 
   async open(ws) {
     //トークンを取得して有効か調べる
-    const token = ws.data.cookie?.token?.value || ws.data.query.token;
-    if (!token) {
+    const tokenFromCookie = ws.data.cookie?.token?.value || ws.data.query.token;
+    if (!tokenFromCookie) {
       ws.send({
         signal: "ERROR",
         data: "token not valid",
@@ -43,15 +44,32 @@ export const wsHandler = new Elysia().ws("/ws", {
       return;
     }
 
-    const user = await db.query.users.findFirst({
-      where: exists(
-        db.select().from(tokens).where(and(eq(tokens.userId, users.id), eq(tokens.token, token as string))),
-      ),
-      with: {
-        ChannelJoin: true,
-      },
-    });
-    if (!user) {
+    const tokenWithUser = await db.query.tokens
+      .findFirst({
+        where: (tokens, { eq }) => eq(tokens.token, tokenFromCookie as string),
+        columns: {},
+        with: {
+          user: {
+            with: {
+              ChannelJoin: {
+                columns: {
+                  channelId: true,
+                },
+              },
+            },
+            columns: {
+              id: true,
+              isBanned: true,
+            },
+          },
+        },
+      })
+      .catch((e) => {
+        console.error("ws :: open : e", { e });
+        throw new Error("ws :: 想定外のエラーが発生しました");
+      });
+
+    if (!tokenWithUser || !tokenWithUser?.user) {
       ws.send({
         signal: "ERROR",
         data: "token not valid",
@@ -59,6 +77,8 @@ export const wsHandler = new Elysia().ws("/ws", {
       ws.close();
       return;
     }
+
+    const user = tokenWithUser.user;
 
     //ハンドラのリンク
     ws.subscribe(`user::${user.id}`);
