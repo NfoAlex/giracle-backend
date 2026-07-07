@@ -104,7 +104,9 @@ export namespace ServiceNotification {
     if (device.userId !== _userId) {
       throw status(403, "Cannot unregister another user's device");
     }
-    await db.delete(notificationDevices).where(eq(notificationDevices.token, token));
+    await db
+      .delete(notificationDevices)
+      .where(eq(notificationDevices.token, token));
     return token;
   };
 
@@ -118,12 +120,17 @@ export namespace ServiceNotification {
 
   export const MuteChannel = async (channelId: string, _userId: string) => {
     // チャンネル存在確認
-    const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+    });
     if (channel === undefined) throw status(404, "Channel not found");
 
     //既にミュート済みならそのまま返す(Prismaのupsert update:{}相当)
     const existing = await db.query.channelMutes.findFirst({
-      where: and(eq(channelMutes.userId, _userId), eq(channelMutes.channelId, channelId)),
+      where: and(
+        eq(channelMutes.userId, _userId),
+        eq(channelMutes.channelId, channelId),
+      ),
     });
     if (existing !== undefined) return existing;
 
@@ -137,7 +144,12 @@ export namespace ServiceNotification {
   export const UnmuteChannel = async (channelId: string, _userId: string) => {
     await db
       .delete(channelMutes)
-      .where(and(eq(channelMutes.userId, _userId), eq(channelMutes.channelId, channelId)))
+      .where(
+        and(
+          eq(channelMutes.userId, _userId),
+          eq(channelMutes.channelId, channelId),
+        ),
+      )
       .catch(() => null);
     return channelId;
   };

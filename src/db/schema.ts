@@ -32,11 +32,21 @@ export const roleInfos = sqliteTable("RoleInfo", {
   createdAt: integer("createdAt", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
-  manageServer: integer("manageServer", { mode: "boolean" }).notNull().default(false),
-  manageChannel: integer("manageChannel", { mode: "boolean" }).notNull().default(false),
-  manageUser: integer("manageUser", { mode: "boolean" }).notNull().default(false),
-  manageRole: integer("manageRole", { mode: "boolean" }).notNull().default(false),
-  manageEmoji: integer("manageEmoji", { mode: "boolean" }).notNull().default(false),
+  manageServer: integer("manageServer", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  manageChannel: integer("manageChannel", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  manageUser: integer("manageUser", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  manageRole: integer("manageRole", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  manageEmoji: integer("manageEmoji", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 export const channels = sqliteTable("Channel", {
@@ -45,7 +55,9 @@ export const channels = sqliteTable("Channel", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull().unique(),
   description: text("description").notNull(),
-  isArchived: integer("isArchived", { mode: "boolean" }).notNull().default(false),
+  isArchived: integer("isArchived", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdUserId: text("createdUserId")
     .notNull()
     .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -58,7 +70,9 @@ export const messages = sqliteTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     content: text("content").notNull(),
-    isSystemMessage: integer("isSystemMessage", { mode: "boolean" }).notNull().default(false),
+    isSystemMessage: integer("isSystemMessage", { mode: "boolean" })
+      .notNull()
+      .default(false),
     isEdited: integer("isEdited", { mode: "boolean" }).notNull().default(false),
     replyingMessageId: text("replyingMessageId"),
     userId: text("userId")
@@ -66,7 +80,10 @@ export const messages = sqliteTable(
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -124,7 +141,10 @@ export const tokens = sqliteTable(
     token: text("token").notNull().unique(),
     userId: text("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -137,13 +157,19 @@ export const roleLinks = sqliteTable(
   {
     roleId: text("roleId")
       .notNull()
-      .references(() => roleInfos.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => roleInfos.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     roleLinkedAt: integer("roleLinkedAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
     userId: text("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.roleId] }),
@@ -160,10 +186,16 @@ export const channelJoins = sqliteTable(
       .$defaultFn(() => new Date()),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.channelId] }),
@@ -180,7 +212,10 @@ export const channelMutes = sqliteTable(
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     mutedAt: integer("mutedAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -197,10 +232,16 @@ export const channelViewableRoles = sqliteTable(
   {
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     roleId: text("roleId")
       .notNull()
-      .references(() => roleInfos.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => roleInfos.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
   },
   (table) => [
     primaryKey({ columns: [table.channelId, table.roleId] }),
@@ -214,7 +255,10 @@ export const channelJoinOnDefaults = sqliteTable("ChannelJoinOnDefault", {
   channelId: text("channelId")
     .notNull()
     .unique()
-    .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    .references(() => channels.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
 });
 
 export const messageUrlPreviews = sqliteTable("MessageUrlPreview", {
@@ -223,7 +267,10 @@ export const messageUrlPreviews = sqliteTable("MessageUrlPreview", {
   type: text("type").notNull(),
   messageId: text("messageId")
     .notNull()
-    .references(() => messages.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    .references(() => messages.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
   title: text("title").notNull(),
   description: text("description"),
   faviconLink: text("faviconLink"),
@@ -237,7 +284,10 @@ export const messageReadTimes = sqliteTable(
     readTime: integer("readTime", { mode: "timestamp_ms" }).notNull(),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -257,10 +307,16 @@ export const messageFileAttached = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     actualFileName: text("actualFileName").notNull(),
     savedFileName: text("savedFileName").notNull(),
     size: integer("size").notNull(),
@@ -285,7 +341,10 @@ export const messageReactions = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -314,10 +373,16 @@ export const inboxes = sqliteTable(
       .$defaultFn(() => new Date()),
     messageId: text("messageId")
       .notNull()
-      .references(() => messages.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => messages.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
   },
   (table) => [
     primaryKey({ columns: [table.messageId, table.userId] }),
@@ -334,7 +399,10 @@ export const customEmojis = sqliteTable(
     code: text("code").notNull().unique(),
     uploadedUserId: text("uploadedUserId")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
   },
   (table) => [index("CustomEmoji_uploadedUserId_idx").on(table.uploadedUserId)],
 );
@@ -364,9 +432,15 @@ export const serverConfigs = sqliteTable("ServerConfig", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   introduction: text("introduction").notNull(),
-  RegisterAvailable: integer("RegisterAvailable", { mode: "boolean" }).notNull().default(true),
-  RegisterInviteOnly: integer("RegisterInviteOnly", { mode: "boolean" }).notNull().default(true),
-  RegisterAnnounceChannelId: text("RegisterAnnounceChannelId").notNull().default(""),
+  RegisterAvailable: integer("RegisterAvailable", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  RegisterInviteOnly: integer("RegisterInviteOnly", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  RegisterAnnounceChannelId: text("RegisterAnnounceChannelId")
+    .notNull()
+    .default(""),
   MessageMaxLength: integer("MessageMaxLength").notNull().default(3000),
   MessageMaxFileSize: integer("MessageMaxFileSize").notNull().default(512000),
 });
@@ -444,19 +518,25 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   MessageUrlPreview: many(messageUrlPreviews),
 }));
 
-export const notificationDevicesRelations = relations(notificationDevices, ({ one }) => ({
-  user: one(users, {
-    fields: [notificationDevices.userId],
-    references: [users.id],
+export const notificationDevicesRelations = relations(
+  notificationDevices,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [notificationDevices.userId],
+      references: [users.id],
+    }),
   }),
-}));
+);
 
-export const notificationConfigsRelations = relations(notificationConfigs, ({ one }) => ({
-  user: one(users, {
-    fields: [notificationConfigs.userId],
-    references: [users.id],
+export const notificationConfigsRelations = relations(
+  notificationConfigs,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [notificationConfigs.userId],
+      references: [users.id],
+    }),
   }),
-}));
+);
 
 export const passwordsRelations = relations(passwords, ({ one }) => ({
   user: one(users, {
@@ -505,71 +585,89 @@ export const channelMutesRelations = relations(channelMutes, ({ one }) => ({
   }),
 }));
 
-export const channelViewableRolesRelations = relations(channelViewableRoles, ({ one }) => ({
-  role: one(roleInfos, {
-    fields: [channelViewableRoles.roleId],
-    references: [roleInfos.id],
+export const channelViewableRolesRelations = relations(
+  channelViewableRoles,
+  ({ one }) => ({
+    role: one(roleInfos, {
+      fields: [channelViewableRoles.roleId],
+      references: [roleInfos.id],
+    }),
+    channel: one(channels, {
+      fields: [channelViewableRoles.channelId],
+      references: [channels.id],
+    }),
   }),
-  channel: one(channels, {
-    fields: [channelViewableRoles.channelId],
-    references: [channels.id],
-  }),
-}));
+);
 
-export const channelJoinOnDefaultsRelations = relations(channelJoinOnDefaults, ({ one }) => ({
-  channel: one(channels, {
-    fields: [channelJoinOnDefaults.channelId],
-    references: [channels.id],
+export const channelJoinOnDefaultsRelations = relations(
+  channelJoinOnDefaults,
+  ({ one }) => ({
+    channel: one(channels, {
+      fields: [channelJoinOnDefaults.channelId],
+      references: [channels.id],
+    }),
   }),
-}));
+);
 
-export const messageUrlPreviewsRelations = relations(messageUrlPreviews, ({ one }) => ({
-  message: one(messages, {
-    fields: [messageUrlPreviews.messageId],
-    references: [messages.id],
+export const messageUrlPreviewsRelations = relations(
+  messageUrlPreviews,
+  ({ one }) => ({
+    message: one(messages, {
+      fields: [messageUrlPreviews.messageId],
+      references: [messages.id],
+    }),
   }),
-}));
+);
 
-export const messageReadTimesRelations = relations(messageReadTimes, ({ one }) => ({
-  user: one(users, {
-    fields: [messageReadTimes.userId],
-    references: [users.id],
+export const messageReadTimesRelations = relations(
+  messageReadTimes,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [messageReadTimes.userId],
+      references: [users.id],
+    }),
+    channel: one(channels, {
+      fields: [messageReadTimes.channelId],
+      references: [channels.id],
+    }),
   }),
-  channel: one(channels, {
-    fields: [messageReadTimes.channelId],
-    references: [channels.id],
-  }),
-}));
+);
 
-export const messageFileAttachedRelations = relations(messageFileAttached, ({ one }) => ({
-  Message: one(messages, {
-    fields: [messageFileAttached.messageId],
-    references: [messages.id],
+export const messageFileAttachedRelations = relations(
+  messageFileAttached,
+  ({ one }) => ({
+    Message: one(messages, {
+      fields: [messageFileAttached.messageId],
+      references: [messages.id],
+    }),
+    user: one(users, {
+      fields: [messageFileAttached.userId],
+      references: [users.id],
+    }),
+    channel: one(channels, {
+      fields: [messageFileAttached.channelId],
+      references: [channels.id],
+    }),
   }),
-  user: one(users, {
-    fields: [messageFileAttached.userId],
-    references: [users.id],
-  }),
-  channel: one(channels, {
-    fields: [messageFileAttached.channelId],
-    references: [channels.id],
-  }),
-}));
+);
 
-export const messageReactionsRelations = relations(messageReactions, ({ one }) => ({
-  Message: one(messages, {
-    fields: [messageReactions.messageId],
-    references: [messages.id],
+export const messageReactionsRelations = relations(
+  messageReactions,
+  ({ one }) => ({
+    Message: one(messages, {
+      fields: [messageReactions.messageId],
+      references: [messages.id],
+    }),
+    user: one(users, {
+      fields: [messageReactions.userId],
+      references: [users.id],
+    }),
+    channel: one(channels, {
+      fields: [messageReactions.channelId],
+      references: [channels.id],
+    }),
   }),
-  user: one(users, {
-    fields: [messageReactions.userId],
-    references: [users.id],
-  }),
-  channel: one(channels, {
-    fields: [messageReactions.channelId],
-    references: [channels.id],
-  }),
-}));
+);
 
 export const inboxesRelations = relations(inboxes, ({ one }) => ({
   user: one(users, {

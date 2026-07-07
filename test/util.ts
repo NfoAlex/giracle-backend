@@ -1,17 +1,18 @@
-import fs from 'node:fs/promises'
+import fs from "node:fs/promises";
 import { $ } from "bun";
 import { eq } from "drizzle-orm";
+import { app } from "../src";
 import { db } from "../src/db";
 import {
   channelJoins,
-  channelViewableRoles,
   channels,
+  channelViewableRoles,
   inboxes,
   invitations,
   messageReactions,
   messageReadTimes,
-  messageUrlPreviews,
   messages,
+  messageUrlPreviews,
   passwords,
   roleInfos,
   roleLinks,
@@ -19,7 +20,6 @@ import {
   tokens,
   users,
 } from "../src/db/schema";
-import { app } from "../src";
 
 let FLAG_INIT_COMPLETED = false;
 
@@ -49,7 +49,7 @@ export async function INIT() {
   await db.delete(users);
   await db.delete(serverConfigs);
 
-  await fs.rm('STORAGE\\file\\TESTCHANNEL1', { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
+  await fs.rm("STORAGE\\file\\TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await $`bun ./src/db/seeds.ts`;
 
   await db.insert(users).values([
@@ -62,40 +62,108 @@ export async function INIT() {
     { userId: "TESTUSER", token: "TESTUSERTOKEN_FOR_DELETION_TEST" },
     { userId: "TESTUSER2", token: "TESTUSER2TOKEN" },
   ]);
-  await db.insert(invitations).values({ inviteCode: "testinvite", createdUserId: "SYSTEM" });
+  await db
+    .insert(invitations)
+    .values({ inviteCode: "testinvite", createdUserId: "SYSTEM" });
 
   // --- 02.channel: チャンネル/メッセージ/ロール作成 ---
   await db.insert(channels).values([
-    { id: "TESTCHANNEL1", name: "General", description: "General channel", createdUserId: "TESTUSER" },
-    { id: "TESTCHANNEL2", name: "Random", description: "Random discussions", createdUserId: "TESTUSER" },
-    { id: "TESTCHANNEL3", name: "Private Channel", description: "Private discussions", createdUserId: "TESTUSER" },
-    { id: "TESTCHANNEL4", name: "Private Channel w/o users", description: "Private discussions", createdUserId: "SYSTEM" },
+    {
+      id: "TESTCHANNEL1",
+      name: "General",
+      description: "General channel",
+      createdUserId: "TESTUSER",
+    },
+    {
+      id: "TESTCHANNEL2",
+      name: "Random",
+      description: "Random discussions",
+      createdUserId: "TESTUSER",
+    },
+    {
+      id: "TESTCHANNEL3",
+      name: "Private Channel",
+      description: "Private discussions",
+      createdUserId: "TESTUSER",
+    },
+    {
+      id: "TESTCHANNEL4",
+      name: "Private Channel w/o users",
+      description: "Private discussions",
+      createdUserId: "SYSTEM",
+    },
   ]);
-  await db.insert(messages)
-    .values({ id: "TESTMESSAGE1", channelId: "TESTCHANNEL1", content: "Welcome to the General channel!", userId: "TESTUSER" })
+  await db
+    .insert(messages)
+    .values({
+      id: "TESTMESSAGE1",
+      channelId: "TESTCHANNEL1",
+      content: "Welcome to the General channel!",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
-  await db.insert(messages)
-    .values({ id: "TESTMESSAGE2", channelId: "TESTCHANNEL2", content: "Feel free to chat here.", userId: "TESTUSER" })
+  await db
+    .insert(messages)
+    .values({
+      id: "TESTMESSAGE2",
+      channelId: "TESTCHANNEL2",
+      content: "Feel free to chat here.",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
-  await db.insert(messages)
-    .values({ id: "TESTMESSAGE3", channelId: "TESTCHANNEL3", content: "Secret message.", userId: "TESTUSER" })
+  await db
+    .insert(messages)
+    .values({
+      id: "TESTMESSAGE3",
+      channelId: "TESTCHANNEL3",
+      content: "Secret message.",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
   await db.insert(channelJoins).values([
     { userId: "TESTUSER", channelId: "TESTCHANNEL1" },
     { userId: "TESTUSER2", channelId: "TESTCHANNEL2" },
   ]);
-  await db.insert(roleInfos).values({ id: "ChannelManage", name: "Channel Manage Role", createdUserId: "TESTUSER", manageChannel: true });
-  await db.insert(roleLinks).values({ userId: "TESTUSER", roleId: "ChannelManage" });
-  await db.insert(roleInfos).values({ id: "ChannelPrivateViewer", name: "Channel Private Viewer Role", createdUserId: "TESTUSER" });
-  await db.insert(roleLinks).values({ userId: "TESTUSER", roleId: "ChannelPrivateViewer" });
-  await db.insert(channelViewableRoles).values({ channelId: "TESTCHANNEL3", roleId: "ChannelPrivateViewer" });
+  await db.insert(roleInfos).values({
+    id: "ChannelManage",
+    name: "Channel Manage Role",
+    createdUserId: "TESTUSER",
+    manageChannel: true,
+  });
+  await db
+    .insert(roleLinks)
+    .values({ userId: "TESTUSER", roleId: "ChannelManage" });
+  await db.insert(roleInfos).values({
+    id: "ChannelPrivateViewer",
+    name: "Channel Private Viewer Role",
+    createdUserId: "TESTUSER",
+  });
+  await db
+    .insert(roleLinks)
+    .values({ userId: "TESTUSER", roleId: "ChannelPrivateViewer" });
+  await db
+    .insert(channelViewableRoles)
+    .values({ channelId: "TESTCHANNEL3", roleId: "ChannelPrivateViewer" });
   // 無人のプライベートなチャンネル(TESTCHANNEL4)用
-  await db.insert(roleInfos).values({ id: "CompletePrivate", name: "Comple private role", createdUserId: "SYSTEM" });
-  await db.insert(channelViewableRoles).values({ channelId: "TESTCHANNEL4", roleId: "CompletePrivate" });
+  await db.insert(roleInfos).values({
+    id: "CompletePrivate",
+    name: "Comple private role",
+    createdUserId: "SYSTEM",
+  });
+  await db
+    .insert(channelViewableRoles)
+    .values({ channelId: "TESTCHANNEL4", roleId: "CompletePrivate" });
 
   // --- 03.role: ロール管理権限付与 ---
-  await db.insert(roleInfos).values({ id: "RoleManage", name: "Role Manage Role", createdUserId: "TESTUSER", manageRole: true });
-  await db.insert(roleLinks).values({ roleId: "RoleManage", userId: "TESTUSER" });
+  await db.insert(roleInfos).values({
+    id: "RoleManage",
+    name: "Role Manage Role",
+    createdUserId: "TESTUSER",
+    manageRole: true,
+  });
+  await db
+    .insert(roleLinks)
+    .values({ roleId: "RoleManage", userId: "TESTUSER" });
 
   // --- 04.message: メッセージ関連データ追加 ---
   await db.delete(messageReadTimes);
@@ -103,17 +171,31 @@ export async function INIT() {
   await db.delete(messageUrlPreviews);
   await db.delete(messages).where(eq(messages.channelId, "TESTCHANNEL1"));
 
-  await db.insert(messages)
-    .values({ id: "TESTMESSAGE1", channelId: "TESTCHANNEL1", content: "Welcome to the General channel!", userId: "TESTUSER" })
+  await db
+    .insert(messages)
+    .values({
+      id: "TESTMESSAGE1",
+      channelId: "TESTCHANNEL1",
+      content: "Welcome to the General channel!",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
-  await db.insert(messages)
-    .values({ id: "TESTMESSAGE2", channelId: "TESTCHANNEL1", content: "Feel free to chat here.", userId: "TESTUSER" })
+  await db
+    .insert(messages)
+    .values({
+      id: "TESTMESSAGE2",
+      channelId: "TESTCHANNEL1",
+      content: "Feel free to chat here.",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
 
-  await db.insert(inboxes)
+  await db
+    .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER" })
     .onConflictDoNothing();
-  await db.insert(inboxes)
+  await db
+    .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
     .onConflictDoNothing();
 }

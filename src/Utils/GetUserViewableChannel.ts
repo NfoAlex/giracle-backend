@@ -1,7 +1,21 @@
-import { and, eq, exists, inArray, notExists, notInArray, or, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  exists,
+  inArray,
+  notExists,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "..";
-import { channelJoins, channelViewableRoles, channels, roleLinks } from "../db/schema";
 import type { Channel } from "../db/schema";
+import {
+  channelJoins,
+  channels,
+  channelViewableRoles,
+  roleLinks,
+} from "../db/schema";
 
 /**
  * 指定のユーザーが閲覧できるチャンネル情報を取得する
@@ -63,7 +77,10 @@ export default async function GetUserViewableChannel(
       .select()
       .from(channelJoins)
       .where(
-        and(eq(channelJoins.channelId, channels.id), eq(channelJoins.userId, _userId)),
+        and(
+          eq(channelJoins.channelId, channels.id),
+          eq(channelJoins.userId, _userId),
+        ),
       ),
   );
 

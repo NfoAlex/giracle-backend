@@ -107,7 +107,8 @@ export namespace ServiceUser {
     });
 
     //デフォルトで参加するチャンネルに参加させる
-    const channelJoinOnDefault = await db.query.channelJoinOnDefaults.findMany();
+    const channelJoinOnDefault =
+      await db.query.channelJoinOnDefaults.findMany();
     const joiningData: { userId: string; channelId: string }[] = [];
     for (const channelIdJson of channelJoinOnDefault) {
       joiningData.push({
@@ -443,7 +444,11 @@ export namespace ServiceUser {
     return userUpdated;
   };
 
-  export const GetSessions = async (userId: string, tokenMarking: string, cursor: number = 1) => {
+  export const GetSessions = async (
+    userId: string,
+    tokenMarking: string,
+    cursor: number = 1,
+  ) => {
     const skipAmount = (cursor - 1) * 30;
     const sessions = await db.query.tokens.findMany({
       where: eq(tokens.userId, userId),
@@ -454,11 +459,15 @@ export namespace ServiceUser {
     return sessions.map((session) => ({
       ...session,
       thisIsYou: session.token === tokenMarking,
-      token: undefined
+      token: undefined,
     }));
   };
 
-  export const ChangeSessionName = async (userId: string, sessionId: number, newName: string) => {
+  export const ChangeSessionName = async (
+    userId: string,
+    sessionId: number,
+    newName: string,
+  ) => {
     const [newSession] = await db
       .update(tokens)
       .set({ name: newName })
@@ -476,17 +485,25 @@ export namespace ServiceUser {
     return { ...newSession, token: undefined };
   };
 
-  export const RemoveSession = async (userId: string, sessionId: number, activeToken: string) => {
+  export const RemoveSession = async (
+    userId: string,
+    sessionId: number,
+    activeToken: string,
+  ) => {
     const targetToken = await db.query.tokens.findFirst({
       where: eq(tokens.id, sessionId),
     });
 
     if (targetToken === undefined) throw status(404, "Session not found");
-    if (targetToken.token === activeToken) throw status(400, "You cannot delete your active session");
+    if (targetToken.token === activeToken)
+      throw status(400, "You cannot delete your active session");
 
-    await db.delete(tokens).where(eq(tokens.id, sessionId)).catch(() => {
-      throw status(500, "Something went wrong");
-    });
+    await db
+      .delete(tokens)
+      .where(eq(tokens.id, sessionId))
+      .catch(() => {
+        throw status(500, "Something went wrong");
+      });
 
     return;
   };
@@ -552,7 +569,8 @@ export namespace ServiceUser {
     }
     //ロールレベルが対象より低いとBANできない
     if (
-      (await Util.getUsersRoleLevel(_userId)) < (await Util.getUsersRoleLevel(userId))
+      (await Util.getUsersRoleLevel(_userId)) <
+      (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't ban higher role level user");
     }
@@ -574,7 +592,8 @@ export namespace ServiceUser {
     }
     //ロールレベルが対象より低いとBAN解除できない
     if (
-      (await Util.getUsersRoleLevel(_userId)) < (await Util.getUsersRoleLevel(userId))
+      (await Util.getUsersRoleLevel(_userId)) <
+      (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't unban higher role level user");
     }

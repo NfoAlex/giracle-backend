@@ -7,7 +7,9 @@ import { FETCH, INIT } from "./util";
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 function pngFile(name = "icon.png") {
-  return new File([Buffer.from(PNG_BASE64, "base64")], name, { type: "image/png" });
+  return new File([Buffer.from(PNG_BASE64, "base64")], name, {
+    type: "image/png",
+  });
 }
 
 // change-password / profile-update / change-icon 等、副作用がありTESTUSERを汚したくないテスト専用ユーザー
@@ -49,7 +51,11 @@ async function signUpAndSignIn(username: string) {
     new Request("http://localhost/user/sign-up", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password: username, inviteCode: "testinvite" }),
+      body: JSON.stringify({
+        username,
+        password: username,
+        inviteCode: "testinvite",
+      }),
     }),
   );
   const signInRes = await app.handle(
@@ -60,15 +66,18 @@ async function signUpAndSignIn(username: string) {
     }),
   );
   const j = await signInRes.json();
-  const token = signInRes.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1] ?? "";
+  const token =
+    signInRes.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1] ?? "";
   return { token, userId: j.data.userId as string };
 }
 
 beforeAll(async () => {
   await INIT();
 
-  ({ token: SUB_TOKEN, userId: SUB_USER_ID } = await signUpAndSignIn("usertestsub"));
-  ({ token: BAN_TARGET_TOKEN, userId: BAN_TARGET_USER_ID } = await signUpAndSignIn("usertestbantarget"));
+  ({ token: SUB_TOKEN, userId: SUB_USER_ID } =
+    await signUpAndSignIn("usertestsub"));
+  ({ token: BAN_TARGET_TOKEN, userId: BAN_TARGET_USER_ID } =
+    await signUpAndSignIn("usertestbantarget"));
 
   // ban/unban確認用にTESTUSERへ manageUser 権限ロールを付与
   await db.insert(roleInfos).values({
@@ -77,7 +86,9 @@ beforeAll(async () => {
     createdUserId: "TESTUSER",
     manageUser: true,
   });
-  await db.insert(roleLinks).values({ roleId: "UserManage", userId: "TESTUSER" });
+  await db
+    .insert(roleLinks)
+    .values({ roleId: "UserManage", userId: "TESTUSER" });
 });
 
 describe("/user/get-online", () => {
@@ -108,7 +119,9 @@ describe("/user/search", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER")).toBe(true);
-    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(false);
+    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(
+      false,
+    );
   });
 
   it("正常 :: 複合検索", async () => {
@@ -120,7 +133,9 @@ describe("/user/search", () => {
     expect(res.ok).toBe(true);
     // console.log("06.user.test :: /user/search : j", j);
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(true);
-    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER1")).toBe(false);
+    expect(j.data.some((u: { id: string }) => u.id === "TESTUSER1")).toBe(
+      false,
+    );
   });
 
   it("% injection 検索", async () => {
@@ -141,18 +156,26 @@ describe("/user/search", () => {
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(res.status).toBe(403);
-    expect(t).toBe("You can't search this channel due to visibility restrictions");
+    expect(t).toBe(
+      "You can't search this channel due to visibility restrictions",
+    );
   });
 });
 
 describe("/user/icon & /user/banner", () => {
   it("アイコン未設定 :: デフォルト画像が返る", async () => {
-    const res = await FETCH({ path: `/user/icon/${SUB_USER_ID}`, method: "GET" });
+    const res = await FETCH({
+      path: `/user/icon/${SUB_USER_ID}`,
+      method: "GET",
+    });
     expect(res.ok).toBe(true);
   });
 
   it("バナー未設定 :: 404", async () => {
-    const res = await FETCH({ path: `/user/banner/${SUB_USER_ID}`, method: "GET" });
+    const res = await FETCH({
+      path: `/user/banner/${SUB_USER_ID}`,
+      method: "GET",
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("User banner not found");
@@ -163,17 +186,33 @@ describe("/user/change-icon", () => {
   it("正常", async () => {
     const formData = new FormData();
     formData.append("icon", pngFile());
-    const res = await subFetch({ path: "/user/change-icon", method: "POST", body: formData, isFormData: true });
+    const res = await subFetch({
+      path: "/user/change-icon",
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
     expect(res.ok).toBe(true);
 
-    const iconRes = await FETCH({ path: `/user/icon/${SUB_USER_ID}`, method: "GET" });
+    const iconRes = await FETCH({
+      path: `/user/icon/${SUB_USER_ID}`,
+      method: "GET",
+    });
     expect(iconRes.ok).toBe(true);
   });
 
   it("不正なファイル形式", async () => {
     const formData = new FormData();
-    formData.append("icon", new File(["hello"], "test.txt", { type: "text/plain" }));
-    const res = await subFetch({ path: "/user/change-icon", method: "POST", body: formData, isFormData: true });
+    formData.append(
+      "icon",
+      new File(["hello"], "test.txt", { type: "text/plain" }),
+    );
+    const res = await subFetch({
+      path: "/user/change-icon",
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("File type is invalid");
@@ -184,17 +223,33 @@ describe("/user/change-banner", () => {
   it("正常", async () => {
     const formData = new FormData();
     formData.append("banner", pngFile());
-    const res = await subFetch({ path: "/user/change-banner", method: "POST", body: formData, isFormData: true });
+    const res = await subFetch({
+      path: "/user/change-banner",
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
     expect(res.ok).toBe(true);
 
-    const bannerRes = await FETCH({ path: `/user/banner/${SUB_USER_ID}`, method: "GET" });
+    const bannerRes = await FETCH({
+      path: `/user/banner/${SUB_USER_ID}`,
+      method: "GET",
+    });
     expect(bannerRes.ok).toBe(true);
   });
 
   it("不正なファイル形式", async () => {
     const formData = new FormData();
-    formData.append("banner", new File(["hello"], "test.txt", { type: "text/plain" }));
-    const res = await subFetch({ path: "/user/change-banner", method: "POST", body: formData, isFormData: true });
+    formData.append(
+      "banner",
+      new File(["hello"], "test.txt", { type: "text/plain" }),
+    );
+    const res = await subFetch({
+      path: "/user/change-banner",
+      method: "POST",
+      body: formData,
+      isFormData: true,
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("File type is invalid");
@@ -227,7 +282,10 @@ describe("/user/change-password", () => {
       new Request("http://localhost/user/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "usertestsub", password: "usertestsubnew" }),
+        body: JSON.stringify({
+          username: "usertestsub",
+          password: "usertestsubnew",
+        }),
       }),
     );
     expect(signInRes.ok).toBe(true);
@@ -266,7 +324,10 @@ describe("/user/info/:id", () => {
   });
 
   it("存在しないユーザー", async () => {
-    const res = await FETCH({ path: "/user/info/NOTEXISTUSER999", method: "GET" });
+    const res = await FETCH({
+      path: "/user/info/NOTEXISTUSER999",
+      method: "GET",
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
@@ -285,14 +346,22 @@ describe("/user/list", () => {
 
 describe("/user/ban & /user/unban", () => {
   it("自分自身をBANしようとする", async () => {
-    const res = await FETCH({ path: "/user/ban", method: "POST", body: { userId: "TESTUSER" } });
+    const res = await FETCH({
+      path: "/user/ban",
+      method: "POST",
+      body: { userId: "TESTUSER" },
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("You can't ban yourself");
   });
 
   it("HOSTをBANしようとする", async () => {
-    const res = await FETCH({ path: "/user/ban", method: "POST", body: { userId: "HOST" } });
+    const res = await FETCH({
+      path: "/user/ban",
+      method: "POST",
+      body: { userId: "HOST" },
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("You can't ban HOST");
@@ -312,14 +381,21 @@ describe("/user/ban & /user/unban", () => {
   });
 
   it("正常 :: BANしてサインインできなくなることを確認", async () => {
-    const res = await FETCH({ path: "/user/ban", method: "POST", body: { userId: BAN_TARGET_USER_ID } });
+    const res = await FETCH({
+      path: "/user/ban",
+      method: "POST",
+      body: { userId: BAN_TARGET_USER_ID },
+    });
     expect(res.ok).toBe(true);
 
     const signInRes = await app.handle(
       new Request("http://localhost/user/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "usertestbantarget", password: "usertestbantarget" }),
+        body: JSON.stringify({
+          username: "usertestbantarget",
+          password: "usertestbantarget",
+        }),
       }),
     );
     const j = await signInRes.json();
@@ -329,21 +405,32 @@ describe("/user/ban & /user/unban", () => {
   });
 
   it("正常 :: UNBANしてサインインできるようになることを確認", async () => {
-    const res = await FETCH({ path: "/user/unban", method: "POST", body: { userId: BAN_TARGET_USER_ID } });
+    const res = await FETCH({
+      path: "/user/unban",
+      method: "POST",
+      body: { userId: BAN_TARGET_USER_ID },
+    });
     expect(res.ok).toBe(true);
 
     const signInRes = await app.handle(
       new Request("http://localhost/user/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "usertestbantarget", password: "usertestbantarget" }),
+        body: JSON.stringify({
+          username: "usertestbantarget",
+          password: "usertestbantarget",
+        }),
       }),
     );
     expect(signInRes.ok).toBe(true);
   });
 
   it("自分自身をUNBANしようとする", async () => {
-    const res = await FETCH({ path: "/user/unban", method: "POST", body: { userId: "TESTUSER" } });
+    const res = await FETCH({
+      path: "/user/unban",
+      method: "POST",
+      body: { userId: "TESTUSER" },
+    });
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("You can't unban yourself");

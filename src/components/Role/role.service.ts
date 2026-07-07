@@ -41,7 +41,10 @@ export namespace ServiceRole {
       })
       .returning()
       .catch((e) => {
-        if (e instanceof Error && e.message.includes("UNIQUE constraint failed")) {
+        if (
+          e instanceof Error &&
+          e.message.includes("UNIQUE constraint failed")
+        ) {
           throw status(400, "Role name already exists");
         }
         throw status(500, "Database error");

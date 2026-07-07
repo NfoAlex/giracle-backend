@@ -1,12 +1,16 @@
 import { and, eq, inArray } from "drizzle-orm";
 import webpush from "web-push";
 import { ConstWebPush, db } from "..";
-import { channelMutes, notificationConfigs, notificationDevices } from "../db/schema";
 import type {
   NotificationPlatform,
   PushPayload,
   WebPushKeys,
 } from "../components/Notification/types";
+import {
+  channelMutes,
+  notificationConfigs,
+  notificationDevices,
+} from "../db/schema";
 
 export type NotifyEventType = "mention" | "reply" | "message";
 
@@ -18,7 +22,8 @@ async function sendToWebDevice(
   keysJson: string | null,
   payload: PushPayload,
 ): Promise<{ ok: boolean; invalidateToken: boolean }> {
-  if (!ConstWebPush.isWebPushReady) return { ok: false, invalidateToken: false };
+  if (!ConstWebPush.isWebPushReady)
+    return { ok: false, invalidateToken: false };
   if (!keysJson) return { ok: false, invalidateToken: true };
 
   let keys: WebPushKeys;
@@ -42,11 +47,7 @@ async function sendToWebDevice(
     if (statusCode === 404 || statusCode === 410) {
       return { ok: false, invalidateToken: true };
     }
-    console.error(
-      "SendPushNotification :: web push send error",
-      endpoint,
-      e,
-    );
+    console.error("SendPushNotification :: web push send error", endpoint, e);
     return { ok: false, invalidateToken: false };
   }
 }
@@ -85,7 +86,10 @@ export default async function SendPushNotification(input: {
 
   //チャンネルミュートを確認
   const muted = await db.query.channelMutes.findFirst({
-    where: and(eq(channelMutes.userId, userId), eq(channelMutes.channelId, channelId)),
+    where: and(
+      eq(channelMutes.userId, userId),
+      eq(channelMutes.channelId, channelId),
+    ),
   });
   if (muted !== undefined) return;
 
@@ -117,6 +121,8 @@ export default async function SendPushNotification(input: {
 
   //無効になったトークンをDBから削除
   if (invalidTokens.length > 0) {
-    await db.delete(notificationDevices).where(inArray(notificationDevices.token, invalidTokens));
+    await db
+      .delete(notificationDevices)
+      .where(inArray(notificationDevices.token, invalidTokens));
   }
 }

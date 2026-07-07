@@ -1,10 +1,21 @@
-import { mkdir } from "node:fs/promises";
-import { unlink } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import { and, eq, exists, gte, inArray, like, max, notExists, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  exists,
+  gte,
+  inArray,
+  like,
+  max,
+  notExists,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
+import type { Message } from "../../db/schema";
 import {
   channelJoins,
   channels,
@@ -12,13 +23,12 @@ import {
   messageFileAttached,
   messageReactions,
   messageReadTimes,
-  messageUrlPreviews,
   messages,
+  messageUrlPreviews,
   roleInfos,
   roleLinks,
   serverConfigs,
 } from "../../db/schema";
-import type { Message } from "../../db/schema";
 import { Util } from "../../Util";
 
 export namespace ServiceMessage {
@@ -61,7 +71,10 @@ export namespace ServiceMessage {
 
     // チャンネルごとの最新createdAtをDB側で集約（groupByはDB集約なので軽い）
     const latestTimes = await db
-      .select({ channelId: messages.channelId, maxCreatedAt: max(messages.createdAt) })
+      .select({
+        channelId: messages.channelId,
+        maxCreatedAt: max(messages.createdAt),
+      })
       .from(messages)
       .where(inArray(messages.channelId, channelIds))
       .groupBy(messages.channelId);
@@ -107,7 +120,10 @@ export namespace ServiceMessage {
       where: eq(channels.id, channelId),
       with: {
         MessageReadTime: {
-          where: and(eq(messageReadTimes.channelId, channelId), eq(messageReadTimes.userId, _userId)),
+          where: and(
+            eq(messageReadTimes.channelId, channelId),
+            eq(messageReadTimes.userId, _userId),
+          ),
         },
       },
     });
@@ -164,7 +180,10 @@ export namespace ServiceMessage {
         throw status(403, "You are not allowed to view this channel");
       }
     } else {
-      const viewableChannels = await Util.getUserViewableChannel(_userId, false);
+      const viewableChannels = await Util.getUserViewableChannel(
+        _userId,
+        false,
+      );
       viewableChannelIds = viewableChannels.map((channel) => channel.id);
     }
 
@@ -177,9 +196,19 @@ export namespace ServiceMessage {
         case undefined:
           return undefined;
         case true:
-          return exists(db.select().from(relTable).where(eq(relTable.messageId, messages.id)));
+          return exists(
+            db
+              .select()
+              .from(relTable)
+              .where(eq(relTable.messageId, messages.id)),
+          );
         case false:
-          return notExists(db.select().from(relTable).where(eq(relTable.messageId, messages.id)));
+          return notExists(
+            db
+              .select()
+              .from(relTable)
+              .where(eq(relTable.messageId, messages.id)),
+          );
       }
     };
 
@@ -191,7 +220,9 @@ export namespace ServiceMessage {
         : sql`false`;
 
     const conditions: (SQL | undefined)[] = [
-      content !== undefined ? like(messages.content, `%${content}%`) : undefined,
+      content !== undefined
+        ? like(messages.content, `%${content}%`)
+        : undefined,
       channelCondition,
       userId !== undefined ? eq(messages.userId, userId) : undefined,
       relationOptionGetter(hasUrlPreview, messageUrlPreviews),
@@ -207,7 +238,8 @@ export namespace ServiceMessage {
       },
       limit: SEARCH_PAGE_SIZE,
       offset: messageSkipping,
-      orderBy: (t, { asc, desc }) => (sort === "asc" ? asc(t.createdAt) : desc(t.createdAt)),
+      orderBy: (t, { asc, desc }) =>
+        sort === "asc" ? asc(t.createdAt) : desc(t.createdAt),
     });
 
     return foundMessages;
@@ -219,10 +251,14 @@ export namespace ServiceMessage {
     _userId: string,
   ) => {
     const joinedChannel = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
     });
     console.log("message.service :: UploadFile : ", { joinedChannel });
-    if (joinedChannel === undefined) throw status(400, "You are not joined to this channel");
+    if (joinedChannel === undefined)
+      throw status(400, "You are not joined to this channel");
 
     //サーバー設定からメッセージの最大ファイルサイズを取得
     const serverConfig = await db.query.serverConfigs.findFirst();
@@ -243,7 +279,7 @@ export namespace ServiceMessage {
     const fileNameGen = `${Date.now()}_${safeFileName}`;
     //チャンネルIdのディレクトリを作成
     await mkdir(`./STORAGE/file/${channelId}`, { recursive: true }).catch(
-      () => { },
+      () => {},
     );
 
     //console.log("message.module :: /file/upload : file.type->", file.type);
@@ -297,7 +333,10 @@ export namespace ServiceMessage {
       throw status(404, "File not found");
     }
 
-    const canView = await Util.checkChannelVisibility(fileData?.channelId, _userId);
+    const canView = await Util.checkChannelVisibility(
+      fileData?.channelId,
+      _userId,
+    );
     if (!canView) {
       throw status(400, "This file is hidden in private channel");
     }
@@ -324,7 +363,9 @@ export namespace ServiceMessage {
         .select({ userId: roleLinks.userId })
         .from(roleLinks)
         .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
-        .where(and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)))
+        .where(
+          and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
+        )
         .get();
 
       if (!canManageServer)
@@ -332,7 +373,9 @@ export namespace ServiceMessage {
     }
 
     //URLプレビューの削除
-    await db.delete(messageUrlPreviews).where(eq(messageUrlPreviews.messageId, messageId));
+    await db
+      .delete(messageUrlPreviews)
+      .where(eq(messageUrlPreviews.messageId, messageId));
     //ファイル情報の取得、削除
     const fileData = await db.query.messageFileAttached.findMany({
       where: eq(messageFileAttached.messageId, messageId),
@@ -345,9 +388,13 @@ export namespace ServiceMessage {
       }
     }
     //リアクションデータを削除
-    await db.delete(messageReactions).where(eq(messageReactions.messageId, messageId));
+    await db
+      .delete(messageReactions)
+      .where(eq(messageReactions.messageId, messageId));
     //添付ファイル情報の削除
-    await db.delete(messageFileAttached).where(eq(messageFileAttached.messageId, messageId));
+    await db
+      .delete(messageFileAttached)
+      .where(eq(messageFileAttached.messageId, messageId));
     //このメッセージからできているInboxデータの削除
     await db.delete(inboxes).where(eq(inboxes.messageId, messageId));
 
@@ -476,7 +523,10 @@ export namespace ServiceMessage {
     }
 
     //チャンネルの閲覧制限があるか確認
-    const viewable = await Util.checkChannelVisibility(message.channelId, _userId);
+    const viewable = await Util.checkChannelVisibility(
+      message.channelId,
+      _userId,
+    );
     if (!viewable) {
       throw status(400, "Message not found or is private");
     }
@@ -493,7 +543,10 @@ export namespace ServiceMessage {
       where: eq(messages.id, messageId),
       with: {
         MessageReaction: {
-          where: and(eq(messageReactions.userId, _userId), eq(messageReactions.emojiCode, emojiCode)),
+          where: and(
+            eq(messageReactions.userId, _userId),
+            eq(messageReactions.emojiCode, emojiCode),
+          ),
         },
       },
     });
@@ -533,7 +586,10 @@ export namespace ServiceMessage {
 
     //チャンネル参加情報を取得
     const channelJoined = await db.query.channelJoins.findFirst({
-      where: and(eq(channelJoins.userId, _userId), eq(channelJoins.channelId, channelId)),
+      where: and(
+        eq(channelJoins.userId, _userId),
+        eq(channelJoins.channelId, channelId),
+      ),
     });
     //チャンネルに参加していない
     if (channelJoined === undefined) {
@@ -541,7 +597,7 @@ export namespace ServiceMessage {
     }
 
     //返信先メッセージ用変数(メッセージ保存処理後に使用)
-    let messageReplyingTo: Message | undefined = undefined;
+    let messageReplyingTo: Message | undefined;
     //返信先メッセージがあるなら存在するか確認
     if (replyingMessageId) {
       messageReplyingTo = await db.query.messages.findFirst({
