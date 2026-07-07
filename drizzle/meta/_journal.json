@@ -8,6 +8,13 @@
       "when": 1783344548001,
       "tag": "0000_pretty_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783442484391,
+      "tag": "0001_chemical_miracleman",
+      "breakpoints": true
     }
   ]
 }

@@ -89,7 +89,12 @@ export const messages = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [
-    index("Message_channelId_idx").on(table.channelId),
+    //GetHistoryのchannelId + createdAt範囲・ソートを高速化する複合インデックス
+    //(channelId単独の検索もこのインデックスでカバーされる)
+    index("Message_channelId_createdAt_idx").on(
+      table.channelId,
+      table.createdAt,
+    ),
     index("Message_userId_idx").on(table.userId),
   ],
 );

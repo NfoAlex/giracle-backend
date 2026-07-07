@@ -1,4 +1,6 @@
-import CalculateReactionTotal from "./Utils/CalculateReactionTotal";
+import CalculateReactionTotal, {
+  CalculateReactionTotalBulk,
+} from "./Utils/CalculateReactionTotal";
 import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisitiblity";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
@@ -9,6 +11,7 @@ import SendSystemMessage from "./Utils/SendSystemMessage";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;
+  export const calculateReactionTotalBulk = CalculateReactionTotalBulk;
   export const calculateRoleLevel = CalculateRoleLevel;
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;

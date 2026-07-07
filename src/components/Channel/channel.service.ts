@@ -8,7 +8,6 @@ import {
   lte,
   notExists,
   or,
-  type SQL,
 } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
@@ -243,81 +242,37 @@ export namespace ServiceChannel {
       }
     }
 
-    //基準のメッセージIdか時間指定があるなら時間を取得、取得設定として設定
-    let dateCondition: SQL | undefined;
-    if (messageDataFrom !== undefined) {
-      //基準のメッセージIdによる取得データがあるなら
-      //取得時間方向に合わせて設定を指定
-      if (fetchDirection === "older") {
-        //古い方向に取得する場合
-        dateCondition = lte(messages.createdAt, messageDataFrom.createdAt);
-      } else {
-        //新しい方向に取得する場合
-        //指定時間以降の最初のメッセージを取得
-        const messageTakingFrom = await db.query.messages.findMany({
-          where: and(
-            eq(messages.channelId, channelId),
-            gte(messages.createdAt, messageDataFrom.createdAt),
-          ),
-          columns: { createdAt: true },
-          orderBy: (t, { asc }) => asc(t.createdAt),
-          limit: fetchLength,
-        });
-        const optionLte =
-          messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
-        //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
-        dateCondition =
-          optionLte !== undefined
-            ? and(
-                lte(messages.createdAt, optionLte),
-                gte(messages.createdAt, messageDataFrom.createdAt),
-              )
-            : gte(messages.createdAt, messageDataFrom.createdAt);
-      }
-    } else if (messageTimeFrom !== undefined) {
-      //メッセージId指定がない場合、時間指定を使う
-      //取得時間方向に合わせて設定を指定
-      if (fetchDirection === "older") {
-        //古い方向に取得する場合
-        dateCondition = lte(messages.createdAt, new Date(messageTimeFrom));
-      } else {
-        //新しい方向に取得する場合
-        //指定時間以降の最初のメッセージを取得
-        const messageTakingFrom = await db.query.messages.findMany({
-          where: and(
-            eq(messages.channelId, channelId),
-            gte(messages.createdAt, new Date(messageTimeFrom)),
-          ),
-          columns: { createdAt: true },
-          orderBy: (t, { asc }) => asc(t.createdAt),
-          limit: fetchLength,
-        });
-        const optionLte =
-          messageTakingFrom[messageTakingFrom.length - 1]?.createdAt;
-        //指定時間以降のメッセージの時間より前のメッセージを取得するように設定
-        dateCondition =
-          optionLte !== undefined
-            ? and(
-                lte(messages.createdAt, optionLte),
-                gte(messages.createdAt, new Date(messageTimeFrom)),
-              )
-            : gte(messages.createdAt, new Date(messageTimeFrom));
-      }
-    }
+    //基準になる時間を決定（メッセージId指定を優先、なければ時間指定）
+    const timeFrom =
+      messageDataFrom !== undefined
+        ? messageDataFrom.createdAt
+        : messageTimeFrom !== undefined
+          ? new Date(messageTimeFrom)
+          : undefined;
 
     //履歴を取得する
+    //新しい方向への取得は昇順で直接取得することで、範囲境界を求める事前クエリを省く
+    const fetchNewer = fetchDirection === "newer" && timeFrom !== undefined;
     const history = await db.query.messages.findMany({
       where:
-        dateCondition !== undefined
-          ? and(eq(messages.channelId, channelId), dateCondition)
+        timeFrom !== undefined
+          ? and(
+              eq(messages.channelId, channelId),
+              fetchNewer
+                ? gte(messages.createdAt, timeFrom)
+                : lte(messages.createdAt, timeFrom),
+            )
           : eq(messages.channelId, channelId),
       with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
       },
       limit: fetchLength,
-      orderBy: (t, { desc }) => desc(t.createdAt),
+      orderBy: (t, { asc, desc }) =>
+        fetchNewer ? asc(t.createdAt) : desc(t.createdAt),
     });
+    //レスポンスは常に新しい順で返す
+    if (fetchNewer) history.reverse();
 
     //履歴の最新・最初まで取得したかどうかを判別するため、取得方向に必要な側のみ取得
     const firstMessageOfChannel =
@@ -373,47 +328,58 @@ export namespace ServiceChannel {
       atTop = history.length < (fetchLength || 30);
     }
 
-    //画像の添付ファイルがあれば画像のメタデータ（縦幅など）を含める
+    //画像の添付ファイルがあれば画像のメタデータ（縦幅など）を含める（並列実行）
     const ImageDimensions: {
       [fileId: string]: { height: number; width: number };
     } = {};
-    for (const index in history) {
-      for (const file of history[index].MessageFileAttached) {
-        if (file.type.startsWith("image/")) {
+    const imageFilesAttached = history.flatMap((m) =>
+      m.MessageFileAttached.filter((file) => file.type.startsWith("image/")),
+    );
+    await Promise.all(
+      imageFilesAttached.map(async (file) => {
+        try {
+          const filePath = `./STORAGE/file/${channelId}/${file.savedFileName}`;
+          //画像サイズはヘッダー部分から取得できるため、まずファイル先頭のみ読み込む
+          let buffer = new Uint8Array(
+            await Bun.file(filePath)
+              .slice(0, 512 * 1024)
+              .arrayBuffer(),
+          );
+          let dimensions: { width?: number; height?: number };
           try {
-            //画像を読み込む
-            const imageArrBuffer = await Bun.file(
-              `./STORAGE/file/${channelId}/${file.savedFileName}`,
-            ).arrayBuffer();
-            const buffer = new Uint8Array(imageArrBuffer);
-            //画像のメタデータを取得
-            const { width, height } = imageSize(buffer);
-
-            if (width !== undefined && height !== undefined) {
-              ImageDimensions[file.id] = {
-                height,
-                width,
-              };
-            }
-          } catch (e) {
-            console.error("channel.service :: GetHistory : 画像取得で失敗", {
-              e,
-            });
+            dimensions = imageSize(buffer);
+          } catch {
+            //先頭だけで解析できない画像はファイル全体を読み込む
+            buffer = new Uint8Array(await Bun.file(filePath).arrayBuffer());
+            dimensions = imageSize(buffer);
           }
-        }
-      }
-    }
 
-    //最後にメッセージごとにリアクションの合計数をそれぞれ格納する（並列実行）
-    const reactionSummaries = await Promise.all(
-      history.map((m) => Util.calculateReactionTotal(m.id, _userId)),
+          const { width, height } = dimensions;
+          if (width !== undefined && height !== undefined) {
+            ImageDimensions[file.id] = {
+              height,
+              width,
+            };
+          }
+        } catch (e) {
+          console.error("channel.service :: GetHistory : 画像取得で失敗", {
+            e,
+          });
+        }
+      }),
+    );
+
+    //最後にメッセージごとにリアクションの合計数をそれぞれ格納する（1クエリで一括集計）
+    const reactionSummaries = await Util.calculateReactionTotalBulk(
+      history.map((m) => m.id),
+      _userId,
     );
     for (const index in history) {
       //結果をこのメッセージ部分に格納する
       history[index] = {
         ...history[index],
         // @ts-expect-error - reactionSummaryの追加
-        reactionSummary: reactionSummaries[index],
+        reactionSummary: reactionSummaries.get(history[index].id) ?? [],
       };
     }
 
