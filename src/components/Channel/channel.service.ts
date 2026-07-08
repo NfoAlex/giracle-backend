@@ -1,13 +1,14 @@
+import { rm } from "node:fs/promises";
 import {
   and,
   eq,
   exists,
   gte,
   inArray,
-  like,
   lte,
   notExists,
   or,
+  sql,
 } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
@@ -18,6 +19,7 @@ import {
   channelJoins,
   channels,
   channelViewableRoles,
+  messageFileAttached,
   messageReadTimes,
   messages,
   users,
@@ -403,7 +405,8 @@ export namespace ServiceChannel {
       .from(channels)
       .where(
         and(
-          like(channels.name, `%${query}%`),
+          //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
+          sql`${channels.name} LIKE ${`%${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
           inArray(channels.id, channelIdsViewable),
         ),
       );
@@ -480,6 +483,15 @@ export namespace ServiceChannel {
       throw status(403, "You are not joined this channel");
     }
 
+    //既読時間データを削除(Leaveと対称にする)
+    await db
+      .delete(messageReadTimes)
+      .where(
+        and(
+          eq(messageReadTimes.channelId, channelId),
+          eq(messageReadTimes.userId, targetUserId),
+        ),
+      );
     //チャンネル参加データを削除(退出させる)
     await db
       .delete(channelJoins)
@@ -546,29 +558,18 @@ export namespace ServiceChannel {
 
     //チャンネル閲覧ロールを更新
     if (viewableRole !== undefined) {
-      // 既存のroleIdを取得
-      const existingRoles = await db
-        .select({ roleId: channelViewableRoles.roleId })
-        .from(channelViewableRoles)
-        .where(eq(channelViewableRoles.channelId, channelId));
+      //重複を除去
+      const uniqueRoleIds = [...new Set(viewableRole)];
 
-      // 既存のroleIdをセットに変換
-      const existingRoleIds = new Set(existingRoles.map((role) => role.roleId));
-
-      // 新しいroleIdをフィルタリング
-      const newRoleIds = viewableRole.filter(
-        (roleId) => !existingRoleIds.has(roleId),
-      );
-
-      //現在の閲覧可能roleIdを削除、新しいroleIdを挿入(1トランザクションにまとめて中間状態を無くす)
+      //現在の閲覧可能roleIdを削除、指定されたroleId全件を挿入(1トランザクションにまとめて中間状態を無くす)
       db.transaction((tx) => {
         tx.delete(channelViewableRoles)
           .where(eq(channelViewableRoles.channelId, channelId))
           .run();
 
-        if (newRoleIds.length > 0) {
+        if (uniqueRoleIds.length > 0) {
           tx.insert(channelViewableRoles)
-            .values(newRoleIds.map((roleId) => ({ channelId, roleId })))
+            .values(uniqueRoleIds.map((roleId) => ({ channelId, roleId })))
             .run();
         }
       });
@@ -642,8 +643,17 @@ export namespace ServiceChannel {
       WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
     }
 
-    //メッセージ・チャンネル参加データ・デフォルト参加データ・チャンネル本体を1トランザクションで削除
+    //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)
     db.transaction((tx) => {
+      tx.delete(messageReadTimes)
+        .where(eq(messageReadTimes.channelId, channelId))
+        .run();
+      tx.delete(channelViewableRoles)
+        .where(eq(channelViewableRoles.channelId, channelId))
+        .run();
+      tx.delete(messageFileAttached)
+        .where(eq(messageFileAttached.channelId, channelId))
+        .run();
       tx.delete(messages).where(eq(messages.channelId, channelId)).run();
       tx.delete(channelJoins)
         .where(eq(channelJoins.channelId, channelId))
@@ -652,6 +662,14 @@ export namespace ServiceChannel {
         .where(eq(channelJoinOnDefaults.channelId, channelId))
         .run();
       tx.delete(channels).where(eq(channels.id, channelId)).run();
+    });
+
+    //添付ファイルの実体を削除(DBの外側なのでトランザクション後に実行)
+    await rm(`./STORAGE/file/${channelId}`, {
+      recursive: true,
+      force: true,
+    }).catch((e) => {
+      console.error("channel.service :: Delete : ストレージ削除エラー->", e);
     });
 
     return;

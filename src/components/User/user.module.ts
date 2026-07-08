@@ -139,7 +139,7 @@ export const user = new Elysia({ prefix: "/user" })
       query: t.Object({
         username: t.Optional(t.String({ minLength: 0 })),
         joinedChannel: t.Optional(t.String()),
-        cursor: t.Optional(t.Number({ default: 0 })),
+        cursor: t.Optional(t.Number({ default: 0, minimum: 0 })),
       }),
       detail: {
         description: "ユーザーを検索します",
@@ -311,7 +311,7 @@ export const user = new Elysia({ prefix: "/user" })
     },
     {
       query: t.Object({
-        cursor: t.Optional(t.Number({ default: 1 })),
+        cursor: t.Optional(t.Number({ default: 1, minimum: 1 })),
       }),
       cookie: t.Cookie({
         token: t.String(),

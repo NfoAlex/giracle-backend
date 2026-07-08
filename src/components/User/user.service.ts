@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
@@ -12,6 +12,7 @@ import {
   tokens,
   users,
 } from "../../db/schema";
+import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
 import { Util } from "../../Util";
 import { userWSInstance } from "../../ws";
 
@@ -55,11 +56,11 @@ export namespace ServiceUser {
           });
         }
         //---------------------------------------
-        //使用回数を加算
+        //使用回数を加算(競合対策のためDB側で加算するsqlを使用)
         await db
           .update(invitations)
           .set({
-            usedCount: Invite.usedCount + 1,
+            usedCount: sql`${invitations.usedCount} + 1`,
           })
           .where(eq(invitations.inviteCode, inviteCode));
       }
@@ -206,8 +207,11 @@ export namespace ServiceUser {
     //検索条件を組み立て
     const conditions = [];
     if (username !== undefined) {
-      const query = username.replaceAll("%", "");
-      conditions.push(like(users.name, `${query}%`));
+      //ワイルドカード(%,_)を無効化してLIKE検索(前方一致)
+      const escapedQuery = Util.escapeLikePattern(username);
+      conditions.push(
+        sql`${users.name} LIKE ${`${escapedQuery}%`} ESCAPE '\\'`,
+      );
     }
     if (joinedChannel !== undefined) {
       //指定チャンネルへ参加しているユーザーIdをサブクエリで絞る(空文字ならいずれかのチャンネルへ参加しているユーザー)
@@ -504,12 +508,18 @@ export namespace ServiceUser {
         throw status(500, "Something went wrong");
       });
 
+    //削除したセッションのトークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
+    invalidateTokenCache(targetToken.token);
+
     return;
   };
 
   export const SignOut = async (token: string) => {
     //トークン削除
     await db.delete(tokens).where(eq(tokens.token, token));
+
+    //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
+    invalidateTokenCache(token);
 
     return;
   };
@@ -580,6 +590,9 @@ export namespace ServiceUser {
       .set({ isBanned: true })
       .where(eq(users.id, userId))
       .returning();
+
+    //トークンキャッシュを無効化(最大5分間BAN前の状態でアクセスできてしまうのを防ぐ)
+    invalidateUserCache(userId);
 
     return userBanned;
   };

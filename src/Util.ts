@@ -4,6 +4,7 @@ import CalculateReactionTotal, {
 import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisitiblity";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
+import EscapeLikePattern from "./Utils/EscapeLikePattern";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import SendPushNotification from "./Utils/SendPushNotification";
@@ -15,6 +16,7 @@ export namespace Util {
   export const calculateRoleLevel = CalculateRoleLevel;
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
+  export const escapeLikePattern = EscapeLikePattern;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
