@@ -197,6 +197,23 @@ describe("/user", () => {
     expect(j.message).toBe("Signed out");
   });
 
+  it("/sign-out :: サインアウト済みトークンが即時無効になっている(トークンキャッシュ無効化)", async () => {
+    //直前のサインアウトリクエストでトークンがキャッシュに乗っているため、
+    //キャッシュ無効化が無いと最大5分間このトークンが有効なままになる
+    const response = await app.handle(
+      new Request("http://localhost/user/verify-token", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_SIGNOUT_TEST",
+        },
+      }),
+    );
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(401);
+  });
+
   it("DELETE /session :: 存在しないセッションを削除する", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/session", {
@@ -251,5 +268,22 @@ describe("/user", () => {
     expect(response.ok).toBe(true);
     expect(j.message).toBe("Session removed");
     expect(j.data.sessionId).toBe(sessionIdRemoving);
+  });
+
+  it("DELETE /session :: 削除済みセッションのトークンが即時無効になっている(トークンキャッシュ無効化)", async () => {
+    //TESTUSERTOKEN_FOR_DELETION_TESTは先のテストでキャッシュに乗っているため、
+    //キャッシュ無効化が無いと最大5分間このトークンが有効なままになる
+    const response = await app.handle(
+      new Request("http://localhost/user/verify-token", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
+        },
+      }),
+    );
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(401);
   });
 });

@@ -17,7 +17,6 @@ let SUB_TOKEN = "";
 let SUB_USER_ID = "";
 
 // ban/unban テスト専用に使い捨てるユーザー
-// biome-ignore lint/correctness/noUnusedVariables: It is used...?
 let BAN_TARGET_TOKEN = "";
 let BAN_TARGET_USER_ID = "";
 
@@ -382,12 +381,30 @@ describe("/user/ban & /user/unban", () => {
   });
 
   it("正常 :: BANしてサインインできなくなることを確認", async () => {
+    //BAN前に対象ユーザーのトークンでアクセスしてキャッシュに乗せておく
+    //(BAN時のキャッシュ無効化が無いと最大5分間アクセスできてしまう)
+    const preBanRes = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: BAN_TARGET_TOKEN,
+    });
+    expect(preBanRes.ok).toBe(true);
+
     const res = await FETCH({
       path: "/user/ban",
       method: "POST",
       body: { userId: BAN_TARGET_USER_ID },
     });
     expect(res.ok).toBe(true);
+
+    //BAN直後に対象ユーザーのトークンが即時無効化されていることを確認
+    const postBanRes = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: BAN_TARGET_TOKEN,
+    });
+    expect(postBanRes.ok).toBe(false);
+    expect(postBanRes.status).toBe(401);
 
     const signInRes = await app.handle(
       new Request("http://localhost/user/sign-in", {

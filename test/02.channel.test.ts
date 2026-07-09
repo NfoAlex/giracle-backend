@@ -1,4 +1,11 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { and, eq } from "drizzle-orm";
+import { db } from "../src";
+import {
+  channelViewableRoles,
+  messageFileAttached,
+  messageReadTimes,
+} from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -368,6 +375,38 @@ describe("/channel/get-history/:channelId", async () => {
     expect(j.data.atTop).toBeFalse();
   });
 
+  it("fetchLengthに0以下を渡すとバリデーションエラー", async () => {
+    //負値でLIMITが無効化され全件取得されるのを防ぐminimum:1の確認
+    const resZero = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        fetchLength: 0,
+      },
+    });
+    expect(resZero.ok).toBe(false);
+
+    const resNegative = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        fetchLength: -5,
+      },
+    });
+    expect(resNegative.ok).toBe(false);
+  });
+
+  it("fetchLengthに上限超えを渡すとバリデーションエラー", async () => {
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: {
+        fetchLength: 31,
+      },
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("存在しないチャンネル", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL999",
@@ -431,6 +470,28 @@ describe("/channel/search", async () => {
       method: "GET",
     });
     expect(res.ok).toBe(false);
+  });
+
+  it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
+    //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
+    const res = await FETCH({
+      path: "/channel/search/?query=%25",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
+  it("ワイルドカード文字(_)がリテラル扱いされる", async () => {
+    //エスケープ無しだと"Gen_"が"General"(Gen+任意1文字)にマッチしてしまう
+    const res = await FETCH({
+      path: "/channel/search/?query=Gen_",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
   });
 
   it("プライベートが非表示なのを確認 :: 二番目のユーザー", async () => {
@@ -569,6 +630,16 @@ describe("/channel/kick", async () => {
   });
 
   it("正常", async () => {
+    //Kick時に既読時間データも削除される(Leaveと対称)ことを確認するため事前投入
+    await db
+      .insert(messageReadTimes)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER2",
+        readTime: new Date(),
+      })
+      .onConflictDoNothing();
+
     const res = await FETCH({
       path: "/channel/kick",
       method: "POST",
@@ -580,6 +651,18 @@ describe("/channel/kick", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.message).toBe("User kicked");
+
+    //既読時間データが残っていないことを確認
+    const readTimesLeft = await db
+      .select()
+      .from(messageReadTimes)
+      .where(
+        and(
+          eq(messageReadTimes.channelId, "TESTCHANNEL1"),
+          eq(messageReadTimes.userId, "TESTUSER2"),
+        ),
+      );
+    expect(readTimesLeft.length).toBe(0);
   });
 });
 
@@ -673,6 +756,39 @@ describe("/channel/update", async () => {
     expect(j.data.name).toBe("General");
     expect(res.ok).toBe(true);
   });
+
+  it("正常 :: viewableRoleが指定した全件に置換される(既存ロールが消えない)", async () => {
+    //旧実装では既存分(ChannelPrivateViewer)が差分計算で消えてしまうバグがあった
+    const res = await FETCH({
+      path: "/channel/update",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL3",
+        viewableRole: ["ChannelPrivateViewer", "ChannelManage"],
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    const roleIds = j.data.ChannelViewableRole.map(
+      (r: { roleId: string }) => r.roleId,
+    ).sort();
+    expect(roleIds).toEqual(["ChannelManage", "ChannelPrivateViewer"]);
+  });
+
+  it("正常 :: viewableRoleを元に戻す", async () => {
+    const res = await FETCH({
+      path: "/channel/update",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL3",
+        viewableRole: ["ChannelPrivateViewer"],
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.ChannelViewableRole.length).toBe(1);
+    expect(j.data.ChannelViewableRole[0].roleId).toBe("ChannelPrivateViewer");
+  });
 });
 
 //作成したチャンネルをすぐ削除テストで使うためにグローバル変数で保持しておく
@@ -710,6 +826,25 @@ describe("/channel/create", async () => {
 
 describe("/channel/delete", async () => {
   it("正常", async () => {
+    //削除時に関連データも消えることを確認するため事前投入
+    await db.insert(messageReadTimes).values({
+      channelId: TEST__NEW_CREATED_CHANNELID,
+      userId: "TESTUSER",
+      readTime: new Date(),
+    });
+    await db.insert(channelViewableRoles).values({
+      channelId: TEST__NEW_CREATED_CHANNELID,
+      roleId: "ChannelPrivateViewer",
+    });
+    await db.insert(messageFileAttached).values({
+      channelId: TEST__NEW_CREATED_CHANNELID,
+      userId: "TESTUSER",
+      actualFileName: "orphan-check.png",
+      savedFileName: "orphan-check.png",
+      size: 1,
+      type: "image/png",
+    });
+
     const res = await FETCH({
       path: "/channel/delete",
       method: "DELETE",
@@ -720,6 +855,23 @@ describe("/channel/delete", async () => {
     const j = await res.json();
     expect(j.message).toBe("Channel deleted");
     expect(res.ok).toBe(true);
+
+    //既読時間・閲覧ロール・添付ファイル情報が孤児として残っていないことを確認
+    const readTimesLeft = await db
+      .select()
+      .from(messageReadTimes)
+      .where(eq(messageReadTimes.channelId, TEST__NEW_CREATED_CHANNELID));
+    expect(readTimesLeft.length).toBe(0);
+    const viewableRolesLeft = await db
+      .select()
+      .from(channelViewableRoles)
+      .where(eq(channelViewableRoles.channelId, TEST__NEW_CREATED_CHANNELID));
+    expect(viewableRolesLeft.length).toBe(0);
+    const filesLeft = await db
+      .select()
+      .from(messageFileAttached)
+      .where(eq(messageFileAttached.channelId, TEST__NEW_CREATED_CHANNELID));
+    expect(filesLeft.length).toBe(0);
   });
 
   it("存在しないチャンネルを削除", async () => {

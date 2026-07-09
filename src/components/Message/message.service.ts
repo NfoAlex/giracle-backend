@@ -5,7 +5,6 @@ import {
   eq,
   exists,
   inArray,
-  like,
   max,
   notExists,
   type SQL,
@@ -26,6 +25,7 @@ import {
   messageUrlPreviews,
   roleInfos,
   roleLinks,
+  users,
 } from "../../db/schema";
 import { Util } from "../../Util";
 
@@ -219,7 +219,7 @@ export namespace ServiceMessage {
 
     const conditions: (SQL | undefined)[] = [
       content !== undefined
-        ? like(messages.content, `%${content}%`)
+        ? sql`${messages.content} LIKE ${`%${Util.escapeLikePattern(content)}%`} ESCAPE '\\'`
         : undefined,
       channelCondition,
       userId !== undefined ? eq(messages.userId, userId) : undefined,
@@ -254,7 +254,6 @@ export namespace ServiceMessage {
         eq(channelJoins.channelId, channelId),
       ),
     });
-    console.log("message.service :: UploadFile : ", { joinedChannel });
     if (joinedChannel === undefined)
       throw status(400, "You are not joined to this channel");
 
@@ -370,11 +369,7 @@ export namespace ServiceMessage {
         throw status(403, "You are not owner of this message");
     }
 
-    //URLプレビューの削除
-    await db
-      .delete(messageUrlPreviews)
-      .where(eq(messageUrlPreviews.messageId, messageId));
-    //ファイル情報の取得、削除
+    //ファイル情報を取得(実体ファイルの削除はトランザクション外で先に実施)
     const fileData = await db.query.messageFileAttached.findMany({
       where: eq(messageFileAttached.messageId, messageId),
     });
@@ -385,19 +380,21 @@ export namespace ServiceMessage {
         console.error("message.module :: /message/delete : 削除エラー->", e);
       }
     }
-    //リアクションデータを削除
-    await db
-      .delete(messageReactions)
-      .where(eq(messageReactions.messageId, messageId));
-    //添付ファイル情報の削除
-    await db
-      .delete(messageFileAttached)
-      .where(eq(messageFileAttached.messageId, messageId));
-    //このメッセージからできているInboxデータの削除
-    await db.delete(inboxes).where(eq(inboxes.messageId, messageId));
 
-    //メッセージの削除
-    await db.delete(messages).where(eq(messages.id, messageId));
+    //DB上の関連データをまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
+    db.transaction((tx) => {
+      tx.delete(messageUrlPreviews)
+        .where(eq(messageUrlPreviews.messageId, messageId))
+        .run();
+      tx.delete(messageReactions)
+        .where(eq(messageReactions.messageId, messageId))
+        .run();
+      tx.delete(messageFileAttached)
+        .where(eq(messageFileAttached.messageId, messageId))
+        .run();
+      tx.delete(inboxes).where(eq(inboxes.messageId, messageId)).run();
+      tx.delete(messages).where(eq(messages.id, messageId)).run();
+    });
 
     return messageData;
   };
@@ -618,6 +615,21 @@ export namespace ServiceMessage {
           })
         : [];
 
+    //渡されたfileIdsが全て取得できているか、かつ自分がこのチャンネルへアップロードした未添付ファイルであるかを検証
+    //(他ユーザーのファイルや他メッセージに添付済みのファイルの付け替えを防止)
+    if (fileData.length !== fileIds.length) {
+      throw status(400, "Attached file not found");
+    }
+    for (const file of fileData) {
+      if (
+        file.userId !== _userId ||
+        file.channelId !== channelId ||
+        file.messageId !== null
+      ) {
+        throw status(400, "Invalid file attachment");
+      }
+    }
+
     //メッセージを保存
     const [messageSavedRow] = await db
       .insert(messages)
@@ -658,9 +670,22 @@ export namespace ServiceMessage {
       [];
     const mentionedUserIdsMerged = [...new Set(mentionedUserIds)];
 
+    //実在するユーザーのみに絞り込む(架空Idによるinbox挿入時のFKエラー・ゴミデータ防止)
+    const existingMentionedUsers =
+      mentionedUserIdsMerged.length > 0
+        ? await db.query.users.findMany({
+            where: inArray(users.id, mentionedUserIdsMerged),
+            columns: { id: true },
+          })
+        : [];
+    const existingMentionedUserIds = new Set(
+      existingMentionedUsers.map((u) => u.id),
+    );
+
     //DBに保存するInbox用データを作成
     const savingInboxData = [];
     for (const mentionedUserId of mentionedUserIdsMerged) {
+      if (!existingMentionedUserIds.has(mentionedUserId)) continue;
       savingInboxData.push({
         userId: mentionedUserId,
         messageId: messageSaved.id,

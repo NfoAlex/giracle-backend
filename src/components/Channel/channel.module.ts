@@ -159,7 +159,7 @@ export const channel = new Elysia({ prefix: "/channel" })
         t.Object({
           messageIdFrom: t.Optional(t.String()),
           messageTimeFrom: t.Optional(t.String()),
-          fetchLength: t.Number({ default: 30, maximum: 30 }),
+          fetchLength: t.Number({ default: 30, minimum: 1, maximum: 30 }),
           fetchDirection: t.Union([t.Literal("older"), t.Literal("newer")], {
             default: "older",
           }),

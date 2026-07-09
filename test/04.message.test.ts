@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { db } from "../src";
-import { channelJoins } from "../src/db/schema";
+import { channelJoins, inboxes, messageFileAttached } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -224,6 +224,17 @@ describe("/message/search", async () => {
     expect(j.message).toBe("Searched messages");
     expect(j.data).toBeArray();
     expect(j.data.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
+    //エスケープ無しだと%%%が全メッセージにマッチしてしまう
+    const res = await FETCH({
+      path: "/message/search?content=%25",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.data.length).toBe(0);
   });
 
   it("見れないユーザーからの検索", async () => {
@@ -668,6 +679,27 @@ describe("/message/send", async () => {
     expect(res.status).toBe(200);
   });
 
+  it("存在しないユーザーへのメンションはinboxに保存されない", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "@<GHOSTUSER999> hello",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.message).toBe("Message sent");
+
+    //架空ユーザーのinboxデータが作られていないことを確認
+    const ghostInbox = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.userId, "GHOSTUSER999"));
+    expect(ghostInbox.length).toBe(0);
+  });
+
   let TEST__MESSAGE_ID_WITH_URL = "";
   it("正常 :: URL含むメッセージ送信 1/2 : 送信", async () => {
     const res = await FETCH({
@@ -1027,6 +1059,121 @@ describe("/message/send", async () => {
     const urls = j.data.MessageUrlPreview.map((p: { url: string }) => p.url);
     expect(urls).toContain("https://fxtwitter.com/TEST/status/00000000");
     expect(urls).toContain("https://example.com");
+  });
+});
+
+describe("/message/send :: fileIds検証", async () => {
+  //自分でアップロードした未添付ファイルのId(正常系用)
+  let TEST_FILEID_OWN = "";
+  beforeAll(async () => {
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const pngBuffer = Buffer.from(pngBase64, "base64");
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File([pngBuffer], "attach-test.png", { type: "image/png" }),
+    );
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const j = await res.json();
+    TEST_FILEID_OWN = j.data.fileId.id;
+  });
+
+  it("存在しないfileIdを添付", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "file test",
+        fileIds: ["FILE_NOT_EXIST"],
+      },
+    });
+    const t = await res.text();
+    expect(res.ok).toBeFalse();
+    expect(res.status).toBe(400);
+    expect(t).toBe("Attached file not found");
+  });
+
+  it("他ユーザーがアップロードしたファイルを添付", async () => {
+    //TESTUSER2名義のファイル情報を直接作成
+    const [foreignFile] = await db
+      .insert(messageFileAttached)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER2",
+        actualFileName: "foreign.png",
+        savedFileName: "foreign.png",
+        size: 1,
+        type: "image/png",
+      })
+      .returning();
+
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "file test",
+        fileIds: [foreignFile.id],
+      },
+    });
+    const t = await res.text();
+    expect(res.ok).toBeFalse();
+    expect(res.status).toBe(400);
+    expect(t).toBe("Invalid file attachment");
+  });
+
+  it("既に他メッセージへ添付済みのファイルを添付", async () => {
+    //添付済み(messageId設定済み)のファイル情報を直接作成
+    const [attachedFile] = await db
+      .insert(messageFileAttached)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        actualFileName: "attached.png",
+        savedFileName: "attached.png",
+        size: 1,
+        type: "image/png",
+        messageId: "TESTMESSAGE1",
+      })
+      .returning();
+
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "file test",
+        fileIds: [attachedFile.id],
+      },
+    });
+    const t = await res.text();
+    expect(res.ok).toBeFalse();
+    expect(res.status).toBe(400);
+    expect(t).toBe("Invalid file attachment");
+  });
+
+  it("正常 :: 自分の未添付ファイルを添付", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "file attach ok",
+        fileIds: [TEST_FILEID_OWN],
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.message).toBe("Message sent");
+    expect(j.data.MessageFileAttached).toBeArray();
+    expect(j.data.MessageFileAttached[0].id).toBe(TEST_FILEID_OWN);
   });
 });
 

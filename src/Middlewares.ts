@@ -29,6 +29,26 @@ setInterval(() => {
   }
 }, ONE_MINUITE);
 
+/**
+ * 指定トークンのキャッシュを無効化する（サインアウト・セッション削除時に使用）
+ * @param token 無効化するトークン
+ */
+export function invalidateTokenCache(token: string) {
+  tokenCache.delete(token);
+}
+
+/**
+ * 指定ユーザーIdに紐づく全トークンキャッシュを無効化する（BAN時に使用）
+ * @param userId 無効化するユーザーId
+ */
+export function invalidateUserCache(userId: string) {
+  for (const [key, value] of tokenCache.entries()) {
+    if (value.userId === userId) {
+      tokenCache.delete(key);
+    }
+  }
+}
+
 //制限設定
 const limitConfig = {
   anonymous: {
@@ -159,9 +179,28 @@ export namespace Middleware {
       //識別キー
       let key: string = (token.value as string | undefined) ?? "anonymous";
 
-      //未ログインの場合は状態を設定しIPアドレス等をキーにする
-      if (token?.value === undefined) {
+      const tokenValue = token.value as string | undefined;
+
+      //トークンがあってもキャッシュ・DBに実在しないなら無効なので匿名扱いにする(なりすましによるIPブロック回避防止)
+      if (tokenValue === undefined) {
         isAnonymous = true;
+      } else {
+        const cachedToken = tokenCache.get(tokenValue);
+        let tokenValid = cachedToken !== undefined;
+        if (!tokenValid) {
+          const tokenExists = await db.query.tokens.findFirst({
+            where: eq(tokens.token, tokenValue),
+            columns: { userId: true },
+          });
+          tokenValid = tokenExists !== undefined;
+        }
+        if (!tokenValid) {
+          isAnonymous = true;
+        }
+      }
+
+      //未ログイン(または無効トークン)の場合は状態を設定しIPアドレス等をキーにする
+      if (isAnonymous) {
         const socketAddress = server?.requestIP(request);
         if (socketAddress === null || socketAddress === undefined) {
           return status(500, "somethin went wrong :(");
@@ -174,7 +213,8 @@ export namespace Middleware {
         });
         if (blockedIP) {
           //ブロックされている場合はカウントを増加させて429を返す
-          db.update(blockedIPAddresses)
+          await db
+            .update(blockedIPAddresses)
             .set({
               blockedCount: blockedIP.blockedCount + 1,
               latestAccess: new Date(),
@@ -205,12 +245,15 @@ export namespace Middleware {
 
         //認証済みで制限を超えたならトークンを無効化
         if (!isAnonymous) {
-          db.delete(tokens).where(eq(tokens.token, key));
+          await db.delete(tokens).where(eq(tokens.token, key));
+          //キャッシュにも残っていると最大5分間有効なままになるため合わせて無効化
+          invalidateTokenCache(key);
         } else {
           //匿名の場合の処理
           //カウントがプラス10を超過している場合はIPアドレスでブロック
           if (bucket.count > configUsing.limit + 10) {
-            db.insert(blockedIPAddresses)
+            await db
+              .insert(blockedIPAddresses)
               .values({ address: key, blockedCount: 1 })
               .onConflictDoUpdate({
                 target: blockedIPAddresses.address,

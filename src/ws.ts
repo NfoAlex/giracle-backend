@@ -79,6 +79,16 @@ export const wsHandler = new Elysia().ws("/ws", {
 
     const user = tokenWithUser.user;
 
+    //BANされているユーザーは接続させない
+    if (user.isBanned) {
+      ws.send({
+        signal: "ERROR",
+        data: "token not valid",
+      });
+      ws.close();
+      return;
+    }
+
     //ハンドラのリンク
     ws.subscribe(`user::${user.id}`);
     ws.subscribe("GLOBAL");
@@ -164,12 +174,9 @@ function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
   if (!currentInstance) {
     return;
   }
-  const socketTokenRemoving = ws.data.cookie.token;
 
-  //トークンのIndex番号を調べてそれを元にインスタンスをsplice
-  const indexToRemove = currentInstance.findIndex((v) => {
-    return v.data.cookie.token.value === socketTokenRemoving.initial.value;
-  });
+  //インスタンス自体の同一性で削除対象を特定する(クエリトークン接続時はcookieが無くクラッシュするため)
+  const indexToRemove = currentInstance.indexOf(ws);
   if (indexToRemove !== -1) {
     currentInstance.splice(indexToRemove, 1);
   }

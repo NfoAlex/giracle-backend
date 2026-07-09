@@ -89,7 +89,12 @@ export const messages = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [
-    index("Message_channelId_idx").on(table.channelId),
+    //GetHistoryのchannelId + createdAt範囲・ソートを高速化する複合インデックス
+    //(channelId単独の検索もこのインデックスでカバーされる)
+    index("Message_channelId_createdAt_idx").on(
+      table.channelId,
+      table.createdAt,
+    ),
     index("Message_userId_idx").on(table.userId),
   ],
 );
@@ -172,8 +177,8 @@ export const roleLinks = sqliteTable(
       }),
   },
   (table) => [
+    //userId単独の検索は複合主キーの先頭列で賄えるため個別インデックス不要
     primaryKey({ columns: [table.userId, table.roleId] }),
-    index("RoleLink_userId_idx").on(table.userId),
     index("RoleLink_roleId_idx").on(table.roleId),
   ],
 );
@@ -198,8 +203,8 @@ export const channelJoins = sqliteTable(
       }),
   },
   (table) => [
+    //userId単独の検索は複合主キーの先頭列で賄えるため個別インデックス不要
     primaryKey({ columns: [table.userId, table.channelId] }),
-    index("ChannelJoin_userId_idx").on(table.userId),
     index("ChannelJoin_channelId_idx").on(table.channelId),
   ],
 );
@@ -221,8 +226,8 @@ export const channelMutes = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [
+    //userId単独の検索は複合主キーの先頭列で賄えるため個別インデックス不要
     primaryKey({ columns: [table.userId, table.channelId] }),
-    index("ChannelMute_userId_idx").on(table.userId),
     index("ChannelMute_channelId_idx").on(table.channelId),
   ],
 );
@@ -244,9 +249,9 @@ export const channelViewableRoles = sqliteTable(
       }),
   },
   (table) => [
+    //channelId単独の検索は複合主キーの先頭列で賄えるため個別インデックス不要
     primaryKey({ columns: [table.channelId, table.roleId] }),
     index("ChannelViewableRole_roleId_idx").on(table.roleId),
-    index("ChannelViewableRole_channelId_idx").on(table.channelId),
   ],
 );
 
@@ -261,22 +266,29 @@ export const channelJoinOnDefaults = sqliteTable("ChannelJoinOnDefault", {
     }),
 });
 
-export const messageUrlPreviews = sqliteTable("MessageUrlPreview", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  url: text("url").notNull(),
-  type: text("type").notNull(),
-  messageId: text("messageId")
-    .notNull()
-    .references(() => messages.id, {
-      onDelete: "cascade",
-      onUpdate: "cascade",
-    }),
-  title: text("title").notNull(),
-  description: text("description"),
-  faviconLink: text("faviconLink"),
-  imageLink: text("imageLink"),
-  videoLink: text("videoLink"),
-});
+export const messageUrlPreviews = sqliteTable(
+  "MessageUrlPreview",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    url: text("url").notNull(),
+    type: text("type").notNull(),
+    messageId: text("messageId")
+      .notNull()
+      .references(() => messages.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    title: text("title").notNull(),
+    description: text("description"),
+    faviconLink: text("faviconLink"),
+    imageLink: text("imageLink"),
+    videoLink: text("videoLink"),
+  },
+  (table) => [
+    //GetHistoryのリレーション取得・メッセージ削除時のmessageId検索を高速化
+    index("MessageUrlPreview_messageId_idx").on(table.messageId),
+  ],
+);
 
 export const messageReadTimes = sqliteTable(
   "MessageReadTime",
@@ -293,9 +305,9 @@ export const messageReadTimes = sqliteTable(
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
   },
   (table) => [
+    //channelId単独の検索は複合主キーの先頭列で賄えるため個別インデックス不要
     primaryKey({ columns: [table.channelId, table.userId] }),
     index("MessageReadTime_userId_idx").on(table.userId),
-    index("MessageReadTime_channelId_idx").on(table.channelId),
   ],
 );
 
@@ -359,7 +371,11 @@ export const messageReactions = sqliteTable(
   },
   (table) => [
     index("MessageReaction_channelId_idx").on(table.channelId),
-    index("MessageReaction_messageId_idx").on(table.messageId),
+    //リアクション集計のmessageId検索 + reactedAtソートを高速化する複合インデックス
+    index("MessageReaction_messageId_reactedAt_idx").on(
+      table.messageId,
+      table.reactedAt,
+    ),
     index("MessageReaction_userId_idx").on(table.userId),
   ],
 );
