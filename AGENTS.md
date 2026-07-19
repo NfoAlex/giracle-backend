@@ -79,10 +79,9 @@ server?.publish(
 
 横断的な処理は `src/Utils/` に 1 ファイル 1 機能（default export。補助関数のみ named export を併用する場合がある）で置く。
 
-- `CheckChannelVisitiblity` は **ファイル名の typo がそのまま**。import 時注意（`Util` 経由の参照名では解消される。後述）。
 - チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
 
-呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisitiblity` → `Util.checkChannelVisibility`、typo も解消される）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
+呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisibility` → `Util.checkChannelVisibility`）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
 
 ## DB（Drizzle / bun:sqlite）
 

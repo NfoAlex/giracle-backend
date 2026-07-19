@@ -2,7 +2,7 @@ import CalculateReactionTotal, {
   CalculateReactionTotalBulk,
 } from "./Utils/CalculateReactionTotal";
 import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
-import CheckChannelVisibility from "./Utils/CheckChannelVisitiblity";
+import CheckChannelVisibility from "./Utils/CheckChannelVisibility";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
 import EscapeLikePattern from "./Utils/EscapeLikePattern";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
