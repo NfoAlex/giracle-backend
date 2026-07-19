@@ -49,7 +49,7 @@ export async function INIT() {
   await db.delete(users);
   await db.delete(serverConfigs);
 
-  await fs.rm("STORAGE\\file\\TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
+  await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await $`bun ./src/db/seeds.ts`;
 
   await db.insert(users).values([
