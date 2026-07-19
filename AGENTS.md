@@ -20,7 +20,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 
 ### テスト
 
-[test/](test/) に `bun:test` ベースの結合テストがある（`01.auth` / `02.channel` / `03.role` / `04.message` / `05.notification` / `06.user`）。`src/index.ts` の `app` を直接 `app.handle()` する形式で、HTTP サーバーは立てない。
+[test/](test/) に `bun:test` ベースの結合テストがある。`src/index.ts` の `app` を直接 `app.handle()` する形式で、HTTP サーバーは立てない。
 
 - **必ず `NODE_ENV=test` を付けて実行する。** Bun が `.env.test` を読み込み `DATABASE_URL` が `file:./test.db` に切り替わる。付け忘れると開発用の `dev.db` が全削除される。
 - [test/util.ts](test/util.ts) の `INIT()` が全テスト共通の前処理（migrate → 全テーブル削除 → seeds 投入 → `TESTUSER` / `TESTUSER2` とトークン作成）。各テストファイルの `beforeAll` で呼ぶ。多重呼び出しはフラグで抑止される。
@@ -77,20 +77,16 @@ server?.publish(
 
 ### Utils
 
-横断的な処理は `src/Utils/` に 1 ファイル 1 機能（default export。補助関数のみ named export を併用する場合がある）で置く。既存:
+横断的な処理は `src/Utils/` に 1 ファイル 1 機能（default export。補助関数のみ named export を併用する場合がある）で置く。
 
-- `SendSystemMessage`（システムメッセージ送信＋WS通知）、`SendPushNotification`
-- `CheckChannelVisitiblity`（※ファイル名の typo はそのまま。import 時注意）、`GetUserViewableChannel`
-- ロールレベル計算系: `CalculateRoleLevel` / `CompareRoleLevelToRole` / `getUsersRoleLevel`
-- `CalculateReactionTotal`（named export の `CalculateReactionTotalBulk` も持つ）、`EscapeLikePattern`（LIKE 検索のエスケープ）
-
-チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
+- `CheckChannelVisitiblity` は **ファイル名の typo がそのまま**。import 時注意（`Util` 経由の参照名では解消される。後述）。
+- チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
 
 呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisitiblity` → `Util.checkChannelVisibility`、typo も解消される）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
 
 ## DB（Drizzle / bun:sqlite）
 
-- スキーマは [src/db/schema.ts](src/db/schema.ts)。主要テーブル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
+- スキーマは [src/db/schema.ts](src/db/schema.ts)。
 - スキーマ変更フロー: `src/db/schema.ts` 編集 → `bun run db:generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bun run db:migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
   - **`drizzle-kit push` は使わないこと。** 複合主キーを持つテーブル（ChannelJoin 等）で既存インデックスを正しく認識できず `index ... already exists` で失敗するバグが drizzle-kit v0.31.10 にある。generate + migrate は DB の現在状態を pull せず履歴ベースで差分適用するためこの問題を踏まない。
 - SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
@@ -98,8 +94,8 @@ server?.publish(
 
 ## コーディング規約
 
-- リンター/フォーマッターは **Biome**（[biome.json](biome.json)）: スペース 2、ダブルクォート、organizeImports 有効。ESLint/Prettier は導入しない。
-- TypeScript strict。型は Drizzle の `$inferSelect` / `$inferInsert` を活用する。
+- リンター/フォーマッターは **Biome**（[biome.json](biome.json)）。ESLint/Prettier は導入しない。
+- 型は Drizzle の `$inferSelect` / `$inferInsert` を活用する。
 - コメントは日本語。既存コードのコメント密度（処理ブロックごとに短い説明）に合わせる。
 - `biome-ignore` を使う場合は既存同様に理由を書く（例: WS インスタンスの `any`）。
 - バージョンが新しめな点に注意: **Elysia v1.4**（macro は object 形式、`resolve({ as: "scoped" }, ...)`）、**Drizzle ORM**（`drizzle-orm/bun-sqlite` は同期ドライバ。クエリは thenable なので `await` は可、`db.transaction()` のコールバック内では `await` 不可）。古い API の記憶で書かない。
