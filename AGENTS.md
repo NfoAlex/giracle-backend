@@ -6,15 +6,27 @@ Giracle（セルフホスト型チャットサービス）のバックエンド�
 
 ```bash
 bun i                      # 依存インストール（Bun 必須。npm/yarn は使わない）
-bunx drizzle-kit generate  # schema.ts 変更時にマイグレーションSQLを drizzle/ へ生成
-bunx drizzle-kit migrate   # マイグレーションを DB へ適用（初回セットアップ必須）
-bun ./src/db/seeds.ts      # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
+bun run db:generate        # schema.ts 変更時にマイグレーションSQLを drizzle/ へ生成
+bun run db:migrate         # マイグレーションを DB へ適用（初回セットアップ必須）
+bun run db:seed            # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
 bun dev                    # 開発サーバー起動（--watch 付き、ポート 3000 固定）
+NODE_ENV=test bun test     # テスト実行（後述。dev.db ではなく test.db を使う）
 bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
 ```
 
-- テストランナーは未整備。`bun test` の対象はなく、`test/*.oldtest.ts` は旧テストの残骸（メンテされていない）。動作確認は `bun dev` + 手動リクエストで行う。
+- `db:*` は package.json の scripts（中身は `drizzle-kit generate` / `drizzle-kit migrate` / `bun ./src/db/seeds.ts`）。`bun run db:baseline` は Prisma 時代の既存 DB に Drizzle を後付けする初回専用スクリプト（[src/db/baseline.ts](src/db/baseline.ts)）で、新規環境では使わない。
+- `npm test` に相当する package.json の `test` スクリプトは未設定（`exit 1` を返すダミー）。テストは必ず `bun test` を直接叩く。
 - Swagger 定義は各ルートの `detail`（tags / description）から生成される。
+
+### テスト
+
+[test/](test/) に `bun:test` ベースの結合テストがある（`01.auth` / `02.channel` / `03.role` / `04.message` / `05.notification` / `06.user`）。`src/index.ts` の `app` を直接 `app.handle()` する形式で、HTTP サーバーは立てない。
+
+- **必ず `NODE_ENV=test` を付けて実行する。** Bun が `.env.test` を読み込み `DATABASE_URL` が `file:./test.db` に切り替わる。付け忘れると開発用の `dev.db` が全削除される。
+- [test/util.ts](test/util.ts) の `INIT()` が全テスト共通の前処理（migrate → 全テーブル削除 → seeds 投入 → `TESTUSER` / `TESTUSER2` とトークン作成）。各テストファイルの `beforeAll` で呼ぶ。多重呼び出しはフラグで抑止される。
+- リクエストは `FETCH({ path, method, body })` ヘルパー経由（内部で `app.handle(new Request(...))`）。デフォルトで `TESTUSER` の Cookie が付く。`useSecondaryUser: true` で `TESTUSER2`、`excludeCredential: true` で未認証リクエストになる。
+- `NODE_ENV=test` のとき index.ts の `.onError()` はエラーログを抑制する。
+- 機能を追加したら対応するテストファイルに追記する。
 
 ## アーキテクチャの約束事
 
@@ -22,7 +34,8 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 
 `db` インスタンスは [src/db/index.ts](src/db/index.ts) で `bun:sqlite` + `drizzle-orm/bun-sqlite` を使い生成され、[src/index.ts](src/index.ts) から re-export される。各 module / service / Utils は `import { db } from "../.."` のように **index.ts から相対 import** する（循環 import に見えるが意図された構成）。新しいインスタンスを作らないこと。
 
-- 接続直後に `PRAGMA foreign_keys = ON;` を実行している（onDelete: cascade の動作に必須）。
+- 接続直後に `PRAGMA foreign_keys = ON;`（onDelete: cascade の動作に必須）と `PRAGMA journal_mode = WAL;` を実行している。
+- DB のパスは環境変数 `DATABASE_URL`（`file:` プレフィックスは除去される。既定は `./dev.db`）。
 - テーブル定義・relations・型 export は [src/db/schema.ts](src/db/schema.ts) にまとめてある。relational query (`db.query.<table>.findFirst/findMany`) を使うため `drizzle(sqlite, { schema })` で初期化されている。
 - `db.query.*.findFirst` は該当なしで `undefined` を返す（Prisma の `null` とは異なるので `!== undefined` で判定する）。`update`/`delete` は対象0件でも例外を投げない（事前 `findFirst` か `.returning()` の行数で判定する）。
 
@@ -60,18 +73,25 @@ server?.publish(
 
 - メンション・リプライ時の通知は DB の `Inbox` + WS `inbox::Added` + Web Push（[src/Utils/SendPushNotification.ts](src/Utils/SendPushNotification.ts)）の 3 経路。
 - Web Push は VAPID 鍵（環境変数）未設定でも起動する設計。送信前に `isWebPushReady()` で判定する。
-- `/notification` モジュール（デバイス登録・通知設定・チャンネルミュート）は README のエンドポイント表に未記載なので、仕様は [notification.module.ts](src/components/Notification/notification.module.ts) を直接読む。
+- `/notification` モジュール（デバイス登録・通知設定・チャンネルミュート）のエンドポイントは README の一覧に記載済み。リクエスト/レスポンスの詳細は [notification.module.ts](src/components/Notification/notification.module.ts) を読む。
 
 ### Utils
 
-横断的な処理は `src/Utils/` に 1 ファイル 1 関数（default export）で置く。既存: `SendSystemMessage`（システムメッセージ送信＋WS通知）、`SendPushNotification`、`CheckChannelVisitiblity`（※ファイル名の typo はそのまま。import 時注意）、`GetUserViewableChannel`、ロールレベル計算系。チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
+横断的な処理は `src/Utils/` に 1 ファイル 1 機能（default export。補助関数のみ named export を併用する場合がある）で置く。既存:
+
+- `SendSystemMessage`（システムメッセージ送信＋WS通知）、`SendPushNotification`
+- `CheckChannelVisitiblity`（※ファイル名の typo はそのまま。import 時注意）、`GetUserViewableChannel`
+- ロールレベル計算系: `CalculateRoleLevel` / `CompareRoleLevelToRole` / `getUsersRoleLevel`
+- `CalculateReactionTotal`（named export の `CalculateReactionTotalBulk` も持つ）、`EscapeLikePattern`（LIKE 検索のエスケープ）
+
+チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
 
 呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisitiblity` → `Util.checkChannelVisibility`、typo も解消される）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
 
 ## DB（Drizzle / bun:sqlite）
 
 - スキーマは [src/db/schema.ts](src/db/schema.ts)。主要テーブル: `User` / `Token` / `Password` / `Channel` / `ChannelJoin` / `ChannelViewableRole` / `Message` / `MessageReaction` / `MessageReadTime` / `MessageFileAttached` / `MessageUrlPreview` / `Inbox` / `RoleInfo` / `RoleLink` / `ServerConfig` / `Invitation` / `CustomEmoji` / `NotificationDevice` / `NotificationConfig` / `ChannelMute` / `BlockedIPAddress` / `ChannelJoinOnDefault`。
-- スキーマ変更フロー: `src/db/schema.ts` 編集 → `bunx drizzle-kit generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bunx drizzle-kit migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
+- スキーマ変更フロー: `src/db/schema.ts` 編集 → `bun run db:generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bun run db:migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
   - **`drizzle-kit push` は使わないこと。** 複合主キーを持つテーブル（ChannelJoin 等）で既存インデックスを正しく認識できず `index ... already exists` で失敗するバグが drizzle-kit v0.31.10 にある。generate + migrate は DB の現在状態を pull せず履歴ベースで差分適用するためこの問題を踏まない。
 - SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
 - シード（`src/db/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
@@ -90,4 +110,5 @@ server?.publish(
 2. 認証が必要か → `Middleware.CheckToken`、管理操作か → `checkRoleTerm`
 3. 状態変化をクライアントへ通知するか → `server?.publish` の WS シグナル追加
 4. README のエンドポイント表・WS シグナル表・環境変数表を更新
-5. `bunx biome check --write .` を通す
+5. `test/` の対応するテストファイルにケースを追記し、`NODE_ENV=test bun test` を通す
+6. `bunx biome check --write .` を通す
