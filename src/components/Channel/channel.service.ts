@@ -1,8 +1,10 @@
 import { rm } from "node:fs/promises";
 import {
   and,
+  asc,
   eq,
   exists,
+  gt,
   gte,
   inArray,
   lte,
@@ -393,13 +395,30 @@ export namespace ServiceChannel {
     };
   };
 
-  export const Search = async (query: string, _userId: string) => {
+  export const Search = async (
+    query: string,
+    _userId: string,
+    fetchLength = 30,
+    cursorChannelId?: string,
+  ) => {
     //閲覧できるチャンネルをId配列で取得
     const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
     //チャンネル検索
     if (channelIdsViewable.length === 0) return [];
+
+    //カーソル位置の指定があるなら存在を確認
+    if (cursorChannelId !== undefined) {
+      const cursorChannel = await db.query.channels.findFirst({
+        where: eq(channels.id, cursorChannelId),
+        columns: { id: true },
+      });
+      if (cursorChannel === undefined) {
+        throw status(404, "Channel cursor position not found");
+      }
+    }
+
     const channelInfos = await db
       .select()
       .from(channels)
@@ -408,8 +427,15 @@ export namespace ServiceChannel {
           //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
           sql`${channels.name} LIKE ${`%${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
           inArray(channels.id, channelIdsViewable),
+          //カーソル位置より後のIdのみ取得(カーソル位置自体は含めない)
+          cursorChannelId !== undefined
+            ? gt(channels.id, cursorChannelId)
+            : undefined,
         ),
-      );
+      )
+      //Id昇順で固定して連続取得できるようにする
+      .orderBy(asc(channels.id))
+      .limit(fetchLength);
 
     return channelInfos;
   };

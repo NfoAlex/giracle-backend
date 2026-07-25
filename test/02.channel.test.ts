@@ -504,6 +504,58 @@ describe("/channel/search", async () => {
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
   });
+
+  it("取得件数の指定", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=&fetchLength=1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+    //Id昇順で取得するため最初のIdになる
+    expect(j.data[0].id).toBe("TESTCHANNEL1");
+  });
+
+  it("カーソル指定で続きを取得", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=&fetchLength=1&cursor=TESTCHANNEL1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+    //カーソル位置自体は含まれない
+    expect(j.data[0].id).toBe("TESTCHANNEL2");
+  });
+
+  it("カーソル指定で最後まで取得すると空になる", async () => {
+    //まず閲覧できるチャンネルを全件取得
+    const resAll = await FETCH({
+      path: "/channel/search/?query=",
+      method: "GET",
+    });
+    const jAll = await resAll.json();
+    const lastChannelId = jAll.data[jAll.data.length - 1].id;
+
+    const res = await FETCH({
+      path: `/channel/search/?query=&cursor=${lastChannelId}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
+  it("存在しないカーソル", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=&cursor=NOTEXISTCHANNEL",
+      method: "GET",
+    });
+    const t = await res.text();
+    expect(res.status).toBe(404);
+    expect(t).toBe("Channel cursor position not found");
+  });
 });
 
 describe("/channel/invite", async () => {
