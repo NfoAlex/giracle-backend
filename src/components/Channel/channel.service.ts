@@ -419,23 +419,28 @@ export namespace ServiceChannel {
       }
     }
 
-    const channelInfos = await db
-      .select()
-      .from(channels)
-      .where(
-        and(
-          //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
-          sql`${channels.name} LIKE ${`%${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
-          inArray(channels.id, channelIdsViewable),
-          //カーソル位置より後のIdのみ取得(カーソル位置自体は含めない)
-          cursorChannelId !== undefined
-            ? gt(channels.id, cursorChannelId)
-            : undefined,
-        ),
-      )
+    const channelInfos = await db.query.channels.findMany({
+      where: and(
+        //ワイルドカード(%,_)を無効化してLIKE検索(前方一致、インデックスを使わせる)
+        sql`${channels.name} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
+        inArray(channels.id, channelIdsViewable),
+        //カーソル位置より後のIdのみ取得(カーソル位置自体は含めない)
+        cursorChannelId !== undefined
+          ? gt(channels.id, cursorChannelId)
+          : undefined,
+      ),
+      with: {
+        //閲覧できるロールも一緒に取得
+        ChannelViewableRole: {
+          columns: {
+            roleId: true,
+          },
+        },
+      },
       //Id昇順で固定して連続取得できるようにする
-      .orderBy(asc(channels.id))
-      .limit(fetchLength);
+      orderBy: asc(channels.id),
+      limit: fetchLength,
+    });
 
     return channelInfos;
   };

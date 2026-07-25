@@ -452,6 +452,19 @@ describe("/channel/search", async () => {
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(1);
     expect(j.data[0].id).toBe("TESTCHANNEL1");
+    //閲覧できるロールも一緒に取得できる
+    expect(j.data[0]).toContainKey("ChannelViewableRole");
+  });
+
+  it("前方一致でしか検索されない", async () => {
+    //"eneral"は"General"の途中一致なのでマッチしない
+    const res = await FETCH({
+      path: "/channel/search/?query=eneral",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
   });
 
   it("存在しないチャンネル", async () => {
