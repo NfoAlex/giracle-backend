@@ -1,17 +1,19 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
-import type { ServerWebSocket } from "elysia/ws/bun";
+import { websocket } from "elysia/websocket";
+import type { ElysiaWSLike } from "elysia/ws";
 import { db } from ".";
 import { tokens } from "./db/schema";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
+// Elysia 2.0でwsハンドラの引数型がElysiaWSLikeに変更されたため型更新
 // biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
-export const userWSInstance = new Map<string, ServerWebSocket<any>[]>();
+export const userWSInstance = new Map<string, ElysiaWSLike<any, any>[]>();
 
 /**
  * WebSocket用 ハンドラ
  */
-export const wsHandler = new Elysia().ws("/ws", {
+export const wsHandler = new Elysia().use(websocket()).ws("/ws", {
   body: t.Object({
     signal: t.String({ minLength: 1 }),
     data: t.String({ minLength: 1 }),
@@ -32,8 +34,8 @@ export const wsHandler = new Elysia().ws("/ws", {
   },
 
   async open(ws) {
-    //トークンを取得して有効か調べる
-    const tokenFromCookie = ws.data.cookie?.token?.value || ws.data.query.token;
+    // Elysia 2.0でcontextがwsへ直下にインライン化されたためws.cookie/ws.queryを参照
+    const tokenFromCookie = ws.cookie?.token?.value || ws.query?.token;
     if (!tokenFromCookie) {
       ws.send({
         signal: "ERROR",
@@ -115,8 +117,8 @@ export const wsHandler = new Elysia().ws("/ws", {
   async close(ws) {
     //console.log("ws :: WS切断");
 
-    //トークンを取得して有効か調べる
-    const token = ws.data.cookie?.token?.value || ws.data.query?.token;
+    // Elysia 2.0でcontextがwsへ直下にインライン化されたためws.cookie/ws.queryを参照
+    const token = ws.cookie?.token?.value || ws.query?.token;
     if (!token) {
       return;
     }
@@ -150,8 +152,9 @@ export const wsHandler = new Elysia().ws("/ws", {
  * @param ws
  * @returns
  */
+// Elysia 2.0でのWSオブジェクト型受容
 // biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSaddUserInstance(userId: string, ws: ServerWebSocket<any>) {
+function WSaddUserInstance(userId: string, ws: ElysiaWSLike<any, any>) {
   const currentInstance = userWSInstance.get(userId);
   //存在しない場合普通にset
   if (!currentInstance) {
@@ -167,8 +170,9 @@ function WSaddUserInstance(userId: string, ws: ServerWebSocket<any>) {
  * @param ws
  * @returns
  */
+// Elysia 2.0でのWSオブジェクト型受容
 // biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
+function WSremoveUserInstance(userId: string, ws: ElysiaWSLike<any, any>) {
   const currentInstance = userWSInstance.get(userId);
   //存在しない場合スルー
   if (!currentInstance) {

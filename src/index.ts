@@ -1,7 +1,7 @@
 //ユーザーアップロード用のディレクトリ作成
 import { mkdir } from "node:fs/promises";
 import { cors } from "@elysiajs/cors";
-import { Elysia, status } from "elysia";
+import { Elysia, NotFound, status } from "elysia";
 import { channel } from "./components/Channel/channel.module";
 import { message } from "./components/Message/message.module";
 import { notification } from "./components/Notification/notification.module";
@@ -54,12 +54,19 @@ export const app = new Elysia()
   .use(
     Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
   )
-  .onError(({ error, code }) => {
-    if (code === "NOT_FOUND") return status(404, "Not Found :(");
+  // Elysia 2.0仕様: onErrorはerrorへ改名されcodeプロパティが廃止されたため個別/汎用ハンドラーに分離
+  .error(NotFound, () => status(404, "Not Found :("))
+  .error(({ error }) => {
     process.env.NODE_ENV !== "test" &&
       console.error("index :: エラー->", error);
-    if (typeof code === "number")
-      return status(code, error.response || "somethin went wrong :(");
+    if ("status" in error && typeof error.status === "number") {
+      return status(
+        error.status,
+        (error as { response?: string }).response ||
+          error.message ||
+          "something went wrong :(",
+      );
+    }
     return status(500, `somethin went wrong :( ${error.message})`);
   })
   .use(wsHandler)

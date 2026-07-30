@@ -79,7 +79,8 @@ export namespace Middleware {
     .guard({
       cookie: t.Object({ token: t.String({ minLength: 1 }) }),
     })
-    .resolve({ as: "scoped" }, async ({ cookie: { token } }) => {
+    // Elysia 2.0でresolveが廃止されderiveに統一、scopedスコープがpluginへ変更されたため
+    .derive("plugin", async ({ cookie: { token } }) => {
       const tokenValue = token.value as string | undefined;
       //そもそもCookieが無いならエラー
       if (tokenValue === undefined) {
@@ -171,8 +172,9 @@ export namespace Middleware {
       },
     });
 
-  export const RateLimiter = new Elysia({ name: "rateLimiter" }).resolve(
-    { as: "scoped" },
+  // Elysia 2.0でresolveが廃止されderiveに統一、scopedスコープがpluginへ変更されたため
+  export const RateLimiter = new Elysia({ name: "rateLimiter" }).derive(
+    "plugin",
     async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
@@ -280,10 +282,11 @@ export namespace Middleware {
         message: t.String({ minLength: 1 }),
       }),
       response: t.Object({
-        data: t.Union([t.Unsafe<Message>(), t.Undefined()]),
+        data: t.Union([t.Unsafe<Message>({}), t.Undefined()]),
       }),
     })
-    .onError(({ error }) => {
+    // Elysia 2.0でonプレフィックスが削除されたため.errorを使用
+    .error(({ error }) => {
       console.error("Middleware :: urlPreviewControl : エラー->", error);
     })
     .macro({
