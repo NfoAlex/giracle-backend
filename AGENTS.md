@@ -64,7 +64,7 @@ server?.publish(
 ```
 
 - signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
-- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
+- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ElysiaWSLike<any, any>[]>) が複数端末の同時接続を管理している。
 - URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
 
 ### 通知（Inbox / Web Push）
@@ -95,7 +95,13 @@ server?.publish(
 - 型は Drizzle の `$inferSelect` / `$inferInsert` を活用する。
 - コメントは日本語。既存コードのコメント密度（処理ブロックごとに短い説明）に合わせる。
 - `biome-ignore` を使う場合は既存同様に理由を書く（例: WS インスタンスの `any`）。
-- バージョンが新しめな点に注意: **Elysia v1.4**（macro は object 形式、`resolve({ as: "scoped" }, ...)`）、**Drizzle ORM**（`drizzle-orm/bun-sqlite` は同期ドライバ。クエリは thenable なので `await` は可、`db.transaction()` のコールバック内では `await` 不可）。古い API の記憶で書かない。
+- **Elysia v2.0** 規約に準拠すること:
+  - `resolve` は廃止。コンテキスト拡張は `.derive("plugin", ...)` を使用。
+  - スコープ表記: `'scoped'` は廃止され `'plugin'` に改称（`{ as: 'scoped' }` 形式は使用不可）。
+  - ライフサイクルフックの `on` プレフィックス削除 (`request`, `beforeHandle`, `afterResponse`, `error` 等)。
+  - ルートの引数順は `app.post('/path', options, handler)` (オプションが先)。
+  - WS 内 Context は `ws` に直下にインライン化 (`ws.cookie`, `ws.query`)。
+- **Drizzle ORM**: `drizzle-orm/bun-sqlite` は同期ドライバ。クエリは thenable なので `await` は可、`db.transaction()` のコールバック内では `await` 不可。古い API の記憶で書かない。
 
 ## 変更時のチェックリスト
 
