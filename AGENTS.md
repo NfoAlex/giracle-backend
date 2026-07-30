@@ -10,7 +10,7 @@ bun run db:generate        # schema.ts 変更時にマイグレーションSQL�
 bun run db:migrate         # マイグレーションを DB へ適用（初回セットアップ必須）
 bun run db:seed            # シード投入（ServerConfig と HOST/MEMBER ロール。初回必須）
 bun dev                    # 開発サーバー起動（--watch 付き、ポート 3000 固定）
-NODE_ENV=test bun test     # テスト実行（後述。dev.db ではなく test.db を使う）
+bun test     # テスト実行（後述。dev.db ではなく test.db を使う）
 bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
 ```
 
@@ -22,10 +22,8 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 
 [test/](test/) に `bun:test` ベースの結合テストがある。`src/index.ts` の `app` を直接 `app.handle()` する形式で、HTTP サーバーは立てない。
 
-- **必ず `NODE_ENV=test` を付けて実行する。** Bun が `.env.test` を読み込み `DATABASE_URL` が `file:./test.db` に切り替わる。付け忘れると開発用の `dev.db` が全削除される。
 - [test/util.ts](test/util.ts) の `INIT()` が全テスト共通の前処理（migrate → 全テーブル削除 → seeds 投入 → `TESTUSER` / `TESTUSER2` とトークン作成）。各テストファイルの `beforeAll` で呼ぶ。多重呼び出しはフラグで抑止される。
 - リクエストは `FETCH({ path, method, body })` ヘルパー経由（内部で `app.handle(new Request(...))`）。デフォルトで `TESTUSER` の Cookie が付く。`useSecondaryUser: true` で `TESTUSER2`、`excludeCredential: true` で未認証リクエストになる。
-- `NODE_ENV=test` のとき index.ts の `.onError()` はエラーログを抑制する。
 - 機能を追加したら対応するテストファイルに追記する。
 
 ## アーキテクチャの約束事
@@ -46,7 +44,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - **`<name>.module.ts`** — `new Elysia({ prefix: "/<name>" })`。ルート定義・`t.Object` によるバリデーション・`response` スキーマ（成功/エラーの status ごとに定義。エラーは `t.Literal("...")` で文言まで固定）・Swagger 用 `detail` を持つ。レスポンス形式は `{ message: string, data?: ... }` が慣習。
 - **`<name>.service.ts`** — `export namespace Service<Name> { ... }` にビジネスロジックを置く。エラーは Elysia の `throw status(4xx, "メッセージ")` で投げる。**service で投げる status とメッセージは module 側の `response` スキーマと一致させる**（ずれるとバリデーションエラーになる）。
 
-グローバルエラーハンドラは index.ts の `.onError()`。`NODE_ENV=test` のときはエラーログを抑制する分岐がある。
+グローバルエラーハンドラは index.ts の `.onError()`。
 
 ### 認証・権限
 
@@ -105,5 +103,5 @@ server?.publish(
 2. 認証が必要か → `Middleware.CheckToken`、管理操作か → `checkRoleTerm`
 3. 状態変化をクライアントへ通知するか → `server?.publish` の WS シグナル追加
 4. README のエンドポイント表・WS シグナル表・環境変数表を更新
-5. `test/` の対応するテストファイルにケースを追記し、`NODE_ENV=test bun test` を通す
+5. `test/` の対応するテストファイルにケースを追記し、`bun test` を通す
 6. `bunx biome check --write .` を通す
