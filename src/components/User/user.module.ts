@@ -441,8 +441,8 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/list",
-    async () => {
-      const users = await ServiceUser.GetUserList();
+    async ({ query: { length, cursorUserId } }) => {
+      const users = await ServiceUser.GetUserList(length, cursorUserId);
 
       return {
         message: "User list",
@@ -450,6 +450,10 @@ export const user = new Elysia({ prefix: "/user" })
       };
     },
     {
+      query: t.Object({
+        length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
+        cursorUserId: t.Optional(t.String({ minLength: 1 })),
+      }),
       detail: {
         description: "ユーザーの情報を一覧で取得します",
         tags: ["User"],
