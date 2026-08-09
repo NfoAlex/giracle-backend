@@ -552,6 +552,9 @@ export namespace ServiceUser {
     length: number = 30,
     cursorUserId?: string,
   ) => {
+    if (cursorUserId === "SYSTEM") {
+      throw status(404, "Cursor user not found");
+    }
     let cursorUser: { createdAt: Date; id: string } | undefined;
     if (cursorUserId) {
       cursorUser = await db.query.users.findFirst({
