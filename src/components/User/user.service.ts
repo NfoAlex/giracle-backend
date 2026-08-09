@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, not, or, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db } from "../..";
@@ -548,8 +548,40 @@ export namespace ServiceUser {
     return user;
   };
 
-  export const GetUserList = async () => {
+  export const GetUserList = async (
+    length: number = 30,
+    cursorUserId?: string,
+  ) => {
+    if (cursorUserId === "SYSTEM") {
+      throw status(404, "Cursor user not found");
+    }
+    let cursorUser: { createdAt: Date; id: string } | undefined;
+    if (cursorUserId) {
+      cursorUser = await db.query.users.findFirst({
+        columns: { createdAt: true, id: true },
+        where: eq(users.id, cursorUserId),
+      });
+      if (cursorUser === undefined) {
+        throw status(404, "Cursor user not found");
+      }
+    }
+
     const usersFound = await db.query.users.findMany({
+      where: and(
+        not(eq(users.id, "SYSTEM")),
+        // 日付とユーザーId基準で取得
+        cursorUser
+          ? or(
+              gt(users.createdAt, cursorUser.createdAt),
+              // 同じ秒で作成されたとき用考慮
+              and(
+                eq(users.createdAt, cursorUser.createdAt),
+                gt(users.id, cursorUser.id),
+              ),
+            )
+          : undefined,
+      ),
+      orderBy: [asc(users.createdAt), asc(users.id)],
       with: {
         ChannelJoin: {
           columns: {
@@ -562,6 +594,7 @@ export namespace ServiceUser {
           },
         },
       },
+      limit: length,
     });
 
     return usersFound;

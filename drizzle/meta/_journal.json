@@ -22,6 +22,20 @@
       "when": 1783442653558,
       "tag": "0002_overrated_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786285691237,
+      "tag": "0003_abandoned_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786287604585,
+      "tag": "0004_typical_shape",
+      "breakpoints": true
     }
   ]
 }

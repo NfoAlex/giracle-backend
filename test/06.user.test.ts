@@ -336,11 +336,40 @@ describe("/user/info/:id", () => {
 });
 
 describe("/user/list", () => {
+  // cursorUserIdのテスト用
+  let middleUserId = "";
+
   it("正常", async () => {
     const res = await FETCH({ path: "/user/list", method: "GET" });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBeGreaterThan(0);
+    middleUserId = j.data[Math.floor(j.data.length / 2)].id;
+  });
+
+  it("正常 :: length指定", async () => {
+    const res = await FETCH({ path: "/user/list?length=1", method: "GET" });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+  });
+
+  it("正常 :: cursorUserId指定", async () => {
+    const res = await FETCH({
+      path: `/user/list?cursorUserId=${middleUserId}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("存在しないcursorUserId", async () => {
+    const res = await FETCH({
+      path: "/user/list?cursorUserId=NOTEXIST",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
   });
 });
 

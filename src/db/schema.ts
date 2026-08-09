@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -11,14 +11,21 @@ import {
 // テーブル定義
 // ============================================================
 
-export const users = sqliteTable("User", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").unique(),
-  selfIntroduction: text("selfIntroduction").notNull(),
-  isBanned: integer("isBanned", { mode: "boolean" }).notNull().default(false),
-});
+export const users = sqliteTable(
+  "User",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").unique(),
+    selfIntroduction: text("selfIntroduction").notNull(),
+    isBanned: integer("isBanned", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("User_id_createdAt_idx").on(table.createdAt, table.id)],
+);
 
 export const roleInfos = sqliteTable("RoleInfo", {
   id: text("id")
