@@ -363,6 +363,14 @@ describe("/user/list", () => {
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(1);
   });
+
+  it("存在しないcursorUserId", async () => {
+    const res = await FETCH({
+      path: "/user/list?cursorUserId=NOTEXIST",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("/user/ban & /user/unban", () => {
