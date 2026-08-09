@@ -100,7 +100,7 @@ giracle-backend/
 | GET | `/user/get-online` | ✅ | - | オンラインユーザー一覧取得 |
 | GET | `/user/search` | ✅ | - | ユーザー検索 |
 | GET | `/user/info/:id` | ✅ | - | ユーザー情報取得 |
-| GET | `/user/list` | ✅ | - | ユーザー一覧取得 |
+| GET | `/user/list` | ✅ | - | ユーザー一覧取得（`length`（既定30・最大50）/ `cursorUserId` によるカーソルページネーション対応。SYSTEM ユーザーは除外） |
 | GET | `/user/icon/:userId` | ✅ | - | アイコン画像取得 |
 | GET | `/user/banner/:userId` | ✅ | - | バナー画像取得 |
 | POST | `/user/change-icon` | ✅ | - | アイコン変更 |
