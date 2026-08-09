@@ -342,6 +342,25 @@ describe("/user/list", () => {
     expect(res.ok).toBe(true);
     expect(j.data.length).toBeGreaterThan(0);
   });
+
+  it("正常 :: length指定", async () => {
+    const res = await FETCH({ path: "/user/list?length=1", method: "GET" });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+  });
+
+  // it("正常 :: cursorUserId指定", async () => {
+  //   const res = await FETCH({
+  //     path: "/user/list?cursorUserId=TESTUSER",
+  //     method: "GET",
+  //   });
+  //   const j = await res.json();
+  //   console.log("06.user :: /user/list cursorUserId指定 : j", j);
+  //   expect(res.ok).toBe(true);
+  //   expect(j.data.length).toBeGreaterThanOrEqual(1);
+  //   expect(j.data[0].id).toBe("TESTUSER2");
+  // });
 });
 
 describe("/user/ban & /user/unban", () => {
