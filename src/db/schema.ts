@@ -24,7 +24,7 @@ export const users = sqliteTable(
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (table) => [index("User_id_createdAt_idx").on(table.id, table.createdAt)],
+  (table) => [index("User_id_createdAt_idx").on(table.createdAt, table.id)],
 );
 
 export const roleInfos = sqliteTable("RoleInfo", {
