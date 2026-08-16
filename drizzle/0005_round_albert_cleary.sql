@@ -1,0 +1,1 @@
+ALTER TABLE `Token` ADD `expiresAt` integer DEFAULT (unixepoch() * 1000 + 14 * 24 * 60 * 60 * 1000) NOT NULL;

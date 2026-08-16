@@ -46,7 +46,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     const tokenWithUser = await db.query.tokens
       .findFirst({
         where: (tokens, { eq }) => eq(tokens.token, tokenFromCookie as string),
-        columns: {},
+        columns: { expiresAt: true },
         with: {
           user: {
             with: {
@@ -75,6 +75,14 @@ export const wsHandler = new Elysia().ws("/ws", {
       });
       ws.close();
       return;
+    }
+
+    // トークンの期限確認
+    if (Date.now().valueOf() > tokenWithUser.expiresAt.valueOf()) {
+      ws.send({
+        signal: "ERROR",
+        data: "token is expired",
+      });
     }
 
     const user = tokenWithUser.user;

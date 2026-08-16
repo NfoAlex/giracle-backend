@@ -61,6 +61,11 @@ export async function INIT() {
     { userId: "TESTUSER", token: "TESTUSERTOKEN_FOR_SIGNOUT_TEST" },
     { userId: "TESTUSER", token: "TESTUSERTOKEN_FOR_DELETION_TEST" },
     { userId: "TESTUSER2", token: "TESTUSER2TOKEN" },
+    {
+      userId: "TESTUSER2",
+      token: "TESTUSER2TOKEN_EXPIRED",
+      expiresAt: new Date(Date.now() - 60 * 1000),
+    },
   ]);
   await db
     .insert(invitations)

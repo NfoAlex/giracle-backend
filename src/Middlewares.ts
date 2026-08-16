@@ -15,7 +15,7 @@ import {
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<
   string,
-  { userId: string; isBanned: boolean; cachedAt: number }
+  { userId: string; isBanned: boolean; cachedAt: number; expiresAt: Date }
 >();
 
 const ONE_MINUITE = 60 * 1000;
@@ -94,7 +94,14 @@ export namespace Middleware {
         if (cachedToken.isBanned) {
           return status(401, "User is banned");
         }
+        //キャッシュの寿命を延長
         token.expires = new Date(now + ONE_MINUITE * 60 * 24 * 15);
+
+        //トークンの期限確認
+        if (Date.now().valueOf() > cachedToken.expiresAt.valueOf()) {
+          invalidateTokenCache(tokenValue);
+          return status(401, "Invalid token");
+        }
         return { CheckToken: { _userId: cachedToken.userId } };
       }
 
@@ -103,6 +110,7 @@ export namespace Middleware {
         where: eq(tokens.token, tokenValue),
         columns: {
           userId: true,
+          expiresAt: true,
         },
         with: {
           user: {
@@ -117,12 +125,17 @@ export namespace Middleware {
       if (tokenData === undefined) {
         return status(401, "Invalid token");
       }
+      //トークンの期限確認
+      if (Date.now().valueOf() > tokenData.expiresAt.valueOf()) {
+        return status(401, "Invalid token");
+      }
 
       // キャッシュに保存
       tokenCache.set(tokenValue, {
         userId: tokenData.userId,
         isBanned: tokenData.user.isBanned,
         cachedAt: now,
+        expiresAt: tokenData.expiresAt,
       });
 
       //BAN確認
