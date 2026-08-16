@@ -101,6 +101,21 @@ describe("/user", () => {
     expect(j.data.userId).toBe("TESTUSER");
   });
 
+  it("/verify-token :: 期限切れトークンは無効", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/verify-token", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSER2TOKEN_EXPIRED",
+        },
+      }),
+    );
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(401);
+  });
+
   let sessionIdRemoving = -1;
   it("/session :: セッションを取得する", async () => {
     const response = await app.handle(
