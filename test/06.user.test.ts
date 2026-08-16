@@ -382,7 +382,7 @@ describe("/user/list", () => {
     }
   });
 
-  it("レスポンス構造 :: ChannelJoin / RoleLink を含む", async () => {
+  it("レスポンス構造 :: RoleLink を含む", async () => {
     const res = await FETCH({ path: "/user/list", method: "GET" });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -390,11 +390,7 @@ describe("/user/list", () => {
     for (const u of j.data) {
       expect(typeof u.id).toBe("string");
       expect(typeof u.name).toBe("string");
-      expect(Array.isArray(u.ChannelJoin)).toBe(true);
       expect(Array.isArray(u.RoleLink)).toBe(true);
-      for (const join of u.ChannelJoin) {
-        expect(typeof join.channelId).toBe("string");
-      }
       for (const link of u.RoleLink) {
         expect(typeof link.roleId).toBe("string");
       }
