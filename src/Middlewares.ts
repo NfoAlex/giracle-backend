@@ -103,6 +103,7 @@ export namespace Middleware {
         where: eq(tokens.token, tokenValue),
         columns: {
           userId: true,
+          expiresAt: true
         },
         with: {
           user: {
@@ -115,6 +116,10 @@ export namespace Middleware {
 
       //トークンが無効ならエラー
       if (tokenData === undefined) {
+        return status(401, "Invalid token");
+      }
+      //トークンの期限確認
+      if (Date.now().valueOf() > tokenData.expiresAt.valueOf()) {
         return status(401, "Invalid token");
       }
 
