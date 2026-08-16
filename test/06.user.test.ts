@@ -100,10 +100,10 @@ describe("/user/get-online", () => {
   });
 });
 
-describe("/user/search", () => {
+describe("/user/list :: 検索", () => {
   it("正常 :: username検索", async () => {
     const res = await FETCH({
-      path: "/user/search?username=testsystemuser",
+      path: "/user/list?username=testsystemuser",
       method: "GET",
     });
     const j = await res.json();
@@ -113,7 +113,7 @@ describe("/user/search", () => {
 
   it("正常 :: joinedChannel検索", async () => {
     const res = await FETCH({
-      path: "/user/search?joinedChannel=TESTCHANNEL1",
+      path: "/user/list?joinedChannel=TESTCHANNEL1",
       method: "GET",
     });
     const j = await res.json();
@@ -126,21 +126,31 @@ describe("/user/search", () => {
 
   it("正常 :: 複合検索", async () => {
     const res = await FETCH({
-      path: "/user/search?joinedChannel=TESTCHANNEL2&username=testsys",
+      path: "/user/list?joinedChannel=TESTCHANNEL2&username=testsys",
       method: "GET",
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
-    // console.log("06.user.test :: /user/search : j", j);
+    // console.log("06.user.test :: /user/list : j", j);
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER2")).toBe(true);
     expect(j.data.some((u: { id: string }) => u.id === "TESTUSER1")).toBe(
       false,
     );
   });
 
+  it("正常 :: 検索とlength指定の併用", async () => {
+    const res = await FETCH({
+      path: "/user/list?username=&length=1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+  });
+
   it("% injection 検索", async () => {
     const res = await FETCH({
-      path: "/user/search?username=%user2",
+      path: "/user/list?username=%user2",
       method: "GET",
     });
     const j = await res.json();
@@ -150,7 +160,7 @@ describe("/user/search", () => {
 
   it("権限がないチャンネルで検索", async () => {
     const res = await FETCH({
-      path: "/user/search?joinedChannel=TESTCHANNEL4",
+      path: "/user/list?joinedChannel=TESTCHANNEL4",
       method: "GET",
     });
     const t = await res.text();
