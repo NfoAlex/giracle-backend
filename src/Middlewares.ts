@@ -29,6 +29,23 @@ setInterval(() => {
   }
 }, ONE_MINUITE);
 
+// URLプレビュー取得禁止IPレンジ（SSRF対策: 名前解決後のアドレスを判定）
+const isBlockedIp = (ip: string): boolean => {
+  const lower = ip.toLowerCase();
+  // IPv4-mapped IPv6 は埋め込まれたIPv4部分で判定
+  const v4 = lower.replace(/^::ffff:/, "");
+  return (
+    // loopback / private / link-local / CGNAT / 予約 / マルチキャスト
+    /^(0\.|10\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.(0\.(0|2)\.|168\.)|198\.(1[89]\.|51\.100\.)|203\.0\.113\.|2(2[4-9]|3\d)\.|2[4-5]\d\.)/.test(
+      v4,
+    ) ||
+    // unspecified / loopback / NAT64 / discard / documentation / unique-local / link-local / multicast
+    /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/.test(
+      lower,
+    )
+  );
+};
+
 /**
  * 指定トークンのキャッシュを無効化する（サインアウト・セッション削除時に使用）
  * @param token 無効化するトークン
@@ -344,31 +361,43 @@ export namespace Middleware {
               .delete(messageUrlPreviews)
               .where(eq(messageUrlPreviews.messageId, messageId));
 
-            // URLリストから不正なもの（ローカルIPなど）を事前にフィルタリング
-            const validUrls = urlMatched.filter((urlStr) => {
+            // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
+            const validUrls: string[] = [];
+            for (const urlStr of urlMatched) {
               try {
-                const parsedUrl = new URL(urlStr);
-                const hostname = parsedUrl.hostname;
+                const hostname = new URL(urlStr).hostname.replace(
+                  /^\[|\]$/g,
+                  "",
+                );
 
-                // 基本的なSSRF対策（より強固にするならDNS名前解決の結果をチェックする必要があります）
-                if (hostname === "localhost" || hostname === "127.0.0.1")
-                  return false;
-                if (hostname.includes("169.254.")) return false; // クラウドのメタデータサーバー
-
-                const isIpAddress =
+                // リテラルIP（IPv4/IPv6）は除外
+                if (
                   /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
-                  hostname.includes(":");
-                if (isIpAddress) return false;
+                  hostname.includes(":")
+                )
+                  continue;
 
-                return true;
+                // 名前解決し、全アドレスが公開IPであることを確認
+                const addresses = await Bun.dns.lookup(hostname);
+                if (
+                  addresses.length === 0 ||
+                  addresses.some((addr) => isBlockedIp(addr.address))
+                )
+                  continue;
+
+                validUrls.push(urlStr);
               } catch {
-                return false; // 無効なURLは除外
+                // 無効なURL・解決不能なホスト名は除外
               }
-            });
+            }
 
             // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
             const fetchPromises = validUrls.map(async (url) => {
-              const data = await ogs({ url });
+              // リダイレクト追従を無効化（外部URL→内部IPへのリダイレクトを防ぐ）
+              const data = await ogs({
+                url,
+                fetchOptions: { redirect: "manual" },
+              });
               if (data.error) {
                 throw new Error(`OGS Fetch Error for ${url}`);
               }

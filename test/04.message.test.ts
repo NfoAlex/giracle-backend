@@ -5,8 +5,16 @@ import { channelJoins, inboxes, messageFileAttached } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
+let lastOgsOptions:
+  | { url?: string; fetchOptions?: { redirect?: string } }
+  | undefined;
 mock.module("open-graph-scraper", () => ({
-  default: async ({ url }: { url: string }) => {
+  default: async (options: {
+    url: string;
+    fetchOptions?: { redirect?: string };
+  }) => {
+    lastOgsOptions = options;
+    const { url } = options;
     if (url === "http://1.2.3.4") {
       return {
         error: false,
@@ -35,7 +43,7 @@ mock.module("open-graph-scraper", () => ({
         },
       };
     }
-    if (url === "https://ogs-error.example.com") {
+    if (url === "https://example.com/ogs-error") {
       return {
         error: true,
         result: undefined,
@@ -824,7 +832,7 @@ describe("/message/send", async () => {
       method: "POST",
       body: {
         channelId: "TESTCHANNEL1",
-        message: "https://example.com https://another-example.com",
+        message: "https://example.com https://example.org",
       },
     });
     const j = await res.json();
@@ -969,7 +977,7 @@ describe("/message/send", async () => {
       method: "POST",
       body: {
         channelId: "TESTCHANNEL1",
-        message: "Check this out https://ogs-error.example.com",
+        message: "Check this out https://example.com/ogs-error",
       },
     });
     const j = await res.json();
@@ -1009,6 +1017,56 @@ describe("/message/send", async () => {
     const getJ = await getRes.json();
     expect(getRes.ok).toBeTrue();
     expect(getJ.data.MessageUrlPreview.length).toBe(0);
+  });
+
+  // SSRF対策: IPv4の異表記がプレビュー対象にならないこと
+  const ssrfBlockedUrls = [
+    "http://2130706433/", // 10進表記 = 127.0.0.1
+    "http://0177.0.0.1/", // 8進表記 = 127.0.0.1
+    "http://0x7f.1/", // 16進表記 = 127.0.0.1
+    "http://127.1/", // 短縮表記 = 127.0.0.1
+  ];
+  for (const blockedUrl of ssrfBlockedUrls) {
+    it(`SSRF対策 :: ${blockedUrl} はプレビュー取得されない`, async () => {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: `Check this out ${blockedUrl}`,
+        },
+      });
+      expect(res.ok).toBeTrue();
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getRes.ok).toBeTrue();
+      expect(getJ.data.MessageUrlPreview.length).toBe(0);
+    });
+  }
+
+  it("SSRF対策 :: OGP取得時にリダイレクト追従が無効化されている", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "Check this out https://example.com",
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message sent");
+
+    await Bun.sleep(500);
+
+    expect(lastOgsOptions?.fetchOptions?.redirect).toBe("manual");
   });
 
   it("IPv6リテラルURL含むメッセージ送信（URL正規表現が非対応のため未検出で通過確認）", async () => {
