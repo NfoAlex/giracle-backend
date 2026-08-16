@@ -94,11 +94,12 @@ export namespace Middleware {
         if (cachedToken.isBanned) {
           return status(401, "User is banned");
         }
+        //キャッシュの寿命を延長
         token.expires = new Date(now + ONE_MINUITE * 60 * 24 * 15);
 
         //トークンの期限確認
         if (Date.now().valueOf() > cachedToken.expiresAt.valueOf()) {
-          invalidateUserCache(cachedToken.userId);
+          invalidateTokenCache(tokenValue);
           return status(401, "Invalid token");
         }
         return { CheckToken: { _userId: cachedToken.userId } };
