@@ -690,7 +690,7 @@ describe("/message/send", async () => {
       .select()
       .from(inboxes)
       .where(eq(inboxes.userId, "TESTUSER"));
-    //util.ts の初期化で追加されたinbox1件だけになっているはず
+    //上記テストで追加されたinbox1件だけになっているはず
     expect(targetInbox.length).toBe(1);
   });
 
