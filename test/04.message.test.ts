@@ -685,6 +685,13 @@ describe("/message/send", async () => {
     const j = await res.json();
     expect(j.message).toBe("Message sent");
     expect(res.status).toBe(200);
+
+    const targetInbox = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.userId, "TESTUSER"));
+    //util.ts の初期化で追加されたinbox1件だけになっているはず
+    expect(targetInbox.length).toBe(1);
   });
 
   it("存在しないユーザーへのメンションはinboxに保存されない", async () => {
@@ -706,6 +713,27 @@ describe("/message/send", async () => {
       .from(inboxes)
       .where(eq(inboxes.userId, "GHOSTUSER999"));
     expect(ghostInbox.length).toBe(0);
+  });
+
+  it("チャンネルに参加していないユーザーへのメンション", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "@<TESTUSER2> hello",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.message).toBe("Message sent");
+
+    //第２ユーザーのInboxは上記の`/message/inbox/clear`で削除しているため0のはず
+    const secondaryInbox = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.userId, "TESTUSER2"));
+    expect(secondaryInbox.length).toBe(0);
   });
 
   let TEST__MESSAGE_ID_WITH_URL = "";
