@@ -287,25 +287,30 @@ export namespace ServiceMessage {
 
     if (mimeType.startsWith("image/")) {
       //画像はすべて再エンコードして保存する(オリジナルバイトを保存しない)
-      if (mimeType === "image/gif") {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await sharp(buffer, { animated: true })
-          .gif({
-            colours: 128, // 色数を128に削減
-            dither: 0, // ディザリングを無効化
-            effort: 7, // パレット生成の計算量を設定
-          })
-          .toFile(`./STORAGE/file/${channelId}/${fileId}.gif`);
-        savedFileName = `${fileId}.gif`;
-        type = "image/gif";
-      } else {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await sharp(buffer)
-          .rotate()
-          .webp({ quality: 95 })
-          .toFile(`./STORAGE/file/${channelId}/${fileId}.webp`);
-        savedFileName = `${fileId}.webp`;
-        type = "image/webp";
+      try {
+        if (mimeType === "image/gif") {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          await sharp(buffer, { animated: true })
+            .gif({
+              colours: 128, // 色数を128に削減
+              dither: 0, // ディザリングを無効化
+              effort: 7, // パレット生成の計算量を設定
+            })
+            .toFile(`./STORAGE/file/${channelId}/${fileId}.gif`);
+          savedFileName = `${fileId}.gif`;
+          type = "image/gif";
+        } else {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          await sharp(buffer)
+            .rotate()
+            .webp({ quality: 95 })
+            .toFile(`./STORAGE/file/${channelId}/${fileId}.webp`);
+          savedFileName = `${fileId}.webp`;
+          type = "image/webp";
+        }
+      } catch {
+        //画像として解釈できないバイト列(例: HTMLをimage/pngと偽装)は保存しない
+        throw status(400, "File type is invalid");
       }
     } else {
       //画像以外はホワイトリスト登録済みの安全な種別のみ許可する
