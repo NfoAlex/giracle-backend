@@ -264,11 +264,6 @@ export namespace ServiceUser {
       ),
       orderBy: [asc(users.createdAt), asc(users.id)],
       with: {
-        ChannelJoin: {
-          columns: {
-            channelId: true,
-          },
-        },
         RoleLink: {
           columns: {
             roleId: true,
