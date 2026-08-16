@@ -25,7 +25,6 @@ import {
   messageUrlPreviews,
   roleInfos,
   roleLinks,
-  users,
 } from "../../db/schema";
 import { Util } from "../../Util";
 
@@ -270,40 +269,59 @@ export namespace ServiceMessage {
       throw status(400, "Invalid channelId");
     }
 
-    //ファイル名からディレクトリ要素を除去(パストラバーサル対策)
+    //表示用ファイル名はパストラバーサル対策としてサニタイズして保持
     const safeFileName = path.basename(file.name).replace(/[/\\]/g, "_");
-    //保存するためのファイル名保存
-    const fileNameGen = `${Date.now()}_${safeFileName}`;
+    //保存ファイル名はサーバー生成のIDのみを使用(オリジナル拡張子を使わせない)
+    const fileId = crypto.randomUUID();
     //チャンネルIdのディレクトリを作成
     await mkdir(`./STORAGE/file/${channelId}`, { recursive: true }).catch(
       () => {},
     );
 
-    //console.log("message.module :: /file/upload : file.type->", file.type);
-    //webpファイルであるかどうかフラグ
-    let isWebp = false;
+    //MIMEタイプを正規化する(クライアント指定値は大文字や `;charset=...` を含み得るため)
+    const mimeType = file.type.split(";")[0].trim().toLowerCase();
 
-    //ファイルを保存する
-    if (file.type.startsWith("image/") && file.type !== "image/gif") {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await sharp(buffer)
-        .rotate()
-        .webp({ quality: 95 })
-        .toFile(`./STORAGE/file/${channelId}/${fileNameGen}.webp`);
-      //webpで保存されたことと設定
-      isWebp = true;
-    } else if (file.type === "image/gif") {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await sharp(buffer, { animated: true })
-        .gif({
-          colours: 128, // 色数を128に削減
-          dither: 0, // ディザリングを無効化
-          effort: 7, // パレット生成の計算量を設定
-        })
-        .toFile(`./STORAGE/file/${channelId}/${fileNameGen}`);
+    //保存後の拡張子とMIMEタイプ
+    let savedFileName: string;
+    let type: string;
+
+    if (mimeType.startsWith("image/")) {
+      //画像はすべて再エンコードして保存する(オリジナルバイトを保存しない)
+      try {
+        if (mimeType === "image/gif") {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          await sharp(buffer, { animated: true })
+            .gif({
+              colours: 128, // 色数を128に削減
+              dither: 0, // ディザリングを無効化
+              effort: 7, // パレット生成の計算量を設定
+            })
+            .toFile(`./STORAGE/file/${channelId}/${fileId}.gif`);
+          savedFileName = `${fileId}.gif`;
+          type = "image/gif";
+        } else {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          await sharp(buffer)
+            .rotate()
+            .webp({ quality: 95 })
+            .toFile(`./STORAGE/file/${channelId}/${fileId}.webp`);
+          savedFileName = `${fileId}.webp`;
+          type = "image/webp";
+        }
+      } catch {
+        //画像として解釈できないバイト列(例: HTMLをimage/pngと偽装)は保存しない
+        throw status(400, "File type is invalid");
+      }
     } else {
-      //ファイルを保存
-      await Bun.write(`./STORAGE/file/${channelId}/${fileNameGen}`, file);
+      //画像以外はホワイトリスト登録済みの安全な種別のみ許可する
+      const safeExt = Util.getSafeFileExtension(mimeType);
+      if (!safeExt) {
+        throw status(400, "File type is invalid");
+      }
+      //画像以外はそのまま保存する(ブラウザ上での実行は配信時のattachment/nosniffで防止)
+      await Bun.write(`./STORAGE/file/${channelId}/${fileId}.${safeExt}`, file);
+      savedFileName = `${fileId}.${safeExt}`;
+      type = mimeType;
     }
 
     //ファイル情報を作成、保存する
@@ -313,9 +331,9 @@ export namespace ServiceMessage {
         channelId,
         userId: _userId,
         size: file.size,
-        actualFileName: isWebp ? `${file.name}.webp` : file.name,
-        savedFileName: isWebp ? `${fileNameGen}.webp` : fileNameGen,
-        type: isWebp ? "image/webp" : file.type,
+        actualFileName: safeFileName,
+        savedFileName,
+        type,
       })
       .returning({ id: messageFileAttached.id });
 

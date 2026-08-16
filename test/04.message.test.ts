@@ -335,6 +335,149 @@ describe("/message/file/upload", async () => {
     });
     expect(res.ok).toBeFalse();
   });
+
+  it("危険なファイル種別(text/html)は拒否される(格納型XSS対策)", async () => {
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File(["<script>alert(1)</script>"], "evil.html", {
+        type: "text/html",
+      }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const t = await res.text();
+    expect(res.status).toBe(400);
+    expect(t).toBe("File type is invalid");
+  });
+
+  it("ホワイトリスト内の非画像ファイルはアップロードできる", async () => {
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File(["hello world"], "note.txt", { type: "text/plain" }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    expect(j.data.fileId.id).toBeString();
+  });
+
+  it("HTMLを画像(image/png)と偽装しても保存されない", async () => {
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File(["<script>alert(1)</script>"], "evil.png", {
+        type: "image/png",
+      }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    // sharp が画像として解釈できず、HTMLの生バイトは保存されず 400 で拒否される
+    expect(res.ok).toBeFalse();
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("File type is invalid");
+  });
+
+  it("octet-stream で送られた .svg は拡張子から image/svg+xml に推論され WebP に再エンコードされる", async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="10" height="10"/></svg>`;
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File([svg], "evil.svg", { type: "application/octet-stream" }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    const fileId = j.data.fileId.id;
+
+    const getRes = await FETCH({
+      path: `/message/file/${fileId}`,
+      method: "GET",
+    });
+    // Bun の multipart パーサーが octet-stream をファイル名拡張子(.svg)から
+    // image/svg+xml に推論するため、画像経路で WebP にラスタライズされる
+    expect(getRes.headers.get("content-type")).toBe("image/webp");
+  });
+
+  it("SVG(image/svg+xml)はWebPに再エンコードされスクリプトが無効化される", async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="10" height="10"/></svg>`;
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File([svg], "evil.svg", { type: "image/svg+xml" }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    const fileId = j.data.fileId.id;
+
+    const getRes = await FETCH({
+      path: `/message/file/${fileId}`,
+      method: "GET",
+    });
+    // SVG として配信されず、WebP にラスタライズされる
+    expect(getRes.headers.get("content-type")).toBe("image/webp");
+  });
+
+  it("HTMLをtext/plainと偽装しても実行可能な型で配信されない", async () => {
+    const payload = "<script>alert(1)</script>";
+    const formData = new FormData();
+    formData.append("channelId", "TESTCHANNEL1");
+    formData.append(
+      "file",
+      new File([payload], "evil.txt", { type: "text/plain" }),
+    );
+
+    const res = await FETCH({
+      path: "/message/file/upload",
+      method: "POST",
+      body: formData,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("File uploaded");
+    const fileId = j.data.fileId.id;
+
+    const getRes = await FETCH({
+      path: `/message/file/${fileId}`,
+      method: "GET",
+    });
+    // HTMLとして解釈されないこと、ダウンロード扱いになることを確認
+    const contentType = getRes.headers.get("content-type");
+    expect(contentType?.startsWith("text/plain")).toBe(true);
+    expect(getRes.headers.get("content-disposition")).toBe("attachment");
+    expect(getRes.headers.get("x-content-type-options")).toBe("nosniff");
+    const body = await getRes.text();
+    expect(body).toBe(payload);
+  });
 });
 
 describe("/message/file/get", async () => {
@@ -397,6 +540,8 @@ describe("/message/file/get", async () => {
     });
     const buf = await res.arrayBuffer();
     expect(res.headers.get("content-type")).toBe("image/webp");
+    expect(res.headers.get("content-disposition")).toBe("attachment");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(buf).toBeObject();
   });
 
