@@ -118,31 +118,34 @@ export const user = new Elysia({ prefix: "/user" })
     },
   )
   .get(
-    "/search",
+    "/list",
     async ({
-      query: { username, joinedChannel, cursor },
+      query: { length, cursorUserId, username, joinedChannel },
       CheckToken: { _userId },
     }) => {
-      const users = await ServiceUser.Search(
+      const users = await ServiceUser.GetUserList(
         _userId,
+        length,
+        cursorUserId,
         username,
         joinedChannel,
-        cursor,
       );
 
       return {
-        message: "User search result",
+        message: "User list",
         data: users,
       };
     },
     {
       query: t.Object({
+        length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
+        cursorUserId: t.Optional(t.String({ minLength: 1 })),
         username: t.Optional(t.String({ minLength: 0 })),
         joinedChannel: t.Optional(t.String()),
-        cursor: t.Optional(t.Number({ default: 0, minimum: 0 })),
       }),
       detail: {
-        description: "ユーザーを検索します",
+        description:
+          "ユーザーの情報を一覧で取得します。username(前方一致)・joinedChannel(参加チャンネル)で絞り込みできます",
         tags: ["User"],
       },
     },
@@ -435,27 +438,6 @@ export const user = new Elysia({ prefix: "/user" })
       }),
       detail: {
         description: "ユーザー情報を取得します",
-        tags: ["User"],
-      },
-    },
-  )
-  .get(
-    "/list",
-    async ({ query: { length, cursorUserId } }) => {
-      const users = await ServiceUser.GetUserList(length, cursorUserId);
-
-      return {
-        message: "User list",
-        data: users,
-      };
-    },
-    {
-      query: t.Object({
-        length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
-        cursorUserId: t.Optional(t.String({ minLength: 1 })),
-      }),
-      detail: {
-        description: "ユーザーの情報を一覧で取得します",
         tags: ["User"],
       },
     },

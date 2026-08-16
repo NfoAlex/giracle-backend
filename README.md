@@ -98,9 +98,8 @@ giracle-backend/
 | GET | `/user/sign-out` | ✅ | - | サインアウト（Cookie 削除） |
 | GET | `/user/verify-token` | ✅ | - | トークン有効性確認 |
 | GET | `/user/get-online` | ✅ | - | オンラインユーザー一覧取得 |
-| GET | `/user/search` | ✅ | - | ユーザー検索 |
 | GET | `/user/info/:id` | ✅ | - | ユーザー情報取得 |
-| GET | `/user/list` | ✅ | - | ユーザー一覧取得（`length`（既定30・最大50）/ `cursorUserId` によるカーソルページネーション対応。SYSTEM ユーザーは除外） |
+| GET | `/user/list` | ✅ | - | ユーザー一覧取得（`length`（既定30・最大50）/ `cursorUserId` によるカーソルページネーション対応。`username`（前方一致）・`joinedChannel`（参加チャンネルでの絞り込み。空文字でいずれかのチャンネル参加者）対応。SYSTEM ユーザーは除外） |
 | GET | `/user/icon/:userId` | ✅ | - | アイコン画像取得 |
 | GET | `/user/banner/:userId` | ✅ | - | バナー画像取得 |
 | POST | `/user/change-icon` | ✅ | - | アイコン変更 |
