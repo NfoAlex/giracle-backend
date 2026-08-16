@@ -389,12 +389,13 @@ describe("/message/file/upload", async () => {
       method: "POST",
       body: formData,
     });
-    // sharp が画像として解釈できず、HTMLの生バイトは保存されずに失敗する
+    // sharp が画像として解釈できず、HTMLの生バイトは保存されず 400 で拒否される
     expect(res.ok).toBeFalse();
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("File type is invalid");
   });
 
-  it("SVGをapplication/octet-streamと偽装してもWebPに再エンコードされ安全", async () => {
+  it("octet-stream で送られた .svg は拡張子から image/svg+xml に推論され WebP に再エンコードされる", async () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="10" height="10"/></svg>`;
     const formData = new FormData();
     formData.append("channelId", "TESTCHANNEL1");
@@ -416,7 +417,8 @@ describe("/message/file/upload", async () => {
       path: `/message/file/${fileId}`,
       method: "GET",
     });
-    // ファイル名拡張子から画像と判定され、SVG/octet-streamのまま配信されない
+    // Bun の multipart パーサーが octet-stream をファイル名拡張子(.svg)から
+    // image/svg+xml に推論するため、画像経路で WebP にラスタライズされる
     expect(getRes.headers.get("content-type")).toBe("image/webp");
   });
 
