@@ -492,39 +492,47 @@ export const message = new Elysia({ prefix: "/message" })
           messageReplyingTo.userId !== _userId
             ? messageReplyingTo.userId
             : null;
+
         if (replyTargetUserId) {
-          await db.insert(inboxes).values({
-            userId: replyTargetUserId,
-            messageId: messageSaved.id,
-            type: "reply",
-          });
-          //WS通知
-          server?.publish(
-            `user::${replyTargetUserId}`,
-            JSON.stringify({
-              signal: "inbox::Added",
-              data: {
-                message: messageSaved,
-                type: "reply",
+          //チャンネル参加していることを確認
+          const channelJoin = await db.select({ userId: channelJoins.userId })
+            .from(channelJoins)
+            .where(eq(channelJoins.userId, replyTargetUserId));
+
+          if (channelJoin.length !== 0) {
+            await db.insert(inboxes).values({
+              userId: replyTargetUserId,
+              messageId: messageSaved.id,
+              type: "reply",
+            });
+            //WS通知
+            server?.publish(
+              `user::${replyTargetUserId}`,
+              JSON.stringify({
+                signal: "inbox::Added",
+                data: {
+                  message: messageSaved,
+                  type: "reply",
+                },
+              }),
+            );
+            //プッシュ通知
+            Util.sendPushNotification({
+              userId: replyTargetUserId,
+              channelId,
+              eventType: "reply",
+              payload: {
+                title: `${senderName} さんからの返信`,
+                body: bodyPreview,
+                tag: `reply-${messageSaved.id}`,
+                data: {
+                  type: "reply",
+                  messageId: messageSaved.id,
+                  channelId,
+                },
               },
-            }),
-          );
-          //プッシュ通知
-          Util.sendPushNotification({
-            userId: replyTargetUserId,
-            channelId,
-            eventType: "reply",
-            payload: {
-              title: `${senderName} さんからの返信`,
-              body: bodyPreview,
-              tag: `reply-${messageSaved.id}`,
-              data: {
-                type: "reply",
-                messageId: messageSaved.id,
-                channelId,
-              },
-            },
-          }).catch((e) => console.error("push reply error", e));
+            }).catch((e) => console.error("push reply error", e));
+          }
         }
 
         //「全通知」モードのユーザー向け: チャンネル参加者へ配信
