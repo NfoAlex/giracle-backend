@@ -176,6 +176,9 @@ export const message = new Elysia({ prefix: "/message" })
 
       //画像のキャッシュ期間を設定
       set.headers["Cache-Control"] = "public, max-age=604800"; // 1週間
+      //格納型XSS対策: インライン実行を防ぐ
+      set.headers["Content-Disposition"] = "attachment";
+      set.headers["X-Content-Type-Options"] = "nosniff";
 
       return file(
         `./STORAGE/file/${fileData.channelId}/${fileData.savedFileName}`,
@@ -495,7 +498,8 @@ export const message = new Elysia({ prefix: "/message" })
 
         if (replyTargetUserId) {
           //チャンネル参加していることを確認
-          const channelJoin = await db.select({ userId: channelJoins.userId })
+          const channelJoin = await db
+            .select({ userId: channelJoins.userId })
             .from(channelJoins)
             .where(eq(channelJoins.userId, replyTargetUserId));
 
