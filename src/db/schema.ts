@@ -162,7 +162,7 @@ export const tokens = sqliteTable(
       .$defaultFn(() => new Date()),
     expiresAt: integer("expiresAt", { mode: "timestamp_ms" })
       .notNull()
-      .default(sql`(unixepoch() * 1000 + 14 * 24 * 60 * 60 * 1000)`)
+      .default(sql`(unixepoch() * 1000 + 14 * 24 * 60 * 60 * 1000)`),
   },
   (table) => [index("Token_userId_idx").on(table.userId)],
 );
