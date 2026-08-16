@@ -9,6 +9,7 @@ import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
+import CheckFileExtensionIsSafe from "./Utils/CheckFileExtensionIsSafe";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;
@@ -21,4 +22,5 @@ export namespace Util {
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
   export const getUsersRoleLevel = GetUsersRoleLevel;
+  export const checkFileExtensionIsSafe = CheckFileExtensionIsSafe;
 }
