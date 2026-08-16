@@ -1,4 +1,7 @@
-const SAFE_FILE_TYPES = new Map<string, string>([
+// アップロードを許可する安全なファイル種別(Content-Type → 保存拡張子)。
+// ブラウザがアクティブコンテンツとして解釈し得る型(text/html / svg / xml / javascript 等)は含めない。
+// 画像以外のXSSは配信時の Content-Disposition: attachment + X-Content-Type-Options: nosniff で防ぐ。
+const SAFE_FILE_EXTENSIONS = new Map<string, string>([
   // ドキュメント
   ["application/pdf", "pdf"],
   ["application/msword", "doc"],
@@ -40,7 +43,9 @@ const SAFE_FILE_TYPES = new Map<string, string>([
   ["video/x-matroska", "mkv"],
 ]);
 
-export default function CheckFileExtensionIsSafe(ext: string) {
-  if (SAFE_FILE_TYPES.get(ext) !== undefined) return true;
-  return false;
+// 許可済みのContent-Typeなら保存用の安全な拡張子を返し、許可外なら undefined を返す
+export default function GetSafeFileExtension(
+  mimeType: string,
+): string | undefined {
+  return SAFE_FILE_EXTENSIONS.get(mimeType);
 }
