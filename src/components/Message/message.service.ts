@@ -670,16 +670,19 @@ export namespace ServiceMessage {
       [];
     const mentionedUserIdsMerged = [...new Set(mentionedUserIds)];
 
-    //実在するユーザーのみに絞り込む(架空Idによるinbox挿入時のFKエラー・ゴミデータ防止)
+    //チャンネル参加者限定
     const existingMentionedUsers =
       mentionedUserIdsMerged.length > 0
-        ? await db.query.users.findMany({
-            where: inArray(users.id, mentionedUserIdsMerged),
-            columns: { id: true },
+        ? await db.query.channelJoins.findMany({
+            where: and(
+              inArray(channelJoins.userId, mentionedUserIdsMerged),
+              eq(channelJoins.channelId, channelId),
+            ),
+            columns: { userId: true },
           })
         : [];
     const existingMentionedUserIds = new Set(
-      existingMentionedUsers.map((u) => u.id),
+      existingMentionedUsers.map((u) => u.userId),
     );
 
     //DBに保存するInbox用データを作成
