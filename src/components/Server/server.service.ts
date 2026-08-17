@@ -18,7 +18,7 @@ export namespace ServiceServer {
     //サーバーの情報取得
     const config = await db.query.serverConfigs.findFirst();
     //最初のユーザーになるかどうか
-    const firstUser = await db.select().from(users).offset(1).limit(1).get();
+    const firstUser = db.select().from(users).offset(1).limit(1).get();
     const isFirstUser = firstUser === undefined;
     //デフォルトで参加するチャンネル
     const defaultJoinChannelFetched =
