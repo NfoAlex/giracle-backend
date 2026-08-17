@@ -116,11 +116,17 @@ export namespace ServiceServer {
 
     if (serverinfo === undefined) throw status(500, "Server config not found");
 
-    if (RegisterAvailable) GIRACLE_SERVER_CONFIG.RegisterAvailable = RegisterAvailable;
-    if (RegisterInviteOnly) GIRACLE_SERVER_CONFIG.RegisterInviteOnly = RegisterInviteOnly;
-    if (RegisterAnnounceChannelId) GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId = RegisterAnnounceChannelId;
-    if (MessageMaxLength) GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
-    if (MessageMaxFileSize) GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
+    if (RegisterAvailable)
+      GIRACLE_SERVER_CONFIG.RegisterAvailable = RegisterAvailable;
+    if (RegisterInviteOnly)
+      GIRACLE_SERVER_CONFIG.RegisterInviteOnly = RegisterInviteOnly;
+    if (RegisterAnnounceChannelId)
+      GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId =
+        RegisterAnnounceChannelId;
+    if (MessageMaxLength)
+      GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
+    if (MessageMaxFileSize)
+      GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
