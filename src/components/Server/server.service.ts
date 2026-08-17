@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { eq } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   channelJoinOnDefaults,
   customEmojis,
@@ -18,7 +18,7 @@ export namespace ServiceServer {
     //サーバーの情報取得
     const config = await db.query.serverConfigs.findFirst();
     //最初のユーザーになるかどうか
-    const firstUser = await db.select().from(users).offset(1).limit(1).get();
+    const firstUser = db.select().from(users).offset(1).limit(1).get();
     const isFirstUser = firstUser === undefined;
     //デフォルトで参加するチャンネル
     const defaultJoinChannelFetched =
@@ -86,6 +86,9 @@ export namespace ServiceServer {
       })
       .returning();
 
+    GIRACLE_SERVER_CONFIG.introduction = introduction;
+    GIRACLE_SERVER_CONFIG.name = name;
+
     //ここでデータ取得失敗したら500エラー
     if (serverinfo === undefined) throw status(500, "Server config not found");
 
@@ -111,8 +114,13 @@ export namespace ServiceServer {
       })
       .returning();
 
-    //ここでデータ取得
     if (serverinfo === undefined) throw status(500, "Server config not found");
+
+    if (RegisterAvailable) GIRACLE_SERVER_CONFIG.RegisterAvailable = RegisterAvailable;
+    if (RegisterInviteOnly) GIRACLE_SERVER_CONFIG.RegisterInviteOnly = RegisterInviteOnly;
+    if (RegisterAnnounceChannelId) GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId = RegisterAnnounceChannelId;
+    if (MessageMaxLength) GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
+    if (MessageMaxFileSize) GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {

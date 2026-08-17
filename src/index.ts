@@ -45,6 +45,10 @@ export const ConstWebPush = {
   getVapidPublicKey: VAPID_PUBLIC_KEY,
 };
 
+import { db } from "./db";
+import { serverConfigs } from "./db/schema";
+export const [GIRACLE_SERVER_CONFIG] = await db.select().from(serverConfigs);
+
 export const app = new Elysia()
   .use(
     cors({
