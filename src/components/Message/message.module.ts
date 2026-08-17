@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import Elysia, { file, t } from "elysia";
-import { db } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import { channelJoins, inboxes, users } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
@@ -421,7 +421,15 @@ export const message = new Elysia({ prefix: "/message" })
       body: { channelId, message, fileIds, replyingMessageId },
       CheckToken: { _userId },
       server,
+      status,
     }) => {
+      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+        throw status(
+          400,
+          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
+        );
+      }
+
       //メッセージの保存処理
       const { messageSaved, messageReplyingTo, mentionedUserIds } =
         await ServiceMessage.Send(
@@ -592,7 +600,15 @@ export const message = new Elysia({ prefix: "/message" })
       body: { messageId, message },
       CheckToken: { _userId },
       server,
+      status,
     }) => {
+      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+        throw status(
+          400,
+          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
+        );
+      }
+
       const messageEditing = await ServiceMessage.Edit(
         messageId,
         message,
