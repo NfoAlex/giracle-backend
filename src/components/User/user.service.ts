@@ -621,6 +621,9 @@ export namespace ServiceUser {
       .where(eq(users.id, userId))
       .returning();
 
+    //BAN状態のキャッシュを無効化する
+    invalidateUserCache(userId);
+
     return userUnbanned;
   };
 }

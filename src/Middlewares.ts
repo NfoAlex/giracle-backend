@@ -55,7 +55,7 @@ export function invalidateTokenCache(token: string) {
 }
 
 /**
- * 指定ユーザーIdに紐づく全トークンキャッシュを無効化する（BAN時に使用）
+ * 指定ユーザーIdに紐づく全トークンキャッシュを無効化する
  * @param userId 無効化するユーザーId
  */
 export function invalidateUserCache(userId: string) {
