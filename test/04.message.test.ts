@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
-import { db } from "../src";
+import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { channelJoins, inboxes, messageFileAttached } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -803,6 +803,24 @@ describe("/message/send", async () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("制限を超える長さのメッセージ", async () => {
+    //一時的
+    const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;
+    GIRACLE_SERVER_CONFIG.MessageMaxLength = 10;
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "Hello, world! Is this too long?",
+      },
+    });
+    expect(res.ok).toBeFalse();
+
+    //戻す
+    GIRACLE_SERVER_CONFIG.MessageMaxLength = backup;
+  });
+
   it("空白のみ送信", async () => {
     const res = await FETCH({
       path: "/message/send",
@@ -1520,5 +1538,23 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
+  });
+
+  it("制限を超える長さのメッセージ", async () => {
+    //一時的
+    const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;
+    GIRACLE_SERVER_CONFIG.MessageMaxLength = 10;
+    const res = await FETCH({
+      path: "/message/edit",
+      method: "POST",
+      body: {
+        channelId: "TEST__MESSAGE_ID",
+        message: "Hello, world! Is this too long?",
+      },
+    });
+    expect(res.ok).toBeFalse();
+
+    //戻す
+    GIRACLE_SERVER_CONFIG.MessageMaxLength = backup;
   });
 });
