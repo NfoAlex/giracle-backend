@@ -728,6 +728,17 @@ describe("/user/ban & /user/unban", () => {
     expect(signInRes.ok).toBe(true);
   });
 
+  it("正常 :: UNBAN直後に旧トークンが即時復活することを確認（BANキャッシュ無効化）", async () => {
+    //BAN中に verify-token を行ったことで BAN_TARGET_TOKEN には isBanned: true のキャッシュが乗っている
+    //UNBAN時のキャッシュ無効化が無いと最大5分間「User is banned」で弾かれてしまう
+    const postUnbanRes = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: BAN_TARGET_TOKEN,
+    });
+    expect(postUnbanRes.ok).toBe(true);
+  });
+
   it("自分自身をUNBANしようとする", async () => {
     const res = await FETCH({
       path: "/user/unban",
