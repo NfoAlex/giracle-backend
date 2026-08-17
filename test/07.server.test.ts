@@ -1,7 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
-import { channelJoinOnDefaults, roleInfos, roleLinks, serverConfigs } from "../src/db/schema";
+import {
+  channelJoinOnDefaults,
+  roleInfos,
+  roleLinks,
+  serverConfigs,
+} from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // TESTUSERに管理者権限をつける
@@ -45,7 +50,7 @@ describe("POST /server/change-info", () => {
         name: "test-name",
         introduction: "test-intro",
       },
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
   });
@@ -79,12 +84,16 @@ describe("POST /server/change-config", () => {
     expect(j.data.MessageMaxFileSize).toBe(2048);
     GIRACLE_SERVER_CONFIG.MessageMaxFileSize = 2048;
 
-    const sc = db.select().from(serverConfigs).limit(1).get()
+    const sc = db.select().from(serverConfigs).limit(1).get();
     expect(sc).toBeDefined();
     expect(sc?.MessageMaxFileSize).toBe(2048);
-    const defaultJoinChannelFromDb = await db.select().from(channelJoinOnDefaults);
+    const defaultJoinChannelFromDb = await db
+      .select()
+      .from(channelJoinOnDefaults);
     expect(defaultJoinChannelFromDb.length).toBe(2);
-    expect(defaultJoinChannelFromDb.some(c => c.channelId === "TESTCHANNEL1")).toBeTrue();
+    expect(
+      defaultJoinChannelFromDb.some((c) => c.channelId === "TESTCHANNEL1"),
+    ).toBeTrue();
   });
 
   it("権限無", async () => {
@@ -99,7 +108,7 @@ describe("POST /server/change-config", () => {
         MessageMaxFileSize: 2048,
         DefaultJoinChannel: ["TESTCHANNEL1", "TESTCHANNEL2"],
       },
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
   });
