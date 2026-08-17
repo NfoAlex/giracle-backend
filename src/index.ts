@@ -60,11 +60,13 @@ export const app = new Elysia()
   )
   .onError(({ error, code }) => {
     if (code === "NOT_FOUND") return status(404, "Not Found :(");
-    process.env.NODE_ENV !== "test" &&
+    if (process.env.NODE_ENV !== "test") {
       console.error("index :: エラー->", error);
-    if (typeof code === "number")
+    }
+    if (typeof code === "number") {
       return status(code, error.response || "somethin went wrong :(");
-    return status(500, `somethin went wrong :( ${error.message})`);
+    }
+    return status(500, "somethin went wrong :(");
   })
   .use(wsHandler)
   .use(user)
