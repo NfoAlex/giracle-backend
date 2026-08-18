@@ -561,15 +561,20 @@ export namespace ServiceUser {
     return;
   };
 
-  export const GetUserInfo = async (userId: string) => {
+  export const GetUserInfo = async (
+    userId: string,
+    includeChannelJoin: boolean = false,
+  ) => {
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
       with: {
-        ChannelJoin: {
-          columns: {
-            channelId: true,
-          },
-        },
+        ChannelJoin: includeChannelJoin
+          ? {
+              columns: {
+                channelId: true,
+              },
+            }
+          : undefined,
         RoleLink: {
           columns: {
             roleId: true,
