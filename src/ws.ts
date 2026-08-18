@@ -16,9 +16,6 @@ export const wsHandler = new Elysia().ws("/ws", {
     signal: t.String({ minLength: 1 }),
     data: t.String({ minLength: 1 }),
   }),
-  query: t.Object({
-    token: t.Optional(t.String({ minLength: 1 })),
-  }),
 
   message(ws, { signal }) {
     //pingを受け取ったらpongを返す
@@ -33,7 +30,7 @@ export const wsHandler = new Elysia().ws("/ws", {
 
   async open(ws) {
     //トークンを取得して有効か調べる
-    const tokenFromCookie = ws.data.cookie?.token?.value || ws.data.query.token;
+    const tokenFromCookie = ws.data.cookie?.token?.value;
     if (!tokenFromCookie) {
       ws.send({
         signal: "ERROR",
