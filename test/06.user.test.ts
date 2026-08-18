@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { and, eq } from "drizzle-orm";
 import { app, db } from "../src";
-import { roleInfos, roleLinks } from "../src/db/schema";
+import { channelJoins, roleInfos, roleLinks } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // sharpのresizeを通せる最小PNG(1x1px)
@@ -672,12 +673,37 @@ describe("/user/info/:id", () => {
     expect(j.data.ChannelJoin).toBeDefined();
   });
 
-  it("正常 :: 他人", async () => {
-    const res = await FETCH({ path: "/user/info/TESTUSER2", method: "GET" });
+  it("正常 :: 他人から見てTESTCHANNEL3は見れないはず", async () => {
+    //TESTUSERに一時的に参加させる
+    await db
+      .insert(channelJoins)
+      .values({ channelId: "TESTCHANNEL3", userId: "TESTUSER" });
+
+    const res = await FETCH({
+      path: "/user/info/TESTUSER",
+      method: "GET",
+      useSecondaryUser: true,
+    });
     const j = await res.json();
+    console.log("06.user.test :: /user/info/:id : ", {
+      jc: j.data.ChannelJoin,
+    });
     expect(res.ok).toBe(true);
-    expect(j.data.id).toBe("TESTUSER2");
-    expect(j.data.ChannelJoin).toBeUndefined();
+    expect(j.data.id).toBe("TESTUSER");
+    expect(
+      //@ts-expect-error: c: { channelId: string }
+      j.data.ChannelJoin.some((c) => c.channelId === "TESTCHANNEL3"),
+    ).toBeFalse();
+
+    //脱退させる
+    await db
+      .delete(channelJoins)
+      .where(
+        and(
+          eq(channelJoins.channelId, "TESTCHANNEL3"),
+          eq(channelJoins.userId, "TESTUSER"),
+        ),
+      );
   });
 
   it("存在しないユーザー", async () => {
