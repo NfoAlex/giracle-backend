@@ -237,8 +237,14 @@ export const user = new Elysia({ prefix: "/user" })
     async ({
       body: { currentPassword, newPassword },
       CheckToken: { _userId },
+      cookie: { token },
     }) => {
-      await ServiceUser.ChangePassword(currentPassword, newPassword, _userId);
+      await ServiceUser.ChangePassword(
+        currentPassword,
+        newPassword,
+        _userId,
+        token.value,
+      );
 
       return {
         message: "Password changed",

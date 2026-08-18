@@ -584,6 +584,60 @@ describe("/user/change-password", () => {
     );
     expect(signInRes.ok).toBe(true);
   });
+
+  it("パスワード変更で他セッションが無効化される", async () => {
+    // 別セッションを用意（現在のパスワードで再サインイン）
+    const secondSignInRes = await app.handle(
+      new Request("http://localhost/user/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: "usertestsub",
+          password: "usertestsubnew",
+        }),
+      }),
+    );
+    const secondToken =
+      secondSignInRes.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1] ??
+      "";
+    expect(secondToken).not.toBe("");
+
+    // 別セッションが有効であることを事前確認
+    const preVerify = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: secondToken,
+    });
+    expect(preVerify.ok).toBe(true);
+
+    // パスワード変更（SUB_TOKEN=現在のセッション）
+    const res = await subFetch({
+      path: "/user/change-password",
+      method: "POST",
+      body: {
+        currentPassword: "usertestsubnew",
+        newPassword: "usertestsubnew2",
+      },
+    });
+    expect(res.ok).toBe(true);
+
+    // 他セッション（secondToken）が無効化されていることを確認
+    const postVerify = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: secondToken,
+    });
+    expect(postVerify.ok).toBe(false);
+    expect(postVerify.status).toBe(401);
+
+    // 現在のセッション（SUB_TOKEN）は引き続き有効
+    const currentVerify = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: SUB_TOKEN,
+    });
+    expect(currentVerify.ok).toBe(true);
+  });
 });
 
 describe("/user/profile-update", () => {
