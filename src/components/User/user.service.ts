@@ -402,6 +402,7 @@ export namespace ServiceUser {
     currentPassword: string,
     newPassword: string,
     _userId: string,
+    currentToken: string,
   ) => {
     //ユーザー情報取得
     const userdata = await db.query.users.findFirst({
@@ -434,6 +435,19 @@ export namespace ServiceUser {
         password: await Bun.password.hash(newPassword + userdata.password.salt),
       })
       .where(eq(passwords.userId, userdata.id));
+
+    //パスワード変更時に他のセッションを無効化する(現在のセッションは維持)
+    await db
+      .delete(tokens)
+      .where(
+        and(
+          eq(tokens.userId, userdata.id),
+          not(eq(tokens.token, currentToken)),
+        ),
+      );
+
+    //トークンキャッシュを全件無効化(現在のセッション含めDB再検証させる)
+    invalidateUserCache(userdata.id);
 
     return;
   };
