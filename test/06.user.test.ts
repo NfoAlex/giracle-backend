@@ -664,11 +664,20 @@ describe("/user/profile-update", () => {
 });
 
 describe("/user/info/:id", () => {
-  it("正常", async () => {
+  it("正常 :: 自分", async () => {
     const res = await FETCH({ path: "/user/info/TESTUSER", method: "GET" });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.id).toBe("TESTUSER");
+    expect(j.data.ChannelJoin).toBeDefined();
+  });
+
+  it("正常 :: 他人", async () => {
+    const res = await FETCH({ path: "/user/info/TESTUSER2", method: "GET" });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("TESTUSER2");
+    expect(j.data.ChannelJoin).toBeUndefined();
   });
 
   it("存在しないユーザー", async () => {
