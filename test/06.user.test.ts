@@ -685,9 +685,6 @@ describe("/user/info/:id", () => {
       useSecondaryUser: true,
     });
     const j = await res.json();
-    console.log("06.user.test :: /user/info/:id : ", {
-      jc: j.data.ChannelJoin,
-    });
     expect(res.ok).toBe(true);
     expect(j.data.id).toBe("TESTUSER");
     expect(
