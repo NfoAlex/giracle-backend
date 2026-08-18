@@ -561,20 +561,22 @@ export namespace ServiceUser {
     return;
   };
 
-  export const GetUserInfo = async (
-    userId: string,
-    includeChannelJoin: boolean = false,
-  ) => {
+  export const GetUserInfo = async (sendersUserId: string, userId: string) => {
+    //リクエスト送信者の閲覧可能チャンネルから対象ユーザーの参加チャンネルをフィルターする
+    const viewableChannels = await Util.getUserViewableChannel(sendersUserId);
+
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
       with: {
-        ChannelJoin: includeChannelJoin
-          ? {
-              columns: {
-                channelId: true,
-              },
-            }
-          : undefined,
+        ChannelJoin: {
+          columns: {
+            channelId: true,
+          },
+          where: inArray(
+            channelJoins.channelId,
+            viewableChannels.map((vc) => vc.id),
+          ),
+        },
         RoleLink: {
           columns: {
             roleId: true,
