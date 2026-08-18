@@ -430,8 +430,8 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .get(
     "/info/:id",
-    async ({ params: { id } }) => {
-      const user = await ServiceUser.GetUserInfo(id);
+    async ({ params: { id }, CheckToken: { _userId } }) => {
+      const user = await ServiceUser.GetUserInfo(_userId, id);
 
       return {
         message: "User info",
