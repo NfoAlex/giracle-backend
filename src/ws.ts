@@ -121,7 +121,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     //console.log("ws :: WS切断");
 
     //トークンを取得して有効か調べる
-    const token = ws.data.cookie?.token?.value || ws.data.query?.token;
+    const token = ws.data.cookie?.token?.value;
     if (!token) {
       return;
     }
