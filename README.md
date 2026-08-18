@@ -7,7 +7,7 @@ Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun
 ## 技術スタック
 
 | 項目 | 内容 |
-|------|------|
+| ------ | ------ |
 | ランタイム | Bun |
 | フレームワーク | Elysia v1.4 |
 | ORM | Drizzle ORM |
@@ -16,19 +16,23 @@ Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun
 
 ---
 
-
 ## 必要パッケージのインストール
+
 Bunが必須です。Bunが入っているならこのリポジトリのディレクトリで次のコマンドを実行。
+
 ```bash
 bun i
 ```
 
 ## Development 開発用実行
+
 初回の実行ならDBのマイグレーション適用と初期データの挿入を行う。
+
 ```bash
 bunx drizzle-kit migrate #DB構造の適用
 bun ./src/db/seeds.ts #初期データの挿入
 ```
+
 開発用に実行するなら
 
 ## 起動方法
@@ -92,10 +96,10 @@ giracle-backend/
 認証不要のルートと認証済みルートが混在する。
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | PUT | `/user/sign-up` | ❌ | - | ユーザー登録 |
 | POST | `/user/sign-in` | ❌ | - | サインイン（Cookie にトークンをセット） |
-| GET | `/user/sign-out` | ✅ | - | サインアウト（Cookie 削除） |
+| POST | `/user/sign-out` | ✅ | - | サインアウト（Cookie 削除） |
 | GET | `/user/verify-token` | ✅ | - | トークン有効性確認 |
 | GET | `/user/get-online` | ✅ | - | オンラインユーザー一覧取得 |
 | GET | `/user/info/:id` | ✅ | - | ユーザー情報取得 |
@@ -117,7 +121,7 @@ giracle-backend/
 ### Channel モジュール (`/channel`)
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | POST | `/channel/join` | ✅ | - | チャンネル参加（WS通知: `channel::Join`） |
 | POST | `/channel/leave` | ✅ | - | チャンネル退出（WS通知: `channel::Left`） |
 | GET | `/channel/get-info/:channelId` | ✅ | - | チャンネル情報取得 |
@@ -135,7 +139,7 @@ giracle-backend/
 ### Message モジュール (`/message`)
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | GET | `/message/:messageId` | ✅ | - | メッセージ単体取得 |
 | GET | `/message/get-new` | ✅ | - | 新着メッセージ確認 |
 | GET | `/message/read-time/get` | ✅ | - | 既読時刻取得 |
@@ -158,7 +162,7 @@ giracle-backend/
 ### Role モジュール (`/role`)
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | GET | `/role/search` | ✅ | - | ロール検索 |
 | GET | `/role/list` | ✅ | - | ロール一覧取得 |
 | GET | `/role/:roleId` | ✅ | - | ロール情報取得 |
@@ -173,7 +177,7 @@ giracle-backend/
 ### Server モジュール (`/server`)
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | GET | `/server/config` | ❌ | - | サーバー設定取得 |
 | GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
 | GET | `/server/custom-emoji` | ✅ | - | カスタム絵文字一覧取得 |
@@ -193,7 +197,7 @@ giracle-backend/
 ### Notification モジュール (`/notification`)
 
 | メソッド | パス | 認証 | 権限 | 概要 |
-|----------|------|------|------|------|
+| ---------- | ------ | ------ | ------ | ------ |
 | GET | `/notification/vapid-public-key` | ❌ | - | Web Push 用 VAPID 公開鍵取得（未設定時は 503） |
 | GET | `/notification/config` | ✅ | - | 自分の通知設定取得 |
 | POST | `/notification/config` | ✅ | - | 自分の通知設定更新（enabled / mode） |
@@ -212,7 +216,7 @@ giracle-backend/
 ### 接続時の購読チャンネル
 
 | WS チャンネル | 対象 |
-|---------------|------|
+| --------------- | ------ |
 | `GLOBAL` | 全ユーザー共通イベント |
 | `user::{userId}` | 該当ユーザー向けイベント |
 | `channel::{channelId}` | 参加済みチャンネルのイベント |
@@ -226,7 +230,7 @@ giracle-backend/
 ### サーバー → クライアント シグナル一覧
 
 | signal | 説明 |
-|--------|------|
+| -------- | ------ |
 | `user::Connected` | ユーザー接続 |
 | `user::Disconnected` | ユーザー切断 |
 | `user::ProfileUpdate` | プロフィール更新 / BAN 状態変化 |
@@ -258,7 +262,7 @@ giracle-backend/
 `src/Middlewares.ts` に Elysia プラグインとして定義。
 
 | 名前 | 概要 |
-|------|------|
+| ------ | ------ |
 | `CheckToken` | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減 |
 | `CheckRoleTerm` | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認 |
 | `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
@@ -267,7 +271,7 @@ giracle-backend/
 ### 権限（`checkRoleTerm`）の種類
 
 | 権限名 | 対象操作 |
-|--------|----------|
+| -------- | ---------- |
 | `manageServer` | サーバー設定・招待コード・ストレージ管理 |
 | `manageChannel` | チャンネル作成・更新・削除・招待・キック |
 | `manageRole` | ロール作成・更新・削除・付与・剥奪 |
@@ -283,7 +287,7 @@ giracle-backend/
 各ファイルは `src/Util.ts` の `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.xxx(...)`）。個々のファイルへの直接 import は行わない。
 
 | ファイル | `Util.` プロパティ名 | 概要 |
-|----------|----------------------|------|
+| ---------- | ---------------------- | ------ |
 | `SendSystemMessage.ts` | `sendSystemMessage` | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
 | `SendPushNotification.ts` | `sendPushNotification` | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除） |
 | `CalculateReactionTotal.ts` | `calculateReactionTotal` | リアクション集計 |
@@ -300,7 +304,7 @@ giracle-backend/
 ## 環境変数
 
 | 変数名 | デフォルト | 概要 |
-|--------|-----------|------|
+| -------- | ----------- | ------ |
 | `DATABASE_URL` | `file:./dev.db` | ローカル SQLite ファイルパス(`file:` プレフィックス付き。`bun:sqlite` 採用のためリモート libsql 接続は不可) |
 | `CORS_ORIGIN` | - | CORS 許可オリジン |
 | `RATE_LIMIT_ENABLED` | - | `"true"` でレート制限有効化 |
@@ -317,9 +321,11 @@ giracle-backend/
 現状は Web のみ対応。Android(Flutter) / iOS(Swift) は将来対応予定。
 
 1. VAPID キーを生成
+
    ```bash
    bunx web-push generate-vapid-keys
    ```
+
 2. 出力を `.env` の `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` に設定
 
 `VAPID_*` 未設定でもサーバーは起動するが、Web プッシュは無効化 (`/notification/vapid-public-key` が 503)。

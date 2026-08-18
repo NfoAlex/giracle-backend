@@ -199,7 +199,7 @@ describe("/user", () => {
   it("/sign-out :: 正常(ログアウトしてセッションが消えていることを確認する)", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/sign-out", {
-        method: "GET",
+        method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
