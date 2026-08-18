@@ -1,4 +1,4 @@
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../..";
 import { roleInfos, roleLinks, users } from "../../db/schema";
@@ -9,7 +9,10 @@ export namespace ServiceRole {
     const roles = await db
       .select()
       .from(roleInfos)
-      .where(like(roleInfos.name, `%${name}%`));
+      .where(
+        //ワイルドカード(%,_)を無効化してLIKE検索(監査#16)
+        sql`${roleInfos.name} LIKE ${`%${Util.escapeLikePattern(name)}%`} ESCAPE '\\'`,
+      );
 
     return roles;
   };
