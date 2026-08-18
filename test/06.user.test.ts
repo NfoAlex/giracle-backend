@@ -679,27 +679,31 @@ describe("/user/info/:id", () => {
       .insert(channelJoins)
       .values({ channelId: "TESTCHANNEL3", userId: "TESTUSER" });
 
-    const res = await FETCH({
-      path: "/user/info/TESTUSER",
-      method: "GET",
-      useSecondaryUser: true,
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.id).toBe("TESTUSER");
-    expect(
-      j.data.ChannelJoin.some((c) => c.channelId === "TESTCHANNEL3"),
-    ).toBeFalse();
-
-    //脱退させる
-    await db
-      .delete(channelJoins)
-      .where(
-        and(
-          eq(channelJoins.channelId, "TESTCHANNEL3"),
-          eq(channelJoins.userId, "TESTUSER"),
+    try {
+      const res = await FETCH({
+        path: "/user/info/TESTUSER",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.id).toBe("TESTUSER");
+      expect(
+        j.data.ChannelJoin.some(
+          (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
         ),
-      );
+      ).toBeFalse();
+    } finally {
+      //脱退させる
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.channelId, "TESTCHANNEL3"),
+            eq(channelJoins.userId, "TESTUSER"),
+          ),
+        );
+    }
   });
 
   it("存在しないユーザー", async () => {
