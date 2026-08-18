@@ -470,7 +470,7 @@ export namespace ServiceMessage {
 
     //自分のリアクションデータを取得して条件確認する
     const targetMessage = await db.query.messages.findFirst({
-      where: eq(messages.id, messageId),
+      where: and(eq(messages.id, messageId), eq(messages.channelId, channelId)),
       with: {
         MessageReaction: {
           columns: {
