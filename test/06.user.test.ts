@@ -688,7 +688,6 @@ describe("/user/info/:id", () => {
     expect(res.ok).toBe(true);
     expect(j.data.id).toBe("TESTUSER");
     expect(
-      //@ts-expect-error: c: { channelId: string }
       j.data.ChannelJoin.some((c) => c.channelId === "TESTCHANNEL3"),
     ).toBeFalse();
 
