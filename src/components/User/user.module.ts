@@ -369,7 +369,7 @@ export const user = new Elysia({ prefix: "/user" })
       }),
     },
   )
-  .get(
+  .post(
     "/sign-out",
     async ({ cookie: { token } }) => {
       //トークン確認
