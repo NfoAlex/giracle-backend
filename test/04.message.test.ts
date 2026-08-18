@@ -681,6 +681,23 @@ describe("/message/emoji-reaction", async () => {
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
   });
+
+  it("指定チャンネルとメッセージの所属チャンネルが不一致", async () => {
+    // TESTCHANNEL1 は閲覧可能だが TESTMESSAGE3 は TESTCHANNEL3 のメッセージ
+    const res = await FETCH({
+      path: "/message/emoji-reaction",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        messageId: "TESTMESSAGE3",
+        emojiCode: "robot",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("Message not found");
+    expect(res.status).toBe(404);
+    expect(res.ok).toBeFalse();
+  });
 });
 
 describe("/message/who-reacted", async () => {
