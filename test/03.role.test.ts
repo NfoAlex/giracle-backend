@@ -29,6 +29,28 @@ describe("/role/search", async () => {
     expect(j.data.length).toBe(0);
   });
 
+  it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
+    //エスケープ無しだと%%%が全ロールにマッチしてしまう
+    const res = await FETCH({
+      path: "/role/search?name=%25",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
+  it("ワイルドカード文字(_)がリテラル扱いされる", async () => {
+    //エスケープ無しだと"Channel_Manage"が"Channel Manage Role"(下線=任意1文字)にマッチしてしまう
+    const res = await FETCH({
+      path: "/role/search?name=Channel_Manage",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
   it("nameが空欄", async () => {
     const res = await FETCH({
       path: "/role/search?name=",
