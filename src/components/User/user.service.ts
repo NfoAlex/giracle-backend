@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, asc, eq, gt, inArray, not, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, lt, not, or, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   channelJoins,
   invitations,
@@ -31,38 +31,24 @@ export namespace ServiceUser {
     }
 
     //最初のユーザーなら招待条件を確認しない
-    if (!flagFirstUser) {
-      //サーバーの設定を取得して招待関連の条件を確認
-      const serverConfig = await db.query.serverConfigs.findFirst();
-      if (!serverConfig?.RegisterAvailable) {
+    if (!flagFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly) {
+      if (inviteCode === undefined) {
         throw status(400, {
-          message: "Registration is disabled",
+          message: "Invite code is invalid",
         });
       }
-      if (serverConfig?.RegisterInviteOnly) {
-        if (inviteCode === undefined) {
-          throw status(400, {
-            message: "Invite code is invalid",
-          });
-        }
-        //招待コードが有効か確認
-        const Invite = await db.query.invitations.findFirst({
-          where: eq(invitations.inviteCode, inviteCode),
+
+      //招待コードが存在するか確認(上限判定はユーザー作成と同一トランザクション内で行う)
+      const Invite = await db.query.invitations.findFirst({
+        where: eq(invitations.inviteCode, inviteCode),
+        columns: { id: true },
+      });
+
+      //招待コードが無効な場合
+      if (Invite === undefined) {
+        throw status(400, {
+          message: "Invite code is invalid",
         });
-        //招待コードが無効な場合
-        if (Invite === undefined) {
-          throw status(400, {
-            message: "Invite code is invalid",
-          });
-        }
-        //---------------------------------------
-        //使用回数を加算(競合対策のためDB側で加算するsqlを使用)
-        await db
-          .update(invitations)
-          .set({
-            usedCount: sql`${invitations.usedCount} + 1`,
-          })
-          .where(eq(invitations.inviteCode, inviteCode));
       }
     }
 
@@ -78,8 +64,37 @@ export namespace ServiceUser {
     //ソルト生成、パスワードのハッシュ化
     const salt = crypto.randomBytes(16).toString("hex");
     const passwordHashed = await Bun.password.hash(password + salt);
-    //DBへユーザー情報を登録(ユーザー・パスワード・ロール付与を1トランザクションで)
-    const createdUser = db.transaction((tx) => {
+    //DBへユーザー情報を登録(ユーザー・パスワード・ロール付与)
+    const result = db.transaction((tx) => {
+      //招待コードの使用回数を条件付きで原子的に加算(-1は無限)。上限到達なら1件も更新されない
+      if (
+        !flagFirstUser &&
+        GIRACLE_SERVER_CONFIG.RegisterInviteOnly &&
+        inviteCode
+      ) {
+        const inviteUpdated = tx
+          .update(invitations)
+          .set({
+            usedCount: sql`${invitations.usedCount} + 1`,
+          })
+          .where(
+            and(
+              eq(invitations.inviteCode, inviteCode),
+              or(
+                eq(invitations.maxUsage, -1),
+                lt(invitations.usedCount, invitations.maxUsage),
+              ),
+            ),
+          )
+          .returning()
+          .get();
+
+        //上限到達のためユーザーは作成しない(トランザクションごとロールバック)
+        if (inviteUpdated === undefined) {
+          return { success: false as const };
+        }
+      }
+
       const newUser = tx
         .insert(users)
         .values({
@@ -104,8 +119,16 @@ export namespace ServiceUser {
         })
         .run();
 
-      return newUser;
+      return { success: true as const, newUser };
     });
+
+    //上限到達でユーザーが作成されなかった場合
+    if (!result.success) {
+      throw status(400, {
+        message: "Invite code reached maximum limit",
+      });
+    }
+    const createdUser = result.newUser;
 
     //デフォルトで参加するチャンネルに参加させる
     const channelJoinOnDefault =

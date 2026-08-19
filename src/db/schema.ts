@@ -440,6 +440,7 @@ export const invitations = sqliteTable("Invitation", {
     .notNull()
     .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
   usedCount: integer("usedCount").notNull().default(0),
+  maxUsage: integer("maxUsage").notNull().default(5),
 });
 
 export const blockedIPAddresses = sqliteTable("BlockedIPAddress", {

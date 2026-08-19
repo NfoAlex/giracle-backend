@@ -59,8 +59,12 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .put(
     "/create-invite",
-    async ({ body: { inviteCode }, CheckToken: { _userId } }) => {
-      const newInvite = await ServiceServer.CreateInvite(inviteCode, _userId);
+    async ({ body: { inviteCode, maxUsage }, CheckToken: { _userId } }) => {
+      const newInvite = await ServiceServer.CreateInvite(
+        inviteCode,
+        maxUsage,
+        _userId,
+      );
 
       return {
         message: "Server invite created",
@@ -70,6 +74,9 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         inviteCode: t.String({ minLength: 1 }),
+        maxUsage: t.Optional(
+          t.Number({ minimum: -1, default: 5, maximum: 9999 }),
+        ),
       }),
       detail: {
         description: "サーバーの招待コードを作成します",

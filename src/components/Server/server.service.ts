@@ -59,12 +59,17 @@ export namespace ServiceServer {
     return invites;
   };
 
-  export const CreateInvite = async (inviteCode: string, _userId: string) => {
+  export const CreateInvite = async (
+    inviteCode: string,
+    maxUsage: number = 5,
+    _userId: string,
+  ) => {
     const [newInvite] = await db
       .insert(invitations)
       .values({
         inviteCode,
         createdUserId: _userId,
+        maxUsage,
       })
       .returning();
 

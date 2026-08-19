@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { eq } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
 import {
   channelJoinOnDefaults,
+  invitations,
   roleInfos,
   roleLinks,
   serverConfigs,
@@ -21,6 +23,89 @@ beforeAll(async () => {
   await db.insert(roleLinks).values({
     roleId: "GOD",
     userId: "TESTUSER",
+  });
+});
+
+describe("PUT /server/create-invite", () => {
+  it("正常 :: maxUsage指定", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-max2", maxUsage: 2 },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.maxUsage).toBe(2);
+    expect(j.data.usedCount).toBe(0);
+
+    const invite = await db.query.invitations.findFirst({
+      where: eq(invitations.inviteCode, "testinvite-max2"),
+    });
+    expect(invite?.maxUsage).toBe(2);
+  });
+
+  it("正常 :: maxUsage省略時はデフォルト5", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-default" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.maxUsage).toBe(5);
+
+    const invite = await db.query.invitations.findFirst({
+      where: eq(invitations.inviteCode, "testinvite-default"),
+    });
+    expect(invite?.maxUsage).toBe(5);
+  });
+
+  it("正常 :: maxUsage=-1(無限)", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-unlimited", maxUsage: -1 },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.maxUsage).toBe(-1);
+
+    const invite = await db.query.invitations.findFirst({
+      where: eq(invitations.inviteCode, "testinvite-unlimited"),
+    });
+    expect(invite?.maxUsage).toBe(-1);
+  });
+
+  it("バリデーション :: maxUsageが下限未満(-2)", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-invalid", maxUsage: -2 },
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(t).toContain("somethin went wrong :(");
+  });
+
+  it("バリデーション :: maxUsageが上限超過(10000)", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-invalid2", maxUsage: 10000 },
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(t).toContain("somethin went wrong :(");
+  });
+
+  it("権限無", async () => {
+    const res = await FETCH({
+      path: "/server/create-invite",
+      method: "PUT",
+      body: { inviteCode: "testinvite-noperm", maxUsage: 1 },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
   });
 });
 

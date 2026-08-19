@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-
-import { app } from "../src";
+import { eq } from "drizzle-orm";
+import { app, db } from "../src";
+import { invitations } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -47,6 +48,149 @@ describe("/user", () => {
     });
 
     expect(res.ok).toBe(true);
+  });
+
+  describe("/sign-up :: 招待コード上限", () => {
+    it("usedCountがmaxUsageに達していると登録できない", async () => {
+      await db.insert(invitations).values({
+        inviteCode: "invitefull",
+        createdUserId: "SYSTEM",
+        usedCount: 2,
+        maxUsage: 2,
+      });
+
+      const res = await FETCH({
+        path: "/user/sign-up",
+        method: "PUT",
+        body: {
+          username: "invitefulluser",
+          password: "testpass",
+          inviteCode: "invitefull",
+        },
+        excludeCredential: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(400);
+      expect(j.message).toBe("Invite code reached maximum limit");
+
+      // 上限到達時は加算されないことを確認(原子的な条件付きUPDATEの検証)
+      const invite = await db.query.invitations.findFirst({
+        where: eq(invitations.inviteCode, "invitefull"),
+      });
+      expect(invite?.usedCount).toBe(2);
+    });
+
+    it("最後の1回を消費した後は登録できない", async () => {
+      await db.insert(invitations).values({
+        inviteCode: "invitelast",
+        createdUserId: "SYSTEM",
+        usedCount: 0,
+        maxUsage: 1,
+      });
+
+      // 1回目(最後の1回): 成功
+      const res1 = await FETCH({
+        path: "/user/sign-up",
+        method: "PUT",
+        body: {
+          username: "invitelastuser",
+          password: "testpass",
+          inviteCode: "invitelast",
+        },
+        excludeCredential: true,
+      });
+      expect(res1.ok).toBe(true);
+
+      // 2回目: 上限到達で失敗
+      const res2 = await FETCH({
+        path: "/user/sign-up",
+        method: "PUT",
+        body: {
+          username: "invitelastuser2",
+          password: "testpass",
+          inviteCode: "invitelast",
+        },
+        excludeCredential: true,
+      });
+      const j2 = await res2.json();
+      expect(res2.ok).toBe(false);
+      expect(res2.status).toBe(400);
+      expect(j2.message).toBe("Invite code reached maximum limit");
+    });
+
+    it("maxUsage=-1は上限なしで複数回登録できる", async () => {
+      await db.insert(invitations).values({
+        inviteCode: "inviteunlimited",
+        createdUserId: "SYSTEM",
+        usedCount: 0,
+        maxUsage: -1,
+      });
+
+      for (let i = 1; i <= 3; i++) {
+        const res = await FETCH({
+          path: "/user/sign-up",
+          method: "PUT",
+          body: {
+            username: `inviteunlimiteduser${i}`,
+            password: "testpass",
+            inviteCode: "inviteunlimited",
+          },
+          excludeCredential: true,
+        });
+        expect(res.ok).toBe(true);
+      }
+
+      // -1の場合も上限チェックを迂回せず、使用回数は正常に加算される
+      const invite = await db.query.invitations.findFirst({
+        where: eq(invitations.inviteCode, "inviteunlimited"),
+      });
+      expect(invite?.usedCount).toBe(3);
+    });
+
+    it("ユーザー名重複で失敗した場合は使用回数を消費しない", async () => {
+      await db.insert(invitations).values({
+        inviteCode: "invitedup",
+        createdUserId: "SYSTEM",
+        usedCount: 0,
+        maxUsage: 5,
+      });
+
+      // 1回目は成功
+      const res1 = await FETCH({
+        path: "/user/sign-up",
+        method: "PUT",
+        body: {
+          username: "invitedupuser",
+          password: "testpass",
+          inviteCode: "invitedup",
+        },
+        excludeCredential: true,
+      });
+      expect(res1.ok).toBe(true);
+
+      // 同じユーザー名で再登録 → 失敗
+      const res2 = await FETCH({
+        path: "/user/sign-up",
+        method: "PUT",
+        body: {
+          username: "invitedupuser",
+          password: "testpass",
+          inviteCode: "invitedup",
+        },
+        excludeCredential: true,
+      });
+      const j2 = await res2.json();
+      expect(res2.ok).toBe(false);
+      expect(res2.status).toBe(400);
+      expect(j2.message).toBe("User already exists");
+
+      // 失敗時は使用回数が消費されない
+      const invite = await db.query.invitations.findFirst({
+        where: eq(invitations.inviteCode, "invitedup"),
+      });
+      expect(invite?.usedCount).toBe(1);
+    });
   });
 
   it("/sign-in :: 正常", async () => {
