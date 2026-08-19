@@ -3,7 +3,7 @@ import { unlink } from "node:fs/promises";
 import { and, asc, eq, gt, inArray, not, or, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   channelJoins,
   invitations,
@@ -51,6 +51,7 @@ export namespace ServiceUser {
           where: eq(invitations.inviteCode, inviteCode),
           columns: { maxUsage: true, usedCount: true },
         });
+
         //招待コードが無効な場合
         if (Invite === undefined) {
           throw status(400, {
@@ -63,14 +64,6 @@ export namespace ServiceUser {
             message: "Invite code reached maximum limit",
           });
         }
-        //---------------------------------------
-        //使用回数を加算(競合対策のためDB側で加算するsqlを使用)
-        await db
-          .update(invitations)
-          .set({
-            usedCount: sql`${invitations.usedCount} + 1`,
-          })
-          .where(eq(invitations.inviteCode, inviteCode));
       }
     }
 
@@ -128,6 +121,16 @@ export namespace ServiceUser {
     //DBへ挿入
     if (joiningData.length > 0) {
       await db.insert(channelJoins).values(joiningData);
+    }
+
+    //招待の使用回数を加算(競合対策のためDB側で加算するsqlを使用)
+    if (GIRACLE_SERVER_CONFIG.RegisterInviteOnly && inviteCode) {
+      await db
+        .update(invitations)
+        .set({
+          usedCount: sql`${invitations.usedCount} + 1`,
+        })
+        .where(eq(invitations.inviteCode, inviteCode));
     }
 
     return { createdUser };
