@@ -31,39 +31,30 @@ export namespace ServiceUser {
     }
 
     //最初のユーザーなら招待条件を確認しない
-    if (!flagFirstUser) {
-      //サーバーの設定を取得して招待関連の条件を確認
-      const serverConfig = await db.query.serverConfigs.findFirst();
-      if (!serverConfig?.RegisterAvailable) {
+    if (!flagFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly) {
+      if (inviteCode === undefined) {
         throw status(400, {
-          message: "Registration is disabled",
+          message: "Invite code is invalid",
         });
       }
-      if (serverConfig?.RegisterInviteOnly) {
-        if (inviteCode === undefined) {
-          throw status(400, {
-            message: "Invite code is invalid",
-          });
-        }
 
-        //招待コードが有効か確認
-        const Invite = await db.query.invitations.findFirst({
-          where: eq(invitations.inviteCode, inviteCode),
-          columns: { maxUsage: true, usedCount: true },
+      //招待コードが有効か確認
+      const Invite = await db.query.invitations.findFirst({
+        where: eq(invitations.inviteCode, inviteCode),
+        columns: { maxUsage: true, usedCount: true },
+      });
+
+      //招待コードが無効な場合
+      if (Invite === undefined) {
+        throw status(400, {
+          message: "Invite code is invalid",
         });
-
-        //招待コードが無効な場合
-        if (Invite === undefined) {
-          throw status(400, {
-            message: "Invite code is invalid",
-          });
-        }
-        //招待コードの使用回数を検証(-1は無限)
-        if (Invite.usedCount >= Invite.maxUsage && Invite.maxUsage !== -1) {
-          throw status(400, {
-            message: "Invite code reached maximum limit",
-          });
-        }
+      }
+      //招待コードの使用回数を検証(-1は無限)
+      if (Invite.usedCount >= Invite.maxUsage && Invite.maxUsage !== -1) {
+        throw status(400, {
+          message: "Invite code reached maximum limit",
+        });
       }
     }
 
