@@ -1,0 +1,1 @@
+ALTER TABLE `Invitation` ADD `maxUsage` integer DEFAULT 5 NOT NULL;

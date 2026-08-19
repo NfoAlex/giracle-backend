@@ -43,6 +43,13 @@
       "when": 1786873414264,
       "tag": "0005_round_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787151120375,
+      "tag": "0006_skinny_omega_flight",
+      "breakpoints": true
     }
   ]
 }
