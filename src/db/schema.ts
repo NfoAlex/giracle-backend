@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -471,6 +472,33 @@ export const serverConfigs = sqliteTable("ServerConfig", {
   MessageMaxLength: integer("MessageMaxLength").notNull().default(3000),
   MessageMaxFileSize: integer("MessageMaxFileSize").notNull().default(512000),
 });
+
+export const requestLog = sqliteTable(
+  "RequestLog",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("RequestLog_method_idx").on(table.method),
+    check(
+      "RequestLog_method_chk",
+      sql`${table.method} IN ('GET','POST','PUT','DELETE','PATCH')`,
+    ),
+
+    index("RequestLog_path_idx").on(table.path),
+    index("RequestLog_userId_idx").on(table.userId),
+  ],
+);
 
 // ============================================================
 // リレーション定義
