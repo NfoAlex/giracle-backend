@@ -7,6 +7,7 @@ import {
   blockedIPAddresses,
   messages,
   messageUrlPreviews,
+  requestLog,
   roleInfos,
   roleLinks,
   tokens,
@@ -460,5 +461,35 @@ export namespace Middleware {
           },
         };
       },
+    });
+
+  export const RequestLogger = new Elysia({ name: "requestLogger" })
+    .onAfterResponse({ as: "global" }, async (ctx) => {
+      //CheckToken分の型補完がされないので変数で抜き出して指定
+      const { request, set } = ctx;
+      const { CheckToken } = ctx as typeof ctx & {
+        CheckToken?: { _userId: string };
+      };
+
+      let path: string;
+      try {
+        path = new URL(request.url).pathname;
+      } catch {
+        path = request.url;
+      }
+
+      await db.insert(requestLog).values({
+        userId: CheckToken?._userId ?? null,
+        method: request.method,
+        path,
+        status: typeof set.status === "number"
+          ? set.status
+          : set.status
+            ? Number(set.status)
+            : 999, //999は内部エラー扱い
+      });
+    })
+    .onError(({ error }) => {
+      console.error("Middleware :: ApiLogger : エラー->", error);
     });
 }
