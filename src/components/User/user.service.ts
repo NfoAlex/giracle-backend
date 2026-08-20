@@ -268,6 +268,8 @@ export namespace ServiceUser {
       );
     }
 
+    const viewableChannels = await Util.getUserViewableChannel(_userId);
+
     const usersFound = await db.query.users.findMany({
       where: and(
         not(eq(users.id, "SYSTEM")),
@@ -287,6 +289,15 @@ export namespace ServiceUser {
       ),
       orderBy: [asc(users.createdAt), asc(users.id)],
       with: {
+        ChannelJoin: {
+          columns: {
+            channelId: true,
+          },
+          where: inArray(
+            channelJoins.channelId,
+            viewableChannels.map((vc) => vc.id),
+          ),
+        },
         RoleLink: {
           columns: {
             roleId: true,
