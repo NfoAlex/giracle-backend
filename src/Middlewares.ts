@@ -478,16 +478,23 @@ export namespace Middleware {
         path = request.url;
       }
 
+      try {
       await db.insert(requestLog).values({
         userId: CheckToken?._userId ?? null,
         method: request.method,
         path,
-        status: typeof set.status === "number"
+          status:
+            typeof set.status === "number"
           ? set.status
           : set.status
             ? Number(set.status)
-            : 200
+                : 200,
+        });
+      } catch (e) {
+        console.error("Middlewares :: RequestLogger : dbの記録に失敗", {
+          Error: e,
       });
+      }
     })
     .onError(({ error }) => {
       console.error("Middleware :: ApiLogger : エラー->", error);
