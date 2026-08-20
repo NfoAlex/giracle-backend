@@ -481,9 +481,8 @@ export const requestLog = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     method: text("method").notNull(),
     path: text("path").notNull(),
-    userId: text("userId")
-      .notNull()
-      .references(() => users.id),
+    status: integer("status").notNull(),
+    userId: text("userId").references(() => users.id),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -496,6 +495,10 @@ export const requestLog = sqliteTable(
     ),
 
     index("RequestLog_path_idx").on(table.path),
+
+    index("RequestLog_status_idx").on(table.status),
+    check("RequestLog_status_chk", sql`${table.status} BETWEEN 100 AND 999`),
+
     index("RequestLog_userId_idx").on(table.userId),
   ],
 );
