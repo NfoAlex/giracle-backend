@@ -471,6 +471,8 @@ export namespace Middleware {
         CheckToken?: { _userId: string };
       };
 
+      if (request.method === "OPTIONS") return;
+
       let path: string;
       try {
         path = new URL(request.url).pathname;
@@ -479,21 +481,21 @@ export namespace Middleware {
       }
 
       try {
-      await db.insert(requestLog).values({
-        userId: CheckToken?._userId ?? null,
-        method: request.method,
-        path,
+        await db.insert(requestLog).values({
+          userId: CheckToken?._userId ?? null,
+          method: request.method,
+          path,
           status:
             typeof set.status === "number"
-          ? set.status
-          : set.status
-            ? Number(set.status)
+              ? set.status
+              : set.status
+                ? Number(set.status)
                 : 200,
         });
       } catch (e) {
         console.error("Middlewares :: RequestLogger : dbの記録に失敗", {
           Error: e,
-      });
+        });
       }
     })
     .onError(({ error }) => {
