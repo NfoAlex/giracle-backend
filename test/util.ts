@@ -4,16 +4,23 @@ import { eq } from "drizzle-orm";
 import { app } from "../src";
 import { db } from "../src/db";
 import {
+  channelJoinOnDefaults,
   channelJoins,
+  channelMutes,
   channels,
   channelViewableRoles,
+  customEmojis,
   inboxes,
   invitations,
+  messageFileAttached,
   messageReactions,
   messageReadTimes,
   messages,
   messageUrlPreviews,
+  notificationConfigs,
+  notificationDevices,
   passwords,
+  requestLog,
   roleInfos,
   roleLinks,
   serverConfigs,
@@ -37,6 +44,13 @@ export async function INIT() {
   await db.delete(passwords);
   await db.delete(channelViewableRoles);
   await db.delete(channelJoins);
+  await db.delete(channelMutes);
+  await db.delete(channelJoinOnDefaults);
+  await db.delete(messageFileAttached);
+  await db.delete(notificationDevices);
+  await db.delete(notificationConfigs);
+  await db.delete(customEmojis);
+  await db.delete(requestLog);
   await db.delete(inboxes);
   await db.delete(messageReadTimes);
   await db.delete(messageReactions);
