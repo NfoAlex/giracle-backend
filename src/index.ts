@@ -68,6 +68,7 @@ export const app = new Elysia()
     }
     return status(500, "somethin went wrong :(");
   })
+  .use(Middleware.RequestLogger)
   .use(wsHandler)
   .use(user)
   .use(channel)
