@@ -383,7 +383,7 @@ describe("/user/list", () => {
     }
   });
 
-  it("レスポンス構造 :: RoleLink を含む", async () => {
+  it("レスポンス構造 :: RoleLink と ChannelJoin を含む", async () => {
     const res = await FETCH({ path: "/user/list", method: "GET" });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -391,10 +391,124 @@ describe("/user/list", () => {
     for (const u of j.data) {
       expect(typeof u.id).toBe("string");
       expect(typeof u.name).toBe("string");
-      expect(Array.isArray(u.RoleLink)).toBe(true);
+      expect(u.RoleLink).toBeArray();
       for (const link of u.RoleLink) {
         expect(typeof link.roleId).toBe("string");
       }
+      // GetUserList 追加: 参加チャンネル(ChannelJoin)が閲覧権限でフィルタされて返る
+      expect(u.ChannelJoin).toBeArray();
+      for (const cj of u.ChannelJoin) {
+        expect(typeof cj.channelId).toBe("string");
+      }
+    }
+    // 閲覧者(TESTUSER)から見て、公開チャンネルの参加が正しく含まれること
+    const testUser = j.data.find((u: { id: string }) => u.id === "TESTUSER");
+    expect(testUser).toBeDefined();
+    expect(
+      testUser.ChannelJoin.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL1",
+      ),
+    ).toBe(true);
+    const testUser2 = j.data.find((u: { id: string }) => u.id === "TESTUSER2");
+    expect(testUser2).toBeDefined();
+    // TESTCHANNEL2 は public なので TESTUSER からも閲覧可能
+    expect(
+      testUser2.ChannelJoin.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL2",
+      ),
+    ).toBe(true);
+    // どのチャンネルにも参加していないユーザー(sub/banTarget)は空配列になる
+    const subUser = j.data.find((u: { id: string }) => u.id === SUB_USER_ID);
+    if (subUser) {
+      expect(subUser.ChannelJoin.length).toBe(0);
+    }
+  });
+
+  it("ChannelJoin :: プライベートチャンネル参加は権限に応じてフィルタされる", async () => {
+    // SUB_USER をプライベートチャンネル TESTCHANNEL3 に一時参加させる
+    await db
+      .insert(channelJoins)
+      .values({ channelId: "TESTCHANNEL3", userId: SUB_USER_ID })
+      .onConflictDoNothing();
+    try {
+      // TESTUSER は ChannelPrivateViewer ロールを持ち TESTCHANNEL3 を閲覧可能 -> ChannelJoin に含まれる
+      const resViewer = await FETCH({
+        path: "/user/list?length=50",
+        method: "GET",
+      });
+      const jViewer = await resViewer.json();
+      expect(resViewer.ok).toBe(true);
+      const subFromViewer = jViewer.data.find(
+        (u: { id: string }) => u.id === SUB_USER_ID,
+      );
+      expect(subFromViewer).toBeDefined();
+      expect(
+        subFromViewer.ChannelJoin.some(
+          (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
+        ),
+      ).toBe(true);
+
+      // TESTUSER2 は TESTCHANNEL3 を閲覧不可 -> ChannelJoin に含まれない
+      const resNoView = await FETCH({
+        path: "/user/list?length=50",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const jNoView = await resNoView.json();
+      expect(resNoView.ok).toBe(true);
+      const subFromNoView = jNoView.data.find(
+        (u: { id: string }) => u.id === SUB_USER_ID,
+      );
+      expect(subFromNoView).toBeDefined();
+      expect(
+        subFromNoView.ChannelJoin.some(
+          (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
+        ),
+      ).toBe(false);
+    } finally {
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.channelId, "TESTCHANNEL3"),
+            eq(channelJoins.userId, SUB_USER_ID),
+          ),
+        );
+    }
+  });
+
+  it("ChannelJoin :: 検索結果でも閲覧可能なチャンネルのみにフィルタされる", async () => {
+    // SUB_USER を一時的に TESTCHANNEL3 に参加させ、joinedChannel 検索と ChannelJoin フィルタの整合を確認
+    await db
+      .insert(channelJoins)
+      .values({ channelId: "TESTCHANNEL3", userId: SUB_USER_ID })
+      .onConflictDoNothing();
+    try {
+      // TESTUSER からは joinedChannel=TESTCHANNEL3 で SUB_USER がヒットし、ChannelJoin にも TESTCHANNEL3 が含まれる
+      const res = await FETCH({
+        path: "/user/list?joinedChannel=TESTCHANNEL3",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.some((u: { id: string }) => u.id === SUB_USER_ID)).toBe(
+        true,
+      );
+      const sub = j.data.find((u: { id: string }) => u.id === SUB_USER_ID);
+      expect(
+        sub.ChannelJoin.some(
+          (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
+        ),
+      ).toBe(true);
+    } finally {
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.channelId, "TESTCHANNEL3"),
+            eq(channelJoins.userId, SUB_USER_ID),
+          ),
+        );
     }
   });
 
