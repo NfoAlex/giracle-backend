@@ -486,7 +486,7 @@ export namespace Middleware {
           ? set.status
           : set.status
             ? Number(set.status)
-            : 999, //999は内部エラー扱い
+            : 200
       });
     })
     .onError(({ error }) => {
