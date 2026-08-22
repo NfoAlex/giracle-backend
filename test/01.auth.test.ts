@@ -409,6 +409,19 @@ describe("/user", () => {
     expect(t).toBe("You cannot delete your active session");
   });
 
+  it("DELETE /session :: 他人のセッションを削除しようとしてみる", async () => {
+    const res = await FETCH({
+      path: "/user/session",
+      method: "DELETE",
+      body: {
+        sessionId: sessionIdRemoving
+      },
+      useSecondaryUser: true
+    });
+    const t = await res.text();
+    expect(t).toBe("Session not found");
+  });
+
   it("DELETE /session :: 正常(セッションを削除する)", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/session", {
