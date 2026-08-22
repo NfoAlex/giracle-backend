@@ -74,12 +74,14 @@ export const wsHandler = new Elysia().ws("/ws", {
       return;
     }
 
-    // トークンの期限確認
+    // トークンの期限確認（期限切れは切断する。放置するとHTTPでは無効なトークンでWS受信が永続する）
     if (Date.now().valueOf() > tokenWithUser.expiresAt.valueOf()) {
       ws.send({
         signal: "ERROR",
         data: "token is expired",
       });
+      ws.close();
+      return;
     }
 
     const user = tokenWithUser.user;
