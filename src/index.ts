@@ -49,7 +49,10 @@ import { db } from "./db";
 import { serverConfigs } from "./db/schema";
 export const [GIRACLE_SERVER_CONFIG] = await db.select().from(serverConfigs);
 
-export const app = new Elysia()
+export const app = new Elysia({
+  //16MB
+  serve: { maxRequestBodySize: 16 * 1024 * 1024 },
+})
   .use(
     cors({
       origin: Bun.env.CORS_ORIGIN,
