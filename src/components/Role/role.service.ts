@@ -84,7 +84,6 @@ export namespace ServiceRole {
     const [roleUpdated] = await db
       .update(roleInfos)
       .set({
-        createdUserId: _userId,
         ...roleData,
       })
       .where(eq(roleInfos.id, roleId))
