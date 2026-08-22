@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { app, db } from "../src";
 import { channelJoins, roleInfos, roleLinks } from "../src/db/schema";
+import { userWSInstance, WSDisconnectUser } from "../src/ws";
 import { FETCH, INIT } from "./util";
 
 // sharpのresizeを通せる最小PNG(1x1px)
@@ -951,5 +952,31 @@ describe("/user/ban & /user/unban", () => {
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("You can't unban yourself");
+  });
+
+  it("正常 :: BAN時に既存のWS接続が切断されること（WSDisconnectUser）", () => {
+    //BAN後もWS接続が生き残ると新着メッセージを受け取り続けてしまう
+    const closed: string[] = [];
+    const fakeWs = (id: string) =>
+      ({
+        send: () => {},
+        close: () => {
+          closed.push(id);
+        },
+        // biome-ignore lint/suspicious/noExplicitAny: 生のWSインスタンスを模したダミーのため
+      }) as any;
+
+    userWSInstance.set("WS_DISCONNECT_TEST_USER", [
+      fakeWs("ws1"),
+      fakeWs("ws2"),
+    ]);
+
+    WSDisconnectUser("WS_DISCONNECT_TEST_USER");
+
+    expect(closed).toEqual(["ws1", "ws2"]);
+    expect(userWSInstance.has("WS_DISCONNECT_TEST_USER")).toBe(false);
+
+    //未接続ユーザーでもエラーにならない
+    expect(() => WSDisconnectUser("NOT_CONNECTED_USER")).not.toThrow();
   });
 });

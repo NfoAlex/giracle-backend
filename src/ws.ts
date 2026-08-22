@@ -195,6 +195,30 @@ function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
 }
 
 /**
+ * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN時等に使用)
+ * @param userId
+ * @returns
+ */
+export function WSDisconnectUser(userId: string) {
+  const currentInstance = userWSInstance.get(userId);
+  //存在しない場合スルー
+  if (!currentInstance) {
+    return;
+  }
+  for (const ws of currentInstance) {
+    //生のWSインスタンスのため文字列で送信する
+    ws.send(
+      JSON.stringify({
+        signal: "ERROR",
+        data: "you are banned",
+      }),
+    );
+    ws.close();
+  }
+  userWSInstance.delete(userId);
+}
+
+/**
  * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルから登録させる
  * @param userId
  * @param wsChannel
