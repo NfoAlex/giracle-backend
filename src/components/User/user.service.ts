@@ -561,11 +561,12 @@ export namespace ServiceUser {
   };
 
   export const RemoveSession = async (
+    _userId: string,
     sessionId: number,
     activeToken: string,
   ) => {
     const targetToken = await db.query.tokens.findFirst({
-      where: eq(tokens.id, sessionId),
+      where: and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)),
     });
 
     if (targetToken === undefined) throw status(404, "Session not found");
@@ -574,7 +575,7 @@ export namespace ServiceUser {
 
     await db
       .delete(tokens)
-      .where(eq(tokens.id, sessionId))
+      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)))
       .catch(() => {
         throw status(500, "Something went wrong");
       });
