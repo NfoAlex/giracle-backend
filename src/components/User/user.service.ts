@@ -14,7 +14,7 @@ import {
 } from "../../db/schema";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
 import { Util } from "../../Util";
-import { userWSInstance } from "../../ws";
+import { userWSInstance, WSDisconnectUser } from "../../ws";
 
 export namespace ServiceUser {
   export const SignUp = async (
@@ -653,6 +653,9 @@ export namespace ServiceUser {
 
     //トークンキャッシュを無効化(最大5分間BAN前の状態でアクセスできてしまうのを防ぐ)
     invalidateUserCache(userId);
+
+    //既存のWS接続も切断する(BAN後も新着メッセージを受信し続けられるのを防ぐ)
+    WSDisconnectUser(userId);
 
     return userBanned;
   };
