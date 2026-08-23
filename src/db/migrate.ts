@@ -8,7 +8,11 @@ try {
   migrate(db, { migrationsFolder: "./drizzle" });
   console.log("migrate :: migrate実行完了");
 } catch (e) {
-  console.error("migrate :: migration 失敗 ", e instanceof Error ? e.message : e);
-  if (e instanceof Error && e.cause) console.error("migrater :: cause: ", e.cause);
+  console.error(
+    "migrate :: migration 失敗 ",
+    e instanceof Error ? e.message : e,
+  );
+  if (e instanceof Error && e.cause)
+    console.error("migrater :: cause: ", e.cause);
   process.exit(1);
 }
