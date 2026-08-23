@@ -115,6 +115,7 @@ giracle-backend/
 | DELETE | `/user/session` | ✅ | - | セッション削除 |
 | POST | `/user/ban` | ✅ | `manageUser` | ユーザー BAN（WS通知: `user::ProfileUpdate`） |
 | POST | `/user/unban` | ✅ | `manageUser` | ユーザー BAN 解除（WS通知: `user::ProfileUpdate`） |
+| DELETE | `/user` | ✅ | `manageUser` | ユーザー削除（論理削除。メッセージ等のデータは残る。WS通知: `user::Deleted`） |
 
 ---
 
@@ -234,6 +235,7 @@ giracle-backend/
 | `user::Connected` | ユーザー接続 |
 | `user::Disconnected` | ユーザー切断 |
 | `user::ProfileUpdate` | プロフィール更新 / BAN 状態変化 |
+| `user::Deleted` | ユーザー削除 |
 | `channel::Join` | チャンネル参加 |
 | `channel::Left` | チャンネル退出 |
 | `channel::UpdateChannel` | チャンネル情報更新 |

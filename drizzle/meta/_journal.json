@@ -57,6 +57,13 @@
       "when": 1787229940467,
       "tag": "0007_stiff_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787495317580,
+      "tag": "0008_complete_captain_cross",
+      "breakpoints": true
     }
   ]
 }

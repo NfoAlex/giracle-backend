@@ -21,6 +21,9 @@ export const users = sqliteTable(
     name: text("name").unique(),
     selfIntroduction: text("selfIntroduction").notNull(),
     isBanned: integer("isBanned", { mode: "boolean" }).notNull().default(false),
+    isDeleted: integer("isDeleted", { mode: "boolean" })
+      .notNull()
+      .default(false),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

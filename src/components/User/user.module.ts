@@ -512,4 +512,35 @@ export const user = new Elysia({ prefix: "/user" })
       },
       checkRoleTerm: "manageUser",
     },
+  )
+  .delete(
+    "/",
+    async ({ body: { userId }, server, CheckToken: { _userId } }) => {
+      await ServiceUser.Delete(userId, _userId);
+
+      //WSで全体へ通知
+      server?.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::Deleted",
+          data: { userId },
+        }),
+      );
+
+      return {
+        message: "User deleted",
+        data: userId,
+      };
+    },
+    {
+      body: t.Object({
+        userId: t.String({ minLength: 1 }),
+      }),
+      detail: {
+        description:
+          "ユーザーを削除します（論理削除。メッセージ等のデータは残ります）",
+        tags: ["User"],
+      },
+      checkRoleTerm: "manageUser",
+    },
   );

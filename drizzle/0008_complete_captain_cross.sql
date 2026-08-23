@@ -1,0 +1,1 @@
+ALTER TABLE `User` ADD `isDeleted` integer DEFAULT false NOT NULL;
