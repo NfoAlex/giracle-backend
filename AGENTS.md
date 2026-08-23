@@ -14,7 +14,7 @@ NODE_ENV=test bun test     # テスト実行（後述。dev.db ではなく test
 bunx biome check --write . # リント＋フォーマット（CI 相当のチェック）
 ```
 
-- `db:*` は package.json の scripts（中身は `drizzle-kit generate` / `drizzle-kit migrate` / `bun ./src/db/seeds.ts`）。`bun run db:baseline` は Prisma 時代の既存 DB に Drizzle を後付けする初回専用スクリプト（[src/db/baseline.ts](src/db/baseline.ts)）で、新規環境では使わない。
+- `db:*` は package.json の scripts（中身は `drizzle-kit generate` / `bun ./src/db/migrate.ts` / `bun ./src/db/seeds.ts`）。`db:migrate` は [src/db/migrate.ts](src/db/migrate.ts) で drizzle-orm の migrator を直接叩く（drizzle-kit migrate はエラー詳細を表示せず exit 1 するため）。`bun run db:baseline` は Prisma 時代の既存 DB に Drizzle を後付けする初回専用スクリプト（[src/db/baseline.ts](src/db/baseline.ts)）で、新規環境では使わない。
 - `npm test` に相当する package.json の `test` スクリプトは未設定（`exit 1` を返すダミー）。テストは必ず `bun test` を直接叩く。
 - Swagger 定義は各ルートの `detail`（tags / description）から生成される。
 
@@ -88,6 +88,7 @@ server?.publish(
 - スキーマは [src/db/schema.ts](src/db/schema.ts)。
 - スキーマ変更フロー: `src/db/schema.ts` 編集 → `bun run db:generate`（[drizzle/](drizzle/) にマイグレーションSQL生成）→ `bun run db:migrate`（DBへ適用）。型は生成物なしで `$inferSelect` / `$inferInsert` から推論する。
   - **`drizzle-kit push` は使わないこと。** 複合主キーを持つテーブル（ChannelJoin 等）で既存インデックスを正しく認識できず `index ... already exists` で失敗するバグが drizzle-kit v0.31.10 にある。generate + migrate は DB の現在状態を pull せず履歴ベースで差分適用するためこの問題を踏まない。
+  - **既存テーブルへの列追加に `.default(sql\`...\`)` は使わない。** SQLite の `ALTER TABLE ADD COLUMN`は式デフォルト（括弧式・`CURRENT_*`）を許可しないため、drizzle-kit が生成した SQL の適用が`Cannot add a column with non-constant default` で失敗する（CREATE TABLE では許可されるため新規テーブルなら問題ない）。既存テーブルへ列を足す場合は `.$defaultFn(() => new Date())` を使う。もし生成済みマイグレーションがこの形になってしまったら、手で「ADD COLUMN（デフォルトなし）→ バックフィル UPDATE」に分割して直す（drizzle-orm は INSERT 時に sql デフォルトをクエリ側に埋め込むため DB 側デフォルトは不要）。
 - SQLite なので高並列書き込みは不可。ヘビーな書き込みループを追加しない。
 - シード（`src/db/seeds.ts`）投入前はサーバーが正常動作しない前提のコードが多い。
 
