@@ -1,7 +1,14 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { app, db } from "../src";
-import { channelJoins, roleInfos, roleLinks } from "../src/db/schema";
+import {
+  channelJoins,
+  messages,
+  roleInfos,
+  roleLinks,
+  tokens,
+  users,
+} from "../src/db/schema";
 import { userWSInstance, WSDisconnectUser } from "../src/ws";
 import { FETCH, INIT } from "./util";
 
@@ -978,5 +985,140 @@ describe("/user/ban & /user/unban", () => {
 
     //未接続ユーザーでもエラーにならない
     expect(() => WSDisconnectUser("NOT_CONNECTED_USER")).not.toThrow();
+  });
+});
+
+describe("/user/delete", () => {
+  let DEL_TARGET_TOKEN = "";
+  let DEL_TARGET_USER_ID = "";
+
+  beforeAll(async () => {
+    ({ token: DEL_TARGET_TOKEN, userId: DEL_TARGET_USER_ID } =
+      await signUpAndSignIn("usertestdelete"));
+
+    //削除後も残るべきメッセージを作る
+    const channel = await db.query.channels.findFirst({
+      columns: { id: true },
+    });
+    if (channel === undefined) throw new Error("seed channel not found");
+    await db.insert(messages).values({
+      content: "delete target message",
+      userId: DEL_TARGET_USER_ID,
+      channelId: channel.id,
+    });
+  });
+
+  it("権限がない人による削除", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: DEL_TARGET_USER_ID },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Role level not enough");
+  });
+
+  it("自分自身を削除しようとする", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: "TESTUSER" },
+    });
+    expect(res.ok).toBe(false);
+    expect(await res.text()).toBe("You can't delete yourself");
+  });
+
+  it("存在しないユーザーを削除しようとする", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: "NOT_EXISTING_USER" },
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("User not found");
+  });
+
+  it("正常 :: 論理削除してデータが残りセッションが無効化されることを確認", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: DEL_TARGET_USER_ID },
+    });
+    expect(res.ok).toBe(true);
+
+    //ユーザー行は残り、論理削除フラグが立っている
+    const deletedUser = await db.query.users.findFirst({
+      where: eq(users.id, DEL_TARGET_USER_ID),
+    });
+    expect(deletedUser?.isDeleted).toBe(true);
+    //要求された保証：メッセージは残る
+    expect(
+      await db.query.messages.findFirst({
+        where: eq(messages.userId, DEL_TARGET_USER_ID),
+      }),
+    ).not.toBeUndefined();
+    //トークンは全件削除されている
+    expect(
+      await db.query.tokens.findFirst({
+        where: eq(tokens.userId, DEL_TARGET_USER_ID),
+      }),
+    ).toBeUndefined();
+
+    //旧トークンは即時無効化される
+    const postRes = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: DEL_TARGET_TOKEN,
+    });
+    expect(postRes.ok).toBe(false);
+    expect(postRes.status).toBe(401);
+
+    //削除済みユーザーでサインインできない
+    const signInRes = await app.handle(
+      new Request("http://localhost/user/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: "usertestdelete",
+          password: "usertestdelete",
+        }),
+      }),
+    );
+    expect(signInRes.ok).toBe(false);
+    expect((await signInRes.json()).message).toBe("User is deleted");
+  });
+
+  it("削除済みユーザーはユーザー一覧に表示されない", async () => {
+    const res = await FETCH({
+      path: "/user/list?username=usertestdelete",
+      method: "GET",
+    });
+    expect(res.ok).toBe(true);
+    expect(await res.json()).toEqual({ message: "User list", data: [] });
+  });
+
+  it("削除済みユーザーの情報はisDeleted付きで取得できる", async () => {
+    const res = await FETCH({
+      path: `/user/info/${DEL_TARGET_USER_ID}`,
+      method: "GET",
+    });
+    expect(res.ok).toBe(true);
+    const j = await res.json();
+    expect(j.data.id).toBe(DEL_TARGET_USER_ID);
+    expect(j.data.isDeleted).toBe(true);
+  });
+
+  it("既に削除済みのユーザーを再度削除しようとする", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: DEL_TARGET_USER_ID },
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("User already deleted");
   });
 });

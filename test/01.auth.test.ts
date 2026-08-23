@@ -414,9 +414,9 @@ describe("/user", () => {
       path: "/user/session",
       method: "DELETE",
       body: {
-        sessionId: sessionIdRemoving
+        sessionId: sessionIdRemoving,
       },
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     const t = await res.text();
     expect(t).toBe("Session not found");

@@ -169,6 +169,12 @@ export namespace ServiceUser {
         message: "Internal error",
       });
     }
+    //ユーザーが削除されている場合
+    if (user.isDeleted) {
+      throw status(401, {
+        message: "User is deleted",
+      });
+    }
     //ユーザーがBANされている場合
     if (user.isBanned) {
       throw status(401, {
@@ -273,6 +279,8 @@ export namespace ServiceUser {
     const usersFound = await db.query.users.findMany({
       where: and(
         not(eq(users.id, "SYSTEM")),
+        //削除済みユーザーは除外
+        eq(users.isDeleted, false),
         // 日付とユーザーId基準で取得
         cursorUser
           ? or(
@@ -658,6 +666,59 @@ export namespace ServiceUser {
     WSDisconnectUser(userId);
 
     return userBanned;
+  };
+
+  export const Delete = async (userId: string, _userId: string) => {
+    //SYSTEM・HOSTは削除できない
+    if (userId === "SYSTEM" || userId === "HOST") {
+      throw status(400, "You can't delete SYSTEM or HOST");
+    }
+    //自分自身を削除することはできない
+    if (userId === _userId) {
+      throw status(400, "You can't delete yourself");
+    }
+    //ユーザーが存在しない場合
+    const targetUser = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { id: true, isDeleted: true },
+    });
+    if (targetUser === undefined) {
+      throw status(404, "User not found");
+    }
+    //既に削除済みの場合
+    if (targetUser.isDeleted) {
+      throw status(400, "User already deleted");
+    }
+    //ロールレベルが対象より低いと削除できない
+    if (
+      (await Util.getUsersRoleLevel(_userId)) <
+      (await Util.getUsersRoleLevel(userId))
+    ) {
+      throw status(400, "You can't delete higher role level user");
+    }
+
+    //キャッシュ無効化用に既存トークン一覧を取得
+    const userTokens = await db
+      .select({ token: tokens.token })
+      .from(tokens)
+      .where(eq(tokens.userId, userId));
+
+    //論理削除（メッセージ・絵文字・チャンネル等のデータは全て残る）
+    await db.update(users).set({ isDeleted: true }).where(eq(users.id, userId));
+
+    //全セッションを無効化
+    await db.delete(tokens).where(eq(tokens.userId, userId));
+
+    //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
+    invalidateUserCache(userId);
+    for (const userToken of userTokens) {
+      invalidateTokenCache(userToken.token);
+    }
+
+    //既存のWS接続も切断する
+    WSDisconnectUser(userId);
+
+    return;
   };
 
   export const Unban = async (userId: string, _userId: string) => {
