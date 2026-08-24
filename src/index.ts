@@ -55,7 +55,12 @@ export const app = new Elysia({
 })
   .use(
     cors({
-      origin: Bun.env.CORS_ORIGIN,
+      origin: Bun.env.CORS_ORIGIN
+        ? Bun.env.CORS_ORIGIN.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : false,
+      credentials: true,
     }),
   )
   .use(
