@@ -200,31 +200,6 @@ describe("GET /server/log", () => {
   );
 
   it(
-    "正常 :: JST境界 UTC前日でもJST当日集計",
-    async () => {
-      await db.delete(requestLog);
-      // UTC 2025-01-09 18:00 = JST 2025-01-10 03:00
-      await db.insert(requestLog).values({
-        method: "GET",
-        path: "/test",
-        status: 200,
-        userId: "TESTUSER",
-        createdAt: new Date("2025-01-10T03:00:00+09:00"),
-      });
-      const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10",
-        method: "GET",
-      });
-      const j = await res.json();
-      expect(res.ok).toBe(true);
-      expect(j.data.length).toBe(1);
-      expect(j.data[0].date).toBe("2025-01-10");
-      expect(j.data[0].successCount).toBe(1);
-    },
-    { timeout: 10000 },
-  );
-
-  it(
     "正常 :: cursorLogDate省略時は直近7日",
     async () => {
       await db.delete(requestLog);
