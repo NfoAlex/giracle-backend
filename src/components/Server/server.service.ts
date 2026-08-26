@@ -305,22 +305,21 @@ export namespace ServiceServer {
     return totalSize;
   };
 
+  // JST 00:00 決定的変換ヘルパ — service内に集約しmodule側二重解釈を解消
+  const jstMidnight = (s: string) => new Date(`${s}T00:00:00+09:00`);
+  const jstTodayMidnight = () =>
+    jstMidnight(
+      new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }),
+    );
+
   export const GetLog = async (filters: {
     type?: "success" | "error";
     userId?: string;
-    cursorLogDate?: Date;
+    cursorLogDate?: string;
   }) => {
-    // cursorLogDate省略時は直近7日間（JST今日起点）をデフォルトとし全件走査を防ぐ
-    // JST今日0時の取得: sv-SE + Asia/Tokyo で YYYY-MM-DD を作り +09:00 で再パース
-    const jstTodayStr = new Date().toLocaleDateString("sv-SE", {
-      timeZone: "Asia/Tokyo",
-    });
-    const jstTodayMidnight = new Date(`${jstTodayStr}T00:00:00+09:00`);
-    const defaultWeekStart = new Date(
-      jstTodayMidnight.getTime() - 6 * 24 * 60 * 60 * 1000,
-    ); // 今日含め7日間
-
-    const weekStart = filters.cursorLogDate ?? defaultWeekStart;
+    const weekStart = filters.cursorLogDate
+      ? jstMidnight(filters.cursorLogDate)
+      : new Date(jstTodayMidnight().getTime() - 6 * 24 * 60 * 60 * 1000);
     // 半開区間 [weekStart, weekEnd) にしカーソル連番時の重複を防ぐ
     const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 

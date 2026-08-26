@@ -339,10 +339,7 @@ export const server = new Elysia({ prefix: "/server" })
       const daily = await ServiceServer.GetLog({
         type,
         userId,
-        // cursorLogDate は JST の日付境界として解釈し、週ウィンドウと日付バケット(JST)を一致させる
-        cursorLogDate: cursorLogDate
-          ? new Date(`${cursorLogDate}T00:00:00+09:00`)
-          : undefined,
+        cursorLogDate,
       });
 
       return {
