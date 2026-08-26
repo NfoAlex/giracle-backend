@@ -1,0 +1,1 @@
+CREATE INDEX `RequestLog_createdAt_idx` ON `RequestLog` (`createdAt`);

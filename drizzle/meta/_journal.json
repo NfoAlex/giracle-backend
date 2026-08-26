@@ -64,6 +64,13 @@
       "when": 1787495317580,
       "tag": "0008_complete_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787761102553,
+      "tag": "0009_legal_phalanx",
+      "breakpoints": true
     }
   ]
 }
