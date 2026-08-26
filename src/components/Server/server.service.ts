@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
@@ -9,6 +9,7 @@ import {
   channelJoinOnDefaults,
   customEmojis,
   invitations,
+  requestLog,
   serverConfigs,
   users,
 } from "../../db/schema";
@@ -302,5 +303,61 @@ export namespace ServiceServer {
       }
     }
     return totalSize;
+  };
+
+  export const GetLog = async (filters: {
+    type?: "success" | "error";
+    userId?: string;
+    cursorLogDate?: Date;
+  }) => {
+    // cursorLogDate省略時は直近7日間（JST今日起点）をデフォルトとし全件走査を防ぐ
+    // JST今日0時の取得: sv-SE + Asia/Tokyo で YYYY-MM-DD を作り +09:00 で再パース
+    const jstTodayStr = new Date().toLocaleDateString("sv-SE", {
+      timeZone: "Asia/Tokyo",
+    });
+    const jstTodayMidnight = new Date(`${jstTodayStr}T00:00:00+09:00`);
+    const defaultWeekStart = new Date(
+      jstTodayMidnight.getTime() - 6 * 24 * 60 * 60 * 1000,
+    ); // 今日含め7日間
+
+    const weekStart = filters.cursorLogDate ?? defaultWeekStart;
+    // 半開区間 [weekStart, weekEnd) にしカーソル連番時の重複を防ぐ
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // 日付バケットは JST(UTC+9) 固定。サーバーTZ依存にせず決定的にする
+    // SQLite: createdAt は ms なので /1000 で unixepoch(秒) 化 → +9時間 → YYYY-MM-DD
+    const day = sql<string>`strftime(
+      '%Y-%m-%d',
+      ${requestLog.createdAt} / 1000,
+      'unixepoch',
+      '+9 hours'
+    )`;
+
+    // 日付別に 200(成功) / >=500(サーバエラー) / その他(3xx/4xx等) を SQLのgroupBy+CASEで集計
+    // success+error+other = 当日total。typeフィルタ時は反対種別のカウントは0になる
+    const dailyCounts = await db
+      .select({
+        date: day,
+        successCount: sql<number>`cast(sum(case when ${requestLog.status} = 200 then 1 else 0 end) as int)`,
+        errorCount: sql<number>`cast(sum(case when ${requestLog.status} >= 500 then 1 else 0 end) as int)`,
+        otherCount: sql<number>`cast(sum(case when ${requestLog.status} != 200 and ${requestLog.status} < 500 then 1 else 0 end) as int)`,
+      })
+      .from(requestLog)
+      .where(
+        and(
+          gte(requestLog.createdAt, weekStart),
+          lt(requestLog.createdAt, weekEnd),
+          filters.type
+            ? filters.type === "success"
+              ? eq(requestLog.status, 200)
+              : gte(requestLog.status, 500)
+            : undefined,
+          filters.userId ? eq(requestLog.userId, filters.userId) : undefined,
+        ),
+      )
+      .groupBy(day)
+      .orderBy(day);
+
+    return dailyCounts;
   };
 }

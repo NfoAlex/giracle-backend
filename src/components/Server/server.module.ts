@@ -332,4 +332,47 @@ export const server = new Elysia({ prefix: "/server" })
       },
       checkRoleTerm: "manageServer",
     },
+  )
+  .get(
+    "/log",
+    async ({ query: { type, userId, cursorLogDate } }) => {
+      const daily = await ServiceServer.GetLog({
+        type,
+        userId,
+        // cursorLogDate は JST の日付境界として解釈し、週ウィンドウと日付バケット(JST)を一致させる
+        cursorLogDate: cursorLogDate
+          ? new Date(`${cursorLogDate}T00:00:00+09:00`)
+          : undefined,
+      });
+
+      return {
+        message: "Fetched request logs",
+        data: daily,
+      };
+    },
+    {
+      detail: {
+        description: "リクエストログを取得します",
+        tags: ["Server"],
+      },
+      query: t.Object({
+        type: t.Optional(t.UnionEnum(["success", "error"])),
+        userId: t.Optional(t.String({ minLength: 1 })),
+        cursorLogDate: t.Optional(t.String({ format: "date" })),
+      }),
+      response: {
+        200: t.Object({
+          message: t.Literal("Fetched request logs"),
+          data: t.Array(
+            t.Object({
+              date: t.String({ format: "date" }),
+              successCount: t.Number(),
+              errorCount: t.Number(),
+              otherCount: t.Number(),
+            }),
+          ),
+        }),
+      },
+      checkRoleTerm: "manageServer",
+    },
   );
