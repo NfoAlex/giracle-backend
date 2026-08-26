@@ -140,7 +140,6 @@ describe("GET /server/log", () => {
       ).toBeUndefined();
       // 日付昇順
       expect(j.data[0].date < j.data[1].date).toBe(true);
-      console.log("08.log.test :: /server/log : 正常", j);
     },
     { timeout: 10000 },
   );
