@@ -353,7 +353,7 @@ export const server = new Elysia({ prefix: "/server" })
         tags: ["Server"],
       },
       query: t.Object({
-        type: t.Optional(t.UnionEnum(["success", "error"])),
+        type: t.Optional(t.Union([t.Literal("success"), t.Literal("error")])),
         userId: t.Optional(t.String({ minLength: 1 })),
         cursorLogDate: t.Optional(t.String({ format: "date" })),
       }),
