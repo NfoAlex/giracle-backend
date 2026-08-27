@@ -38,7 +38,7 @@ export async function INIT() {
   FLAG_INIT_COMPLETED = true;
 
   // --- 01.auth: DBリセット + シード + ユーザー/トークン作成 ---
-  await $`bunx drizzle-kit migrate`;
+  await $`bun db:migrate`;
 
   await db.delete(tokens);
   await db.delete(passwords);
