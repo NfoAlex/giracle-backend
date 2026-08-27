@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, gte, lt, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
@@ -312,7 +312,7 @@ export namespace ServiceServer {
       new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }),
     );
 
-  export const GetLog = async (filters: {
+  export const GetLog = (filters: {
     type?: "success" | "error";
     userId?: string;
     cursorLogDate?: string;
@@ -332,14 +332,18 @@ export namespace ServiceServer {
       '+9 hours'
     )`;
 
+    const cnt = (cond: SQL) =>
+      sql<number>`cast(sum(case when ${cond} then 1 else 0 end) as int)`;
+
     // 日付別に 200(成功) / >=500(サーバエラー) / その他(3xx/4xx等) を SQLのgroupBy+CASEで集計
-    // success+error+other = 当日total。typeフィルタ時は反対種別のカウントは0になる
-    const dailyCounts = await db
+    return db
       .select({
         date: day,
-        successCount: sql<number>`cast(sum(case when ${requestLog.status} = 200 then 1 else 0 end) as int)`,
-        errorCount: sql<number>`cast(sum(case when ${requestLog.status} >= 500 then 1 else 0 end) as int)`,
-        otherCount: sql<number>`cast(sum(case when ${requestLog.status} != 200 and ${requestLog.status} < 500 then 1 else 0 end) as int)`,
+        successCount: cnt(sql`${requestLog.status} = 200`),
+        errorCount: cnt(sql`${requestLog.status} >= 500`),
+        otherCount: cnt(
+          sql`${requestLog.status} != 200 and ${requestLog.status} < 500`,
+        ),
       })
       .from(requestLog)
       .where(
@@ -347,16 +351,17 @@ export namespace ServiceServer {
           gte(requestLog.createdAt, weekStart),
           lt(requestLog.createdAt, weekEnd),
           filters.type
-            ? filters.type === "success"
-              ? eq(requestLog.status, 200)
-              : gte(requestLog.status, 500)
+            ? (
+                {
+                  success: eq(requestLog.status, 200),
+                  error: gte(requestLog.status, 500),
+                } as const
+              )[filters.type]
             : undefined,
           filters.userId ? eq(requestLog.userId, filters.userId) : undefined,
         ),
       )
       .groupBy(day)
       .orderBy(day);
-
-    return dailyCounts;
   };
 }

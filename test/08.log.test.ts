@@ -38,75 +38,29 @@ beforeAll(async () => {
 // 固定ウィンドウ [2025-01-10 .. 2025-01-17) で検証
 async function seedLog() {
   await db.delete(requestLog);
-  await db.insert(requestLog).values([
-    // 2025-01-10 JST: success x2, error x1, other(404) x1
-    {
-      method: "GET",
+
+  // [method, status, userId, date, time]
+  const rows: [string, number, string, string, string][] = [
+    ["GET", 200, "TESTUSER", "2025-01-10", "01:00:00"],
+    ["GET", 200, "TESTUSER", "2025-01-10", "12:00:00"],
+    ["GET", 500, "TESTUSER", "2025-01-10", "23:00:00"],
+    ["GET", 404, "TESTUSER2", "2025-01-10", "15:00:00"],
+    ["GET", 200, "TESTUSER", "2025-01-11", "02:00:00"],
+    ["POST", 500, "TESTUSER2", "2025-01-11", "03:00:00"],
+    ["GET", 200, "TESTUSER", "2025-01-10", "03:00:00"], // JST境界
+    ["GET", 200, "TESTUSER", "2025-01-09", "23:59:00"], // 窓外
+    ["GET", 500, "TESTUSER", "2025-01-17", "00:00:00"], // 窓外 exclusive
+  ];
+
+  await db.insert(requestLog).values(
+    rows.map(([method, status, userId, date, time]) => ({
+      method,
       path: "/test",
-      status: 200,
-      userId: "TESTUSER",
-      createdAt: jst("2025-01-10", "01:00:00"),
-    },
-    {
-      method: "GET",
-      path: "/test",
-      status: 200,
-      userId: "TESTUSER",
-      createdAt: jst("2025-01-10", "12:00:00"),
-    },
-    {
-      method: "GET",
-      path: "/test",
-      status: 500,
-      userId: "TESTUSER",
-      createdAt: jst("2025-01-10", "23:00:00"),
-    },
-    {
-      method: "GET",
-      path: "/test",
-      status: 404,
-      userId: "TESTUSER2",
-      createdAt: jst("2025-01-10", "15:00:00"),
-    },
-    // 2025-01-11 JST
-    {
-      method: "GET",
-      path: "/test",
-      status: 200,
-      userId: "TESTUSER",
-      createdAt: jst("2025-01-11", "02:00:00"),
-    },
-    {
-      method: "POST",
-      path: "/test",
-      status: 500,
-      userId: "TESTUSER2",
-      createdAt: jst("2025-01-11", "03:00:00"),
-    },
-    // JST境界: 2025-01-10T03:00 JST = 前日18:00 UTC -> JSTでは10日に集計されるべき
-    {
-      method: "GET",
-      path: "/test",
-      status: 200,
-      userId: "TESTUSER",
-      createdAt: new Date("2025-01-10T03:00:00+09:00"),
-    },
-    // 窓外
-    {
-      method: "GET",
-      path: "/test",
-      status: 200,
-      userId: "TESTUSER",
-      createdAt: jst("2025-01-09", "23:59:00"),
-    },
-    {
-      method: "GET",
-      path: "/test",
-      status: 500,
-      userId: "TESTUSER",
-      createdAt: new Date("2025-01-17T00:00:00+09:00"),
-    }, // exclusive
-  ]);
+      status,
+      userId,
+      createdAt: jst(date, time),
+    })),
+  );
 }
 
 describe("GET /server/log", () => {
