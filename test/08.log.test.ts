@@ -7,7 +7,7 @@ import { FETCH, INIT } from "./util";
 const jst = (date: string, time = "12:00:00") =>
   new Date(`${date}T${time}+09:00`);
 
-// GET /server/log のレスポンス要素型
+// GET /server/log-group のレスポンス要素型
 type LogDaily = {
   date: string;
   successCount: number;
@@ -63,37 +63,37 @@ async function seedLog() {
   );
 }
 
-describe("GET /server/log", () => {
+describe("GET /server/log-group", () => {
   it(
     "正常 :: 日付別 success/error/other 集計",
     async () => {
       await seedLog();
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10",
+        path: "/server/log-group?cursorLogDate=2025-01-10",
         method: "GET",
       });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      expect(j.message).toBe("Fetched request logs");
+      expect(j.message).toBe("Fetched request log counts by day");
       // 2025-01-10 は 4件(+境界1件) -> success 3, error 1, other 1
-      const d10 = j.data.find((d: LogDaily) => d.date === "2025-01-10");
+      const d10 = j.data.group.find((d: LogDaily) => d.date === "2025-01-10");
       expect(d10).toBeDefined();
       expect(d10.successCount).toBe(3);
       expect(d10.errorCount).toBe(1);
       expect(d10.otherCount).toBe(1);
-      const d11 = j.data.find((d: LogDaily) => d.date === "2025-01-11");
+      const d11 = j.data.group.find((d: LogDaily) => d.date === "2025-01-11");
       expect(d11.successCount).toBe(1);
       expect(d11.errorCount).toBe(1);
       expect(d11.otherCount).toBe(0);
       // 窓外の日付は含まれない
       expect(
-        j.data.find((d: LogDaily) => d.date === "2025-01-09"),
+        j.data.group.find((d: LogDaily) => d.date === "2025-01-09"),
       ).toBeUndefined();
       expect(
-        j.data.find((d: LogDaily) => d.date === "2025-01-17"),
+        j.data.group.find((d: LogDaily) => d.date === "2025-01-17"),
       ).toBeUndefined();
       // 日付昇順
-      expect(j.data[0].date < j.data[1].date).toBe(true);
+      expect(j.data.group[0].date < j.data.group[1].date).toBe(true);
     },
     { timeout: 10000 },
   );
@@ -103,12 +103,12 @@ describe("GET /server/log", () => {
     async () => {
       await seedLog();
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10&type=success",
+        path: "/server/log-group?cursorLogDate=2025-01-10&type=success",
         method: "GET",
       });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      const d10 = j.data.find((d: LogDaily) => d.date === "2025-01-10");
+      const d10 = j.data.group.find((d: LogDaily) => d.date === "2025-01-10");
       expect(d10.successCount).toBe(3);
       expect(d10.errorCount).toBe(0);
       expect(d10.otherCount).toBe(0);
@@ -121,12 +121,12 @@ describe("GET /server/log", () => {
     async () => {
       await seedLog();
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10&type=error",
+        path: "/server/log-group?cursorLogDate=2025-01-10&type=error",
         method: "GET",
       });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      const d10 = j.data.find((d: LogDaily) => d.date === "2025-01-10");
+      const d10 = j.data.group.find((d: LogDaily) => d.date === "2025-01-10");
       expect(d10.successCount).toBe(0);
       expect(d10.errorCount).toBe(1);
     },
@@ -138,16 +138,16 @@ describe("GET /server/log", () => {
     async () => {
       await seedLog();
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10&userId=TESTUSER2",
+        path: "/server/log-group?cursorLogDate=2025-01-10&userId=TESTUSER2",
         method: "GET",
       });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      const d10 = j.data.find((d: LogDaily) => d.date === "2025-01-10");
+      const d10 = j.data.group.find((d: LogDaily) => d.date === "2025-01-10");
       expect(d10.successCount).toBe(0);
       expect(d10.errorCount).toBe(0);
       expect(d10.otherCount).toBe(1);
-      const d11 = j.data.find((d: LogDaily) => d.date === "2025-01-11");
+      const d11 = j.data.group.find((d: LogDaily) => d.date === "2025-01-11");
       expect(d11.errorCount).toBe(1);
     },
     { timeout: 10000 },
@@ -167,10 +167,12 @@ describe("GET /server/log", () => {
         userId: "TESTUSER",
         createdAt: new Date(`${todayStr}T12:00:00+09:00`),
       });
-      const res = await FETCH({ path: "/server/log", method: "GET" });
+      const res = await FETCH({ path: "/server/log-group", method: "GET" });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      expect(j.data.find((d: LogDaily) => d.date === todayStr)).toBeDefined();
+      expect(
+        j.data.group.find((d: LogDaily) => d.date === todayStr),
+      ).toBeDefined();
     },
     { timeout: 10000 },
   );
@@ -180,12 +182,44 @@ describe("GET /server/log", () => {
     async () => {
       await db.delete(requestLog);
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2099-01-01",
+        path: "/server/log-group?cursorLogDate=2099-01-01",
         method: "GET",
       });
       const j = await res.json();
       expect(res.ok).toBe(true);
-      expect(j.data).toEqual([]);
+      expect(j.data.group).toEqual([]);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "正常 :: includeFirstLogs省略時は firstDayLog なし",
+    async () => {
+      await seedLog();
+      const res = await FETCH({
+        path: "/server/log-group?cursorLogDate=2025-01-10",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.firstDayLog).toBeUndefined();
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "正常 :: includeFirstLogs=true で初日生ログを返す",
+    async () => {
+      await seedLog();
+      const res = await FETCH({
+        path: "/server/log-group?cursorLogDate=2025-01-10&includeFirstLogs=true",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.group.length).toBe(2);
+      // 初日(2025-01-10)の生ログ 5件
+      expect(j.data.firstDayLog).toHaveLength(5);
     },
     { timeout: 10000 },
   );
@@ -194,7 +228,7 @@ describe("GET /server/log", () => {
     "権限無 :: manageServerなし",
     async () => {
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10",
+        path: "/server/log-group?cursorLogDate=2025-01-10",
         method: "GET",
         useSecondaryUser: true,
       });
@@ -207,7 +241,56 @@ describe("GET /server/log", () => {
     "未認証",
     async () => {
       const res = await FETCH({
-        path: "/server/log?cursorLogDate=2025-01-10",
+        path: "/server/log-group?cursorLogDate=2025-01-10",
+        method: "GET",
+        excludeCredential: true,
+      });
+      expect(res.ok).toBe(false);
+    },
+    { timeout: 10000 },
+  );
+});
+
+describe("GET /server/logs", () => {
+  it(
+    "正常 :: 対象日の生ログのみ返す",
+    async () => {
+      await seedLog();
+      const res = await FETCH({
+        path: "/server/logs?targetDate=2025-01-10",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.message).toBe("Fetched request logs");
+      // seedLog の 2025-01-10 は5件(status 3x200 / 1x500 / 1x404)。窓外(01-09,01-17)は含まれない
+      expect(j.data.length).toBe(5);
+      const statuses = j.data.map((l: { status: number }) => l.status);
+      expect(statuses.filter((s: number) => s === 200).length).toBe(3);
+      expect(statuses.filter((s: number) => s === 500).length).toBe(1);
+      expect(statuses.filter((s: number) => s === 404).length).toBe(1);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "権限無 :: manageServerなし",
+    async () => {
+      const res = await FETCH({
+        path: "/server/logs?targetDate=2025-01-10",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      expect(res.ok).toBe(false);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "未認証",
+    async () => {
+      const res = await FETCH({
+        path: "/server/logs?targetDate=2025-01-10",
         method: "GET",
         excludeCredential: true,
       });
