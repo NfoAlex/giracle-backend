@@ -305,18 +305,40 @@ export namespace ServiceServer {
     return totalSize;
   };
 
-  // JST 00:00 決定的変換ヘルパ — service内に集約しmodule側二重解釈を解消
-  const jstMidnight = (s: string) => new Date(`${s}T00:00:00+09:00`);
-  const jstTodayMidnight = () =>
-    jstMidnight(
-      new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }),
-    );
+  export const GetLogs = async (targetDate: Date) => {
+    const dashedDateString = targetDate.toLocaleDateString("sv-SE", {
+      timeZone: "Asia/Tokyo",
+    });
+    const dayStart = new Date(`${dashedDateString}T00:00:00+09:00`);
+    const dayEnd = new Date(`${dashedDateString}T23:59:59+09:00`);
 
-  export const GetLog = (filters: {
-    type?: "success" | "error";
-    userId?: string;
-    cursorLogDate?: string;
-  }) => {
+    const logs = await db
+      .select()
+      .from(requestLog)
+      .where(
+        and(
+          gte(requestLog.createdAt, dayStart),
+          lt(requestLog.createdAt, dayEnd),
+        ),
+      );
+    return logs;
+  };
+
+  export const GetLogGroup = async (
+    filters: {
+      type?: "success" | "error";
+      userId?: string;
+      cursorLogDate?: string;
+    },
+    includeFirstDayLogs?: boolean,
+  ) => {
+    // JST 00:00 決定的変換ヘルパ — service内に集約しmodule側二重解釈を解消
+    const jstMidnight = (s: string) => new Date(`${s}T00:00:00+09:00`);
+    const jstTodayMidnight = () =>
+      jstMidnight(
+        new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }),
+      );
+
     const weekStart = filters.cursorLogDate
       ? jstMidnight(filters.cursorLogDate)
       : new Date(jstTodayMidnight().getTime() - 6 * 24 * 60 * 60 * 1000);
@@ -335,8 +357,7 @@ export namespace ServiceServer {
     const cnt = (cond: SQL) =>
       sql<number>`cast(sum(case when ${cond} then 1 else 0 end) as int)`;
 
-    // 日付別に 200(成功) / >=500(サーバエラー) / その他(3xx/4xx等) を SQLのgroupBy+CASEで集計
-    return db
+    const logByGroup = await db
       .select({
         date: day,
         successCount: cnt(sql`${requestLog.status} = 200`),
@@ -363,5 +384,10 @@ export namespace ServiceServer {
       )
       .groupBy(day)
       .orderBy(day);
+
+    return {
+      group: logByGroup,
+      firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
+    };
   };
 }
