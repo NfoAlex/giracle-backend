@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { and, eq, gte, lt, type SQL, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
@@ -306,11 +306,13 @@ export namespace ServiceServer {
   };
 
   export const GetLogs = async (targetDate: Date) => {
+    if (Number.isNaN(targetDate.getTime())) throw status(400, "Invalid date");
+
     const dashedDateString = targetDate.toLocaleDateString("sv-SE", {
       timeZone: "Asia/Tokyo",
     });
     const dayStart = new Date(`${dashedDateString}T00:00:00+09:00`);
-    const dayEnd = new Date(`${dashedDateString}T23:59:59+09:00`);
+    const dayEnd = new Date(`${dashedDateString}T23:59:59.999+09:00`);
 
     const logs = await db
       .select()
@@ -318,7 +320,7 @@ export namespace ServiceServer {
       .where(
         and(
           gte(requestLog.createdAt, dayStart),
-          lt(requestLog.createdAt, dayEnd),
+          lte(requestLog.createdAt, dayEnd),
         ),
       );
     return logs;
