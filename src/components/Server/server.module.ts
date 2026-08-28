@@ -334,13 +334,13 @@ export const server = new Elysia({ prefix: "/server" })
     },
   )
   .get(
-    "/logs",
+    "/log",
     async ({ query: { targetDate } }) => {
-      const daily = await ServiceServer.GetLogs(new Date(targetDate));
+      const logs = await ServiceServer.GetLogs(new Date(targetDate));
 
       return {
         message: "Fetched request logs",
-        data: daily,
+        data: logs,
       };
     },
     {

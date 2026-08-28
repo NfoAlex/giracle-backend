@@ -251,13 +251,13 @@ describe("GET /server/log-group", () => {
   );
 });
 
-describe("GET /server/logs", () => {
+describe("GET /server/log", () => {
   it(
     "正常 :: 対象日の生ログのみ返す",
     async () => {
       await seedLog();
       const res = await FETCH({
-        path: "/server/logs?targetDate=2025-01-10",
+        path: "/server/log?targetDate=2025-01-10",
         method: "GET",
       });
       const j = await res.json();
@@ -277,7 +277,7 @@ describe("GET /server/logs", () => {
     "権限無 :: manageServerなし",
     async () => {
       const res = await FETCH({
-        path: "/server/logs?targetDate=2025-01-10",
+        path: "/server/log?targetDate=2025-01-10",
         method: "GET",
         useSecondaryUser: true,
       });
@@ -290,7 +290,7 @@ describe("GET /server/logs", () => {
     "未認証",
     async () => {
       const res = await FETCH({
-        path: "/server/logs?targetDate=2025-01-10",
+        path: "/server/log?targetDate=2025-01-10",
         method: "GET",
         excludeCredential: true,
       });
