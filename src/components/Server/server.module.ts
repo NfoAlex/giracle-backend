@@ -349,7 +349,7 @@ export const server = new Elysia({ prefix: "/server" })
         tags: ["Server"],
       },
       query: t.Object({
-        targetDate: t.String({ format: "date" })
+        targetDate: t.String({ format: "date" }),
       }),
       checkRoleTerm: "manageServer",
     },
@@ -357,11 +357,14 @@ export const server = new Elysia({ prefix: "/server" })
   .get(
     "/log-group",
     async ({ query: { type, userId, cursorLogDate, includeFirstLogs } }) => {
-      const logs = await ServiceServer.GetLogGroup({
-        type,
-        userId,
-        cursorLogDate,
-      }, includeFirstLogs);
+      const logs = await ServiceServer.GetLogGroup(
+        {
+          type,
+          userId,
+          cursorLogDate,
+        },
+        includeFirstLogs,
+      );
 
       return {
         message: "Fetched request log counts by day",
@@ -377,7 +380,7 @@ export const server = new Elysia({ prefix: "/server" })
         type: t.Optional(t.Union([t.Literal("success"), t.Literal("error")])),
         userId: t.Optional(t.String({ minLength: 1 })),
         cursorLogDate: t.Optional(t.String({ format: "date" })),
-        includeFirstLogs: t.Optional(t.Boolean({ default: false }))
+        includeFirstLogs: t.Optional(t.Boolean({ default: false })),
       }),
       response: {
         200: t.Object({
@@ -400,9 +403,9 @@ export const server = new Elysia({ prefix: "/server" })
                   status: t.Number(),
                   userId: t.Nullable(t.String()),
                   createdAt: t.Date(),
-                })
-              )
-            )
+                }),
+              ),
+            ),
           }),
         }),
       },
