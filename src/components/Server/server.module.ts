@@ -335,8 +335,8 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .get(
     "/log",
-    async ({ query: { targetDate } }) => {
-      const logs = await ServiceServer.GetLogs(new Date(targetDate));
+    async ({ query: { targetDate, cursorLogId } }) => {
+      const logs = await ServiceServer.GetLogs(new Date(targetDate), cursorLogId);
 
       return {
         message: "Fetched request logs",
@@ -350,6 +350,7 @@ export const server = new Elysia({ prefix: "/server" })
       },
       query: t.Object({
         targetDate: t.String({ format: "date" }),
+        cursorLogId: t.Optional(t.String()),
       }),
       checkRoleTerm: "manageServer",
     },

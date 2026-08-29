@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { and, eq, gte, lt, lte, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
@@ -305,7 +305,7 @@ export namespace ServiceServer {
     return totalSize;
   };
 
-  export const GetLogs = async (targetDate: Date) => {
+  export const GetLogs = async (targetDate: Date, cursorLogId?: string) => {
     if (Number.isNaN(targetDate.getTime())) throw status(400, "Invalid date");
 
     const dashedDateString = targetDate.toLocaleDateString("sv-SE", {
@@ -314,15 +314,35 @@ export namespace ServiceServer {
     const dayStart = new Date(`${dashedDateString}T00:00:00+09:00`);
     const dayEnd = new Date(`${dashedDateString}T23:59:59.999+09:00`);
 
+    const cursorRequestLog = cursorLogId
+      ? db
+          .select({ id: requestLog.id, createdAt: requestLog.createdAt })
+          .from(requestLog)
+          .where(eq(requestLog.id, cursorLogId))
+          .get()
+      : undefined;
+
     const logs = await db
-      .select()
-      .from(requestLog)
-      .where(
-        and(
-          gte(requestLog.createdAt, dayStart),
-          lte(requestLog.createdAt, dayEnd),
-        ),
-      );
+     .select()
+     .from(requestLog)
+     .where(
+       and(
+         gte(requestLog.createdAt, dayStart),
+         lte(requestLog.createdAt, dayEnd),
+         cursorRequestLog
+           ? or(
+               lt(requestLog.createdAt, cursorRequestLog.createdAt),
+               and(
+                 eq(requestLog.createdAt, cursorRequestLog.createdAt),
+                 lt(requestLog.id, cursorRequestLog.id),
+               ),
+             )
+           : undefined,
+       ),
+     )
+     .orderBy(desc(requestLog.createdAt), desc(requestLog.id))
+     .limit(50);
+
     return logs;
   };
 
