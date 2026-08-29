@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { requestLog, roleInfos, roleLinks } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
@@ -269,6 +270,48 @@ describe("GET /server/log", () => {
       expect(statuses.filter((s: number) => s === 200).length).toBe(3);
       expect(statuses.filter((s: number) => s === 500).length).toBe(1);
       expect(statuses.filter((s: number) => s === 404).length).toBe(1);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "正常 :: 新しい順で返す",
+    async () => {
+      await seedLog();
+      const res = await FETCH({
+        path: "/server/log?targetDate=2025-01-10",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      const times = j.data.map((l: { createdAt: string }) =>
+        new Date(l.createdAt).getTime(),
+      );
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+    },
+    { timeout: 10000 },
+  );
+
+  it(
+    "正常 :: cursorLogId で継続取得",
+    async () => {
+      await seedLog();
+      const cursor = await db.query.requestLog.findFirst({
+        where: eq(requestLog.createdAt, jst("2025-01-10", "12:00:00")),
+      });
+      const res = await FETCH({
+        path: `/server/log?targetDate=2025-01-10&cursorLogId=${cursor?.id}`,
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      // 12:00 より古い 03:00 / 01:00 の2件のみ
+      expect(j.data).toHaveLength(2);
+      const times = j.data.map((l: { createdAt: string }) =>
+        new Date(l.createdAt).getTime(),
+      );
+      expect(times).toContain(jst("2025-01-10", "03:00:00").getTime());
+      expect(times).toContain(jst("2025-01-10", "01:00:00").getTime());
     },
     { timeout: 10000 },
   );
