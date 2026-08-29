@@ -91,11 +91,12 @@ export namespace ServiceServer {
       })
       .returning();
 
+    //ここでデータ取得失敗したら500エラー
+    if (serverinfo === undefined) throw status(500, "Server config not found");
+
     GIRACLE_SERVER_CONFIG.introduction = introduction;
     GIRACLE_SERVER_CONFIG.name = name;
 
-    //ここでデータ取得失敗したら500エラー
-    if (serverinfo === undefined) throw status(500, "Server config not found");
 
     return serverinfo;
   };
