@@ -38,7 +38,7 @@ export async function INIT() {
   FLAG_INIT_COMPLETED = true;
 
   // --- 01.auth: DBリセット + シード + ユーザー/トークン作成 ---
-  await $`bun db:migrate`;
+  await $`bun run db:migrate`;
 
   await db.delete(tokens);
   await db.delete(passwords);
