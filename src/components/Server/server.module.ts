@@ -332,4 +332,84 @@ export const server = new Elysia({ prefix: "/server" })
       },
       checkRoleTerm: "manageServer",
     },
+  )
+  .get(
+    "/log",
+    async ({ query: { targetDate, cursorLogId } }) => {
+      const logs = await ServiceServer.GetLogs(new Date(targetDate), cursorLogId);
+
+      return {
+        message: "Fetched request logs",
+        data: logs,
+      };
+    },
+    {
+      detail: {
+        description: "リクエストログを取得します",
+        tags: ["Server"],
+      },
+      query: t.Object({
+        targetDate: t.String({ format: "date" }),
+        cursorLogId: t.Optional(t.String()),
+      }),
+      checkRoleTerm: "manageServer",
+    },
+  )
+  .get(
+    "/log-group",
+    async ({ query: { type, userId, cursorLogDate, includeFirstLogs } }) => {
+      const logs = await ServiceServer.GetLogGroup(
+        {
+          type,
+          userId,
+          cursorLogDate,
+        },
+        includeFirstLogs,
+      );
+
+      return {
+        message: "Fetched request log counts by day",
+        data: logs,
+      };
+    },
+    {
+      detail: {
+        description: "リクエストログを取得します",
+        tags: ["Server"],
+      },
+      query: t.Object({
+        type: t.Optional(t.Union([t.Literal("success"), t.Literal("error")])),
+        userId: t.Optional(t.String({ minLength: 1 })),
+        cursorLogDate: t.Optional(t.String({ format: "date" })),
+        includeFirstLogs: t.Optional(t.Boolean({ default: false })),
+      }),
+      response: {
+        200: t.Object({
+          message: t.Literal("Fetched request log counts by day"),
+          data: t.Object({
+            group: t.Array(
+              t.Object({
+                date: t.String({ format: "date" }),
+                successCount: t.Number(),
+                errorCount: t.Number(),
+                otherCount: t.Number(),
+              }),
+            ),
+            firstDayLog: t.Optional(
+              t.Array(
+                t.Object({
+                  id: t.String(),
+                  method: t.String(),
+                  path: t.String(),
+                  status: t.Number(),
+                  userId: t.Nullable(t.String()),
+                  createdAt: t.Date(),
+                }),
+              ),
+            ),
+          }),
+        }),
+      },
+      checkRoleTerm: "manageServer",
+    },
   );

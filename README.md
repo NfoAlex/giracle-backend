@@ -192,6 +192,8 @@ giracle-backend/
 | PUT | `/server/custom-emoji/upload` | ✅ | `manageEmoji` | カスタム絵文字追加（WS通知: `server::CustomEmojiUploaded`） |
 | DELETE | `/server/custom-emoji/delete` | ✅ | `manageEmoji` | カスタム絵文字削除（WS通知: `server::CustomEmojiDeleted`） |
 | GET | `/server/storage-usage` | ✅ | `manageServer` | ストレージ使用量取得 |
+| GET | `/server/log` | ✅ | `manageServer` | リクエストログ取得（`targetDate` 必須。`cursorLogId` で継続取得。カーソルが対象日の範囲外の場合は 400） |
+| GET | `/server/log-group` | ✅ | `manageServer` | リクエストログの日別集計取得（`type` / `userId` / `cursorLogDate` で絞り込み、`includeFirstLogs` で対象日のログを同梱） |
 
 ---
 

@@ -64,6 +64,20 @@
       "when": 1787495317580,
       "tag": "0008_complete_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787761102553,
+      "tag": "0009_legal_phalanx",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788276395428,
+      "tag": "0010_aberrant_doorman",
+      "breakpoints": true
     }
   ]
 }

@@ -503,6 +503,8 @@ export const requestLog = sqliteTable(
     check("RequestLog_status_chk", sql`${table.status} BETWEEN 100 AND 999`),
 
     index("RequestLog_userId_idx").on(table.userId),
+
+    index("RequestLog_createdAt_idx").on(table.createdAt, table.id),
   ],
 );
 

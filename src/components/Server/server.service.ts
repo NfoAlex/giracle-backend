@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
@@ -9,6 +9,7 @@ import {
   channelJoinOnDefaults,
   customEmojis,
   invitations,
+  requestLog,
   serverConfigs,
   users,
 } from "../../db/schema";
@@ -303,5 +304,123 @@ export namespace ServiceServer {
       }
     }
     return totalSize;
+  };
+
+  export const GetLogs = async (targetDate: Date, cursorLogId?: string) => {
+    if (Number.isNaN(targetDate.getTime())) throw status(400, "Invalid date");
+
+    const dashedDateString = targetDate.toLocaleDateString("sv-SE", {
+      timeZone: "Asia/Tokyo",
+    });
+    const dayStart = new Date(`${dashedDateString}T00:00:00+09:00`);
+    const dayEnd = new Date(`${dashedDateString}T23:59:59.999+09:00`);
+
+    const cursorRequestLog = cursorLogId
+      ? db
+          .select({ id: requestLog.id, createdAt: requestLog.createdAt })
+          .from(requestLog)
+          .where(eq(requestLog.id, cursorLogId))
+          .get()
+      : undefined;
+
+    if (cursorLogId && !cursorRequestLog)
+      throw status(400, "Invalid cursorLogId");
+
+    if (
+      cursorRequestLog &&
+      (cursorRequestLog.createdAt < dayStart ||
+        cursorRequestLog.createdAt > dayEnd)
+    )
+      throw status(400, "cursorLogId is out of the target date range");
+
+    const logs = await db
+      .select()
+      .from(requestLog)
+      .where(
+        and(
+          gte(requestLog.createdAt, dayStart),
+          lte(requestLog.createdAt, dayEnd),
+          cursorRequestLog
+            ? or(
+                lt(requestLog.createdAt, cursorRequestLog.createdAt),
+                and(
+                  eq(requestLog.createdAt, cursorRequestLog.createdAt),
+                  lt(requestLog.id, cursorRequestLog.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(requestLog.createdAt), desc(requestLog.id))
+      .limit(50);
+
+    return logs;
+  };
+
+  export const GetLogGroup = async (
+    filters: {
+      type?: "success" | "error";
+      userId?: string;
+      cursorLogDate?: string;
+    },
+    includeFirstDayLogs?: boolean,
+  ) => {
+    // JST 00:00 決定的変換ヘルパ — service内に集約しmodule側二重解釈を解消
+    const jstMidnight = (s: string) => new Date(`${s}T00:00:00+09:00`);
+    const jstTodayMidnight = () =>
+      jstMidnight(
+        new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }),
+      );
+
+    const weekStart = filters.cursorLogDate
+      ? jstMidnight(filters.cursorLogDate)
+      : new Date(jstTodayMidnight().getTime() - 6 * 24 * 60 * 60 * 1000);
+    // 半開区間 [weekStart, weekEnd) にしカーソル連番時の重複を防ぐ
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // 日付バケットは JST(UTC+9) 固定。サーバーTZ依存にせず決定的にする
+    // SQLite: createdAt は ms なので /1000 で unixepoch(秒) 化 → +9時間 → YYYY-MM-DD
+    const day = sql<string>`strftime(
+      '%Y-%m-%d',
+      ${requestLog.createdAt} / 1000,
+      'unixepoch',
+      '+9 hours'
+    )`;
+
+    const cnt = (cond: SQL) =>
+      sql<number>`cast(sum(case when ${cond} then 1 else 0 end) as int)`;
+
+    const logByGroup = await db
+      .select({
+        date: day,
+        successCount: cnt(sql`${requestLog.status} = 200`),
+        errorCount: cnt(sql`${requestLog.status} >= 500`),
+        otherCount: cnt(
+          sql`${requestLog.status} != 200 and ${requestLog.status} < 500`,
+        ),
+      })
+      .from(requestLog)
+      .where(
+        and(
+          gte(requestLog.createdAt, weekStart),
+          lt(requestLog.createdAt, weekEnd),
+          filters.type
+            ? (
+                {
+                  success: eq(requestLog.status, 200),
+                  error: gte(requestLog.status, 500),
+                } as const
+              )[filters.type]
+            : undefined,
+          filters.userId ? eq(requestLog.userId, filters.userId) : undefined,
+        ),
+      )
+      .groupBy(day)
+      .orderBy(day);
+
+    return {
+      group: logByGroup,
+      firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
+    };
   };
 }
