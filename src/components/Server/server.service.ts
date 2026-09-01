@@ -322,26 +322,29 @@ export namespace ServiceServer {
           .get()
       : undefined;
 
+    if (cursorLogId && !cursorRequestLog)
+      throw status(400, "Invalid cursorLogId");
+
     const logs = await db
-     .select()
-     .from(requestLog)
-     .where(
-       and(
-         gte(requestLog.createdAt, dayStart),
-         lte(requestLog.createdAt, dayEnd),
-         cursorRequestLog
-           ? or(
-               lt(requestLog.createdAt, cursorRequestLog.createdAt),
-               and(
-                 eq(requestLog.createdAt, cursorRequestLog.createdAt),
-                 lt(requestLog.id, cursorRequestLog.id),
-               ),
-             )
-           : undefined,
-       ),
-     )
-     .orderBy(desc(requestLog.createdAt), desc(requestLog.id))
-     .limit(50);
+      .select()
+      .from(requestLog)
+      .where(
+        and(
+          gte(requestLog.createdAt, dayStart),
+          lte(requestLog.createdAt, dayEnd),
+          cursorRequestLog
+            ? or(
+                lt(requestLog.createdAt, cursorRequestLog.createdAt),
+                and(
+                  eq(requestLog.createdAt, cursorRequestLog.createdAt),
+                  lt(requestLog.id, cursorRequestLog.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(requestLog.createdAt), desc(requestLog.id))
+      .limit(50);
 
     return logs;
   };
