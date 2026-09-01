@@ -317,6 +317,19 @@ describe("GET /server/log", () => {
   );
 
   it(
+    "異常 :: 存在しない cursorLogId は 400",
+    async () => {
+      await seedLog();
+      const res = await FETCH({
+        path: "/server/log?targetDate=2025-01-10&cursorLogId=nonexistent",
+        method: "GET",
+      });
+      expect(res.status).toBe(400);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
     "権限無 :: manageServerなし",
     async () => {
       const res = await FETCH({
