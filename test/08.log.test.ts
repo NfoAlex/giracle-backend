@@ -330,6 +330,22 @@ describe("GET /server/log", () => {
   );
 
   it(
+    "異常 :: 対象日と異なる cursorLogId は 400",
+    async () => {
+      await seedLog();
+      const cursor = await db.query.requestLog.findFirst({
+        where: eq(requestLog.createdAt, jst("2025-01-11", "02:00:00")),
+      });
+      const res = await FETCH({
+        path: `/server/log?targetDate=2025-01-10&cursorLogId=${cursor?.id}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(400);
+    },
+    { timeout: 10000 },
+  );
+
+  it(
     "権限無 :: manageServerなし",
     async () => {
       const res = await FETCH({

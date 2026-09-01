@@ -325,6 +325,13 @@ export namespace ServiceServer {
     if (cursorLogId && !cursorRequestLog)
       throw status(400, "Invalid cursorLogId");
 
+    if (
+      cursorRequestLog &&
+      (cursorRequestLog.createdAt < dayStart ||
+        cursorRequestLog.createdAt > dayEnd)
+    )
+      throw status(400, "cursorLogId is out of the target date range");
+
     const logs = await db
       .select()
       .from(requestLog)
