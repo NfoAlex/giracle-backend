@@ -504,7 +504,7 @@ export const requestLog = sqliteTable(
 
     index("RequestLog_userId_idx").on(table.userId),
 
-    index("RequestLog_createdAt_idx").on(table.createdAt),
+    index("RequestLog_createdAt_idx").on(table.createdAt, table.id),
   ],
 );
 

@@ -71,6 +71,13 @@
       "when": 1787761102553,
       "tag": "0009_legal_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788276395428,
+      "tag": "0010_aberrant_doorman",
+      "breakpoints": true
     }
   ]
 }
