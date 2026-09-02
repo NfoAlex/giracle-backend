@@ -304,6 +304,18 @@ export const messageUrlPreviews = sqliteTable(
   ],
 );
 
+export const messageUrlPreviewThumbnails = sqliteTable(
+  "MessageUrlPreviewThumbnail",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    url: text("url").unique().notNull(),
+    fileName: text("fileName").notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+);
+
 export const messageReadTimes = sqliteTable(
   "MessageReadTime",
   {
