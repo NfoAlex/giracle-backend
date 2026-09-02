@@ -98,7 +98,6 @@ export namespace ServiceServer {
     GIRACLE_SERVER_CONFIG.introduction = introduction;
     GIRACLE_SERVER_CONFIG.name = name;
 
-
     return serverinfo;
   };
 
