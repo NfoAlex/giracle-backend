@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import Elysia, { file, t } from "elysia";
+import Elysia, { file, status, t } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import { channelJoins, inboxes, users } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
@@ -193,6 +193,24 @@ export const message = new Elysia({ prefix: "/message" })
         tags: ["Message"],
       },
     },
+  )
+  .get(
+    "/url-thumbnail/:targetUrl",
+    async ({ params: { targetUrl } }) => {
+      const image = await ServiceMessage.GetUrlThumbnail(targetUrl);
+      if (image === null) throw status(500, "Internal Server Error");
+
+      return image;
+    },
+    {
+      params: t.Object({
+        targetUrl: t.String({ format: "uri" })
+      }),
+      detail: {
+        description: "URLプレビュー用に圧縮されたサムネイルを取得します",
+        tags: ["Message"]
+      }
+    }
   )
   .delete(
     "/delete",

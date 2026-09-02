@@ -23,6 +23,7 @@ import {
   messageReadTimes,
   messages,
   messageUrlPreviews,
+  messageUrlPreviewThumbnails,
   roleInfos,
   roleLinks,
 } from "../../db/schema";
@@ -357,6 +358,61 @@ export namespace ServiceMessage {
     }
 
     return fileData;
+  };
+
+  export const GetUrlThumbnail = async (targetUrl: string) => {
+    const thumbnail = db
+      .select({ fileName: messageUrlPreviewThumbnails.fileName })
+      .from(messageUrlPreviewThumbnails)
+      .where(eq(messageUrlPreviewThumbnails.url, targetUrl))
+      .get();
+
+    // キャッシュ済みサムネイルがあれば返す
+    const cachedFile = thumbnail
+      ? Bun.file(`./STORAGE/thumbnail/${thumbnail.fileName}`)
+      : null;
+    if (cachedFile && (await cachedFile.exists())) {
+      return cachedFile;
+    }
+
+    // URLのプロトコル確認（無効なURL形式は fetch が弾くので接頭辞のみ判定）
+    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+      return null;
+    }
+
+    // URLから画像を取得
+    const response = await fetch(targetUrl, {
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => null);
+
+    if (!response?.ok) {
+      return null;
+    }
+
+    // 画像圧縮とファイル保存
+    const fileName = `${crypto.randomUUID()}.webp`;
+    const filePath = `./STORAGE/thumbnail/${fileName}`;
+    try {
+      const arrayBuffer = await response.arrayBuffer();
+      const image = new Bun.Image(arrayBuffer);
+      await image.webp({ quality: 80 }).write(filePath);
+    } catch {
+      return null;
+    }
+
+    // DBへ保存
+    await db
+      .insert(messageUrlPreviewThumbnails)
+      .values({
+        url: targetUrl,
+        fileName,
+      })
+      .onConflictDoUpdate({
+        target: messageUrlPreviewThumbnails.url,
+        set: { fileName, createdAt: new Date() },
+      });
+
+    return Bun.file(filePath);
   };
 
   export const Delete = async (messageId: string, _userId: string) => {
