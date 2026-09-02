@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "../src";
-import { runRefreshUrlPreview } from "../src/Cron";
+import { CronInstances, runRefreshUrlPreview } from "../src/Cron";
 import { messageUrlPreviewThumbnails } from "../src/db/schema";
 import { INIT } from "./util";
 
@@ -67,6 +67,36 @@ describe("Cron/refreshUrlPreview", () => {
         .delete(messageUrlPreviewThumbnails)
         .where(eq(messageUrlPreviewThumbnails.fileName, newFileName));
       await unlink(`./STORAGE/thumbnail/${newFileName}`).catch(() => {});
+    }
+  });
+
+  test("NODE_ENV=testではBun.cronが登録されない", () => {
+    expect(CronInstances.refreshUrlPreview).toBeUndefined();
+  });
+
+  test("多重実行時に安全にスキップ・完了する", async () => {
+    const fileName = crypto.randomUUID();
+    const now = Date.now();
+
+    await db.insert(messageUrlPreviewThumbnails).values({
+      url: `https://example.com/${fileName}`,
+      fileName,
+      createdAt: new Date(now - OLD_MS),
+    });
+    await Bun.write(`./STORAGE/thumbnail/${fileName}`, "concurrent-test");
+
+    try {
+      const results = await Promise.all([
+        runRefreshUrlPreview(),
+        runRefreshUrlPreview(),
+      ]);
+      expect(results).toContain(true);
+      expect(results).toContain(false);
+    } finally {
+      await db
+        .delete(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.fileName, fileName));
+      await unlink(`./STORAGE/thumbnail/${fileName}`).catch(() => {});
     }
   });
 });
