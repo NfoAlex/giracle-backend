@@ -513,6 +513,28 @@ export const user = new Elysia({ prefix: "/user" })
       checkRoleTerm: "manageUser",
     },
   )
+  .post(
+    "/reset-password",
+    async ({ body: { targetUserId } }) => {
+      const newPassword = await ServiceUser.ResetPassword(targetUserId);
+
+      return {
+        message: "Password resetted",
+        data: {
+          newPassword
+        }
+      };
+    },
+    {
+      body: t.Object({
+        targetUserId: t.String()
+      }),
+      detail: {
+        description: "ユーザーのパスワードリセット"
+      },
+      checkRoleTerm: "manageServer",
+    }
+  )
   .delete(
     "/",
     async ({ body: { userId }, server, CheckToken: { _userId } }) => {

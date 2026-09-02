@@ -494,6 +494,28 @@ export namespace ServiceUser {
     return;
   };
 
+  export const ResetPassword = async (targetUserId: string) => {
+    const newPassword = crypto.randomBytes(16).toString("hex");
+
+    // ソルト再生成してハッシュ化保存（平文保存だとサインイン検証で必ず不一致になる）
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHashed = await Bun.password.hash(newPassword + salt);
+
+    db.transaction((tx) => {
+      tx.update(passwords)
+        .set({ password: passwordHashed, salt })
+        .where(eq(passwords.userId, targetUserId))
+        .run();
+
+      tx.delete(tokens).where(eq(tokens.userId, targetUserId)).run();
+    });
+
+    // 5分トークンキャッシュに残った旧トークンを即時無効化
+    invalidateUserCache(targetUserId);
+
+    return newPassword;
+  };
+
   export const UpdateProfile = async (
     _userId: string,
     name?: string,
