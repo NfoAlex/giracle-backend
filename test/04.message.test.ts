@@ -1,7 +1,13 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
-import { channelJoins, inboxes, messageFileAttached } from "../src/db/schema";
+import { ServiceMessage } from "../src/components/Message/message.service";
+import {
+  channelJoins,
+  inboxes,
+  messageFileAttached,
+  messageUrlPreviewThumbnails,
+} from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -561,6 +567,78 @@ describe("/message/file/get", async () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
+  });
+});
+
+describe("/message/url-thumbnail/:targetUrl", () => {
+  it("サムネイル未キャッシュ時: URLから画像を取得しBun.Imageで圧縮・保存・DB登録される", async () => {
+    const originalFetch = globalThis.fetch;
+    const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      if (input.toString() === testUrl) {
+        return new Response(sampleImg, {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        });
+      }
+      return originalFetch(input);
+    }) as typeof fetch;
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl);
+      expect(file).not.toBeNull();
+      if (!file) throw new Error("file must not be null");
+
+      expect(await file.exists()).toBeTrue();
+      expect(file.type).toBe("image/webp");
+
+      // DBに登録されていることを確認
+      const record = db
+        .select()
+        .from(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+        .get();
+      expect(record).toBeDefined();
+      if (!record) throw new Error("record must not be undefined");
+      expect(file.name).toContain(record.fileName);
+
+      // キャッシュ後の再取得では既存ファイルが返ること
+      const cachedFile = await ServiceMessage.GetUrlThumbnail(testUrl);
+      expect(cachedFile).not.toBeNull();
+      if (!cachedFile) throw new Error("cachedFile must not be null");
+      expect(cachedFile.name).toBe(file.name);
+
+      // クリーンアップ
+      await file.delete().catch(() => {});
+      await db
+        .delete(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fetch失敗時: nullが返りDBにも登録されない", async () => {
+    const originalFetch = globalThis.fetch;
+    const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      if (input.toString() === testUrl) {
+        return new Response("Not found", { status: 404 });
+      }
+      return originalFetch(input);
+    }) as typeof fetch;
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl);
+      expect(file).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
@@ -1574,4 +1652,5 @@ describe("/message/edit", async () => {
     //戻す
     GIRACLE_SERVER_CONFIG.MessageMaxLength = backup;
   });
+
 });
