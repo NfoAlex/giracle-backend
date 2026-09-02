@@ -1,0 +1,1 @@
+CREATE INDEX `MessageUrlPreviewThumbnail_createdAt_idx` ON `MessageUrlPreviewThumbnail` (`createdAt`);
