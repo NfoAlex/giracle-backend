@@ -4,6 +4,7 @@ import { app, db } from "../src";
 import {
   channelJoins,
   messages,
+  passwords,
   roleInfos,
   roleLinks,
   tokens,
@@ -1120,5 +1121,102 @@ describe("/user/delete", () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("User already deleted");
+  });
+});
+
+describe("/user/reset-password", () => {
+  let RESET_TARGET_TOKEN = "";
+  let RESET_TARGET_USER_ID = "";
+
+  beforeAll(async () => {
+    ({ token: RESET_TARGET_TOKEN, userId: RESET_TARGET_USER_ID } =
+      await signUpAndSignIn("usertestreset"));
+
+    // reset-passwordはcheckRoleTerm: "manageServer"必須。TESTUSERに付与する
+    await db.insert(roleInfos).values({
+      id: "ServerManageForResetTest",
+      name: "Server Manage Role",
+      createdUserId: "TESTUSER",
+      manageServer: true,
+    });
+    await db
+      .insert(roleLinks)
+      .values({ roleId: "ServerManageForResetTest", userId: "TESTUSER" });
+  });
+
+  it("未認証 :: 401", async () => {
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: RESET_TARGET_USER_ID },
+      excludeCredential: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+
+  it("manageServer権限なし :: 401", async () => {
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: RESET_TARGET_USER_ID },
+      useSecondaryUser: true,
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(t).toBe("Role level not enough");
+  });
+
+  it("正常 :: パスワードがリセットされ全セッションが無効化される", async () => {
+    const before = await db.query.passwords.findFirst({
+      where: eq(passwords.userId, RESET_TARGET_USER_ID),
+    });
+    expect(before).toBeDefined();
+
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: RESET_TARGET_USER_ID },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Password resetted");
+    expect(j.data.newPassword).toHaveLength(32); // randomBytes(16)のhex表記
+
+    // DBのパスワードが書き換わっている
+    const after = await db.query.passwords.findFirst({
+      where: eq(passwords.userId, RESET_TARGET_USER_ID),
+    });
+    expect(after).toBeDefined();
+    expect(after?.password).not.toBe(before?.password);
+
+    // 対象ユーザーのトークンが全削除されている
+    const remainingTokens = await db.query.tokens.findMany({
+      where: eq(tokens.userId, RESET_TARGET_USER_ID),
+    });
+    expect(remainingTokens).toHaveLength(0);
+
+    // 旧トークンは即時無効化される
+    const oldVerify = await subFetch({
+      path: "/user/verify-token",
+      method: "GET",
+      token: RESET_TARGET_TOKEN,
+    });
+    expect(oldVerify.ok).toBe(false);
+    expect(oldVerify.status).toBe(401);
+
+    // 新しいパスワードでサインインできる
+    const signInRes = await app.handle(
+      new Request("http://localhost/user/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: "usertestreset",
+          password: j.data.newPassword,
+        }),
+      }),
+    );
+    expect(signInRes.ok).toBe(true);
   });
 });
