@@ -1,5 +1,5 @@
-// URL検証 (SSRF対策): リテラルIP排除 + DNS解決 + 禁止IP判定まとめ
-// 参照形: Util.validateUrl.isValid(...) / .isBlockedIp(...) / .isLiteralIp(...)
+// URL検証 (SSRF対策): プロトコル制限 + リテラルIP排除 + DNS解決 + 禁止IP判定まとめ
+// 参照形: Util.validateUrl.isValid(...)
 
 export namespace ValidateUrl {
   // プライベート/予約IPv4レンジ判定 (SSRF対策)
