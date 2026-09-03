@@ -378,15 +378,36 @@ export namespace ServiceMessage {
       return cachedFile;
     }
 
-    // URLのプロトコル確認（無効なURL形式は fetch が弾くので接頭辞のみ判定）
-    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+    // 無効URL (内部IP・解決不能) は取得しない (SSRF対策)
+    if (!(await Util.validateUrl.isValid(targetUrl))) {
       return null;
     }
 
-    // URLから画像を取得
-    const response = await fetch(targetUrl, {
-      signal: AbortSignal.timeout(5000),
-    }).catch(() => null);
+    // リダイレクト先も検証しながら追跡 (自動追従は検証前の内部IPへ飛ぶためmanual)
+    const MAX_THUMBNAIL_REDIRECT = 3;
+    let url = targetUrl;
+    let response: Response | null = null;
+    for (let i = 0; i <= MAX_THUMBNAIL_REDIRECT; i++) {
+      response = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
+        redirect: "manual",
+      }).catch(() => null);
+      if (!response) return null;
+
+      // 304はリダイレクトではなく本体応答として扱う
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+
+      const location = response.headers.get("location");
+      if (!location) return null;
+
+      try {
+        url = new URL(location, url).toString();
+      } catch {
+        return null;
+      }
+      if (!(await Util.validateUrl.isValid(url))) return null;
+      if (i === MAX_THUMBNAIL_REDIRECT) return null;
+    }
 
     if (!response?.ok) {
       return null;
@@ -406,7 +427,9 @@ export namespace ServiceMessage {
       } else {
         const image = new Bun.Image(arrayBuffer);
         await image
-          .resize(forFavicon ? 32 : 512, undefined, { withoutEnlargement: true })
+          .resize(forFavicon ? 32 : 512, undefined, {
+            withoutEnlargement: true,
+          })
           .webp({ quality: 95 })
           .write(filePath);
       }
@@ -588,18 +611,12 @@ export namespace ServiceMessage {
     //スキップ数と取得数を設定
     const skip = (cursor - 1) * 30;
     const length = 30;
-    //メッセージが存在するか確認
+    //メッセージが存在するか確認 (チャンネル可視性判定にchannelIdだけ必要)
     const message = await db.query.messages.findFirst({
       where: eq(messages.id, messageId),
-      with: {
-        MessageReaction: {
-          offset: skip,
-          limit: length,
-          columns: {
-            userId: true,
-          },
-          where: eq(messageReactions.emojiCode, emojiCode),
-        },
+      columns: {
+        id: true,
+        channelId: true,
       },
     });
     if (message === undefined) {
@@ -615,7 +632,21 @@ export namespace ServiceMessage {
       throw status(400, "Message not found or is private");
     }
 
-    return message;
+    //ネストリレーションにoffset不可のため直接ページネーション取得
+    const reactions = await db.query.messageReactions.findMany({
+      where: and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.emojiCode, emojiCode),
+      ),
+      columns: {
+        userId: true,
+      },
+      orderBy: (t, { asc }) => asc(t.reactedAt),
+      limit: length,
+      offset: skip,
+    });
+
+    return { ...message, MessageReaction: reactions };
   };
 
   export const DeleteEmojiReaction = async (

@@ -12,6 +12,7 @@ import {
   roleLinks,
   tokens,
 } from "./db/schema";
+import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<
@@ -29,23 +30,6 @@ setInterval(() => {
     }
   }
 }, ONE_MINUITE);
-
-// URLプレビュー取得禁止IPレンジ（SSRF対策: 名前解決後のアドレスを判定）
-const isBlockedIp = (ip: string): boolean => {
-  const lower = ip.toLowerCase();
-  // IPv4-mapped IPv6 は埋め込まれたIPv4部分で判定
-  const v4 = lower.replace(/^::ffff:/, "");
-  return (
-    // loopback / private / link-local / CGNAT / 予約 / マルチキャスト
-    /^(0\.|10\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.(0\.(0|2)\.|168\.)|198\.(1[89]\.|51\.100\.)|203\.0\.113\.|2(2[4-9]|3\d)\.|2[4-5]\d\.)/.test(
-      v4,
-    ) ||
-    // unspecified / loopback / NAT64 / discard / documentation / unique-local / link-local / multicast
-    /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/.test(
-      lower,
-    )
-  );
-};
 
 /**
  * 指定トークンのキャッシュを無効化する（サインアウト・セッション削除時に使用）
@@ -365,30 +349,8 @@ export namespace Middleware {
             // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
             const validUrls: string[] = [];
             for (const urlStr of urlMatched) {
-              try {
-                const hostname = new URL(urlStr).hostname.replace(
-                  /^\[|\]$/g,
-                  "",
-                );
-
-                // リテラルIP（IPv4/IPv6）は除外
-                if (
-                  /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
-                  hostname.includes(":")
-                )
-                  continue;
-
-                // 名前解決し、全アドレスが公開IPであることを確認
-                const addresses = await Bun.dns.lookup(hostname);
-                if (
-                  addresses.length === 0 ||
-                  addresses.some((addr) => isBlockedIp(addr.address))
-                )
-                  continue;
-
+              if (await Util.validateUrl.isValid(urlStr)) {
                 validUrls.push(urlStr);
-              } catch {
-                // 無効なURL・解決不能なホスト名は除外
               }
             }
 

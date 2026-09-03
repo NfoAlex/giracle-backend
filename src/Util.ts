@@ -11,6 +11,7 @@ import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
+import { ValidateUrl } from "./Utils/ValidateUrl";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;
@@ -19,6 +20,7 @@ export namespace Util {
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
   export const escapeLikePattern = EscapeLikePattern;
+  export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;

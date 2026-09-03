@@ -55,6 +55,7 @@ export async function INIT() {
   await db.delete(inboxes);
   await db.delete(messageReadTimes);
   await db.delete(messageReactions);
+  await db.delete(messageUrlPreviewThumbnails);
   await db.delete(messageUrlPreviews);
   await db.delete(messages);
   await db.delete(roleLinks);
@@ -65,6 +66,7 @@ export async function INIT() {
   await db.delete(serverConfigs);
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
+  await fs.rm("./STORAGE/thumbnail", { recursive: true, force: true });
   await $`bun ./src/db/seeds.ts`;
 
   await db.insert(users).values([
