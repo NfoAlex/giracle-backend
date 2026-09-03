@@ -196,21 +196,22 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/url-thumbnail",
-    async ({ query: { targetUrl } }) => {
-      const image = await ServiceMessage.GetUrlThumbnail(targetUrl);
+    async ({ query: { targetUrl, forFavicon } }) => {
+      const image = await ServiceMessage.GetUrlThumbnail(targetUrl, forFavicon);
       if (image === null) throw status(500, "Internal Server Error");
 
       return image;
     },
     {
       query: t.Object({
-        targetUrl: t.String({ format: "uri" })
+        targetUrl: t.String({ format: "uri" }),
+        forFavicon: t.Boolean({ default: false }),
       }),
       detail: {
         description: "URLプレビュー用に圧縮されたサムネイルを取得します",
-        tags: ["Message"]
-      }
-    }
+        tags: ["Message"],
+      },
+    },
   )
   .delete(
     "/delete",

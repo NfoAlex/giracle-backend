@@ -360,7 +360,10 @@ export namespace ServiceMessage {
     return fileData;
   };
 
-  export const GetUrlThumbnail = async (targetUrl: string) => {
+  export const GetUrlThumbnail = async (
+    targetUrl: string,
+    forFavicon: boolean,
+  ) => {
     const thumbnail = db
       .select({ fileName: messageUrlPreviewThumbnails.fileName })
       .from(messageUrlPreviewThumbnails)
@@ -389,14 +392,26 @@ export namespace ServiceMessage {
       return null;
     }
 
-    // 画像圧縮とファイル保存
-    const fileName = `${crypto.randomUUID()}.webp`;
+    const arrayBuffer = await response.arrayBuffer();
+
+    // ファイル名と保存パスを決める
+    const isSvg = response.headers.get("content-type")?.includes("image/svg");
+    const fileName = `${crypto.randomUUID()}.${isSvg ? "svg" : "webp"}`;
     const filePath = `./STORAGE/thumbnail/${fileName}`;
+
     try {
-      const arrayBuffer = await response.arrayBuffer();
-      const image = new Bun.Image(arrayBuffer);
-      await image.resize(256).webp({ quality: 80 }).write(filePath);
-    } catch {
+      // SVG は Bun.Image 非対応のためバイト列をそのまま保存
+      if (isSvg) {
+        await Bun.write(filePath, new Uint8Array(arrayBuffer));
+      } else {
+        const image = new Bun.Image(arrayBuffer);
+        await image
+          .resize(forFavicon ? 32 : 256)
+          .webp({ quality: 95 })
+          .write(filePath);
+      }
+    } catch (e) {
+      console.error("message.service :: GetUrlThumbnail : 失敗", e);
       return null;
     }
 
