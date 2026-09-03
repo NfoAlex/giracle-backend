@@ -689,6 +689,12 @@ describe("/message/url-thumbnail", () => {
     }
   });
 
+  it("http以外・リテラルIPは無効", async () => {
+    // DNS解決前の判定のみで完結するケース (ネットワーク不要)
+    expect(await Util.validateUrl.isValid("ftp://example.com/x")).toBeFalse();
+    expect(await Util.validateUrl.isValid("http://127.0.0.1/x")).toBeFalse();
+  });
+
   it("リダイレクト先が内部IP: 追従せずnull", async () => {
     const testUrl = `https://example.com/redirect-${crypto.randomUUID()}.png`;
     const evil = "http://169.254.169.254/latest/meta-data/";

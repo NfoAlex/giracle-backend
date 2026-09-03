@@ -31,7 +31,14 @@ export namespace ValidateUrl {
    */
   export async function isValid(urlStr: string): Promise<boolean> {
     try {
-      const hostname = new URL(urlStr).hostname.replace(/^\[|\]$/g, "");
+      const parsed = new URL(urlStr);
+
+      // http/https以外は取得しない
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return false;
+      }
+
+      const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
 
       // リテラルIPは除外
       if (isLiteralIp(hostname)) return false;
