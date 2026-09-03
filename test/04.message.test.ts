@@ -8,6 +8,7 @@ import {
   messageFileAttached,
   messageUrlPreviewThumbnails,
 } from "../src/db/schema";
+import { Util } from "../src/Util";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -685,6 +686,36 @@ describe("/message/url-thumbnail", () => {
     } finally {
       restoreFavicon();
       restoreNormal();
+    }
+  });
+
+  it("リダイレクト先が内部IP: 追従せずnull", async () => {
+    const testUrl = `https://example.com/redirect-${crypto.randomUUID()}.png`;
+    const evil = "http://169.254.169.254/latest/meta-data/";
+    const fetched: string[] = [];
+    // biome-ignore lint/suspicious/noExplicitAny: fetchスタブの引数検査用
+    let fetchInit: any;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request, init?: any) => {
+      fetched.push(input.toString());
+      fetchInit = init;
+      if (input.toString() === testUrl) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: evil },
+        });
+      }
+      return new Response("blocked", { status: 500 });
+    }) as typeof fetch;
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      expect(file).toBeNull();
+      expect(fetched).not.toContain(evil);
+      // 自動追従 (デフォルト) では検証前に内部へ飛ぶため manual 必須
+      expect(fetchInit?.redirect).toBe("manual");
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 

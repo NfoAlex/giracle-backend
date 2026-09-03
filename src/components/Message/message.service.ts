@@ -383,10 +383,31 @@ export namespace ServiceMessage {
       return null;
     }
 
-    // URLから画像を取得
-    const response = await fetch(targetUrl, {
-      signal: AbortSignal.timeout(5000),
-    }).catch(() => null);
+    // リダイレクト先も検証しながら追跡 (自動追従は検証前の内部IPへ飛ぶためmanual)
+    const MAX_THUMBNAIL_REDIRECT = 3;
+    let url = targetUrl;
+    let response: Response | null = null;
+    for (let i = 0; i <= MAX_THUMBNAIL_REDIRECT; i++) {
+      response = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
+        redirect: "manual",
+      }).catch(() => null);
+      if (!response) return null;
+
+      // 304はリダイレクトではなく本体応答として扱う
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+
+      const location = response.headers.get("location");
+      if (!location) return null;
+
+      try {
+        url = new URL(location, url).toString();
+      } catch {
+        return null;
+      }
+      if (!(await Util.validateUrl.isValid(url))) return null;
+      if (i === MAX_THUMBNAIL_REDIRECT) return null;
+    }
 
     if (!response?.ok) {
       return null;
