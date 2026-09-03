@@ -406,7 +406,7 @@ export namespace ServiceMessage {
       } else {
         const image = new Bun.Image(arrayBuffer);
         await image
-          .resize(forFavicon ? 32 : 256)
+          .resize(forFavicon ? 32 : 512, undefined, { withoutEnlargement: true })
           .webp({ quality: 95 })
           .write(filePath);
       }
