@@ -17,6 +17,7 @@ import {
   messageReadTimes,
   messages,
   messageUrlPreviews,
+  messageUrlPreviewThumbnails,
   notificationConfigs,
   notificationDevices,
   passwords,
@@ -247,4 +248,46 @@ export async function FETCH({
       body: isFormData ? body : JSON.stringify(body),
     }),
   );
+}
+
+/**
+ * 指定URLへのfetchだけ差し替える。戻り値は復元関数。
+ */
+export function mockFetchFor(
+  testUrl: string,
+  body: BodyInit,
+  contentType: string,
+  status = 200,
+) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) =>
+    input.toString() === testUrl
+      ? new Response(body, { status, headers: { "Content-Type": contentType } })
+      : originalFetch(input)) as typeof fetch;
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
+/**
+ * 生成サムネイルのファイルとDB行を掃除する。
+ */
+export async function cleanupThumbnail(
+  testUrl: string,
+  file?: Bun.BunFile | null,
+) {
+  if (file) await file.delete().catch(() => {});
+  const record = db
+    .select()
+    .from(messageUrlPreviewThumbnails)
+    .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+    .get();
+  if (record) {
+    await Bun.file(`./STORAGE/thumbnail/${record.fileName}`)
+      .delete()
+      .catch(() => {});
+    await db
+      .delete(messageUrlPreviewThumbnails)
+      .where(eq(messageUrlPreviewThumbnails.url, testUrl));
+  }
 }

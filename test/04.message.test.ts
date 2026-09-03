@@ -8,7 +8,7 @@ import {
   messageFileAttached,
   messageUrlPreviewThumbnails,
 } from "../src/db/schema";
-import { FETCH, INIT } from "./util";
+import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 let lastOgsOptions:
@@ -571,45 +571,12 @@ describe("/message/file/get", async () => {
 });
 
 describe("/message/url-thumbnail", () => {
-  // 指定URLへのfetchだけ差し替える。戻り値は復元関数
-  const mockFetch = (handler: (url: string) => Response | null) => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: string | URL | Request) =>
-      handler(input.toString()) ?? originalFetch(input)) as typeof fetch;
-    return () => {
-      globalThis.fetch = originalFetch;
-    };
-  };
-
-  // 生成ファイルとDB行を掃除する
-  const cleanupThumbnail = async (testUrl: string) => {
-    const record = db
-      .select()
-      .from(messageUrlPreviewThumbnails)
-      .where(eq(messageUrlPreviewThumbnails.url, testUrl))
-      .get();
-    if (record) {
-      await Bun.file(`./STORAGE/thumbnail/${record.fileName}`)
-        .delete()
-        .catch(() => {});
-      await db
-        .delete(messageUrlPreviewThumbnails)
-        .where(eq(messageUrlPreviewThumbnails.url, testUrl));
-    }
-  };
   it("GET: サムネイル取得成功", async () => {
     const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
     const sampleImg = await Bun.file(
       "./STORAGE/icon/default.png",
     ).arrayBuffer();
-    const restore = mockFetch((url) =>
-      url === testUrl
-        ? new Response(sampleImg, {
-            status: 200,
-            headers: { "Content-Type": "image/png" },
-          })
-        : null,
-    );
+    const restore = mockFetchFor(testUrl, sampleImg, "image/png");
 
     try {
       const res = await FETCH({
@@ -627,9 +594,7 @@ describe("/message/url-thumbnail", () => {
 
   it("GET: fetch失敗時 500", async () => {
     const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
-    const restore = mockFetch((url) =>
-      url === testUrl ? new Response("Not found", { status: 404 }) : null,
-    );
+    const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
 
     try {
       const res = await FETCH({
@@ -647,14 +612,7 @@ describe("/message/url-thumbnail", () => {
     const sampleImg = await Bun.file(
       "./STORAGE/icon/default.png",
     ).arrayBuffer();
-    const restore = mockFetch((url) =>
-      url === testUrl
-        ? new Response(sampleImg, {
-            status: 200,
-            headers: { "Content-Type": "image/png" },
-          })
-        : null,
-    );
+    const restore = mockFetchFor(testUrl, sampleImg, "image/png");
 
     try {
       const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
@@ -677,7 +635,7 @@ describe("/message/url-thumbnail", () => {
       if (!cachedFile) throw new Error("cachedFile must not be null");
       expect(cachedFile.name).toBe(file.name);
 
-      await cleanupThumbnail(testUrl);
+      await cleanupThumbnail(testUrl, file);
     } finally {
       restore();
     }
@@ -685,9 +643,7 @@ describe("/message/url-thumbnail", () => {
 
   it("fetch失敗時: nullが返りDBにも登録されない", async () => {
     const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
-    const restore = mockFetch((url) =>
-      url === testUrl ? new Response("Not found", { status: 404 }) : null,
-    );
+    const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
 
     try {
       const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
@@ -702,13 +658,15 @@ describe("/message/url-thumbnail", () => {
     const sampleImg = await Bun.file(
       "./STORAGE/icon/default.png",
     ).arrayBuffer();
-    const restore = mockFetch((url) =>
-      url === normalUrl || url === faviconUrl
-        ? new Response(sampleImg.slice(0), {
-            status: 200,
-            headers: { "Content-Type": "image/png" },
-          })
-        : null,
+    const restoreFavicon = mockFetchFor(
+      faviconUrl,
+      sampleImg.slice(0),
+      "image/png",
+    );
+    const restoreNormal = mockFetchFor(
+      normalUrl,
+      sampleImg.slice(0),
+      "image/png",
     );
 
     try {
@@ -722,24 +680,18 @@ describe("/message/url-thumbnail", () => {
         (await normal.arrayBuffer()).byteLength,
       );
 
-      await cleanupThumbnail(normalUrl);
-      await cleanupThumbnail(faviconUrl);
+      await cleanupThumbnail(normalUrl, normal);
+      await cleanupThumbnail(faviconUrl, favicon);
     } finally {
-      restore();
+      restoreFavicon();
+      restoreNormal();
     }
   });
 
   it("SVG時: 変換せずsvgのまま保存される", async () => {
     const testUrl = `https://example.com/image-${crypto.randomUUID()}.svg`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg"/>`;
-    const restore = mockFetch((url) =>
-      url === testUrl
-        ? new Response(svg, {
-            status: 200,
-            headers: { "Content-Type": "image/svg+xml" },
-          })
-        : null,
-    );
+    const restore = mockFetchFor(testUrl, svg, "image/svg+xml");
 
     try {
       const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
@@ -749,7 +701,7 @@ describe("/message/url-thumbnail", () => {
       expect(file.name?.endsWith(".svg")).toBeTrue();
       expect(await file.text()).toBe(svg);
 
-      await cleanupThumbnail(testUrl);
+      await cleanupThumbnail(testUrl, file);
     } finally {
       restore();
     }
