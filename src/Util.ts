@@ -5,13 +5,13 @@ import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisibility";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
 import EscapeLikePattern from "./Utils/EscapeLikePattern";
-import { ExtractValidPreviewUrls } from "./Utils/ExtractValidPreviewUrls";
 import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
+import { ValidateUrl } from "./Utils/ValidateUrl";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;
@@ -20,7 +20,7 @@ export namespace Util {
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
   export const escapeLikePattern = EscapeLikePattern;
-  export const extractValidPreviewUrls = ExtractValidPreviewUrls;
+  export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
