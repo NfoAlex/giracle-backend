@@ -311,17 +311,48 @@ export namespace Middleware {
             const messageData = responseData;
             const messageId = messageData.id;
 
-            // URL抽出・正規化・SSRF検証まとめ取得
-            const validUrls = await Util.extractValidPreviewUrls.extract(
-              messageData.content ?? "",
-            );
+            const urlRegex: RegExp =
+              /https?:\/\/[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#　-ヾ一-龠！-￣]+/g;
 
-            if (validUrls.length === 0 && !messageData.isEdited) return;
+            // 重複したURLを排除（同じURLのOGPを何度も取得しないようにする）
+            let urlMatched = [
+              ...new Set(messageData.content?.match(urlRegex) ?? []),
+            ];
+
+            if (urlMatched.length === 0 && !messageData.isEdited) return;
+
+            // Twitter/Xのリンクをfxtwitterに置換（URLオブジェクトを使って安全にパース）
+            urlMatched = urlMatched.map((urlStr) => {
+              try {
+                const parsedUrl = new URL(urlStr);
+                const isTwitterOrX =
+                  parsedUrl.hostname === "twitter.com" ||
+                  parsedUrl.hostname === "www.twitter.com" ||
+                  parsedUrl.hostname === "x.com" ||
+                  parsedUrl.hostname === "www.x.com";
+
+                if (isTwitterOrX && parsedUrl.pathname.includes("/status/")) {
+                  parsedUrl.hostname = "fxtwitter.com";
+                  return parsedUrl.toString();
+                }
+                return urlStr;
+              } catch {
+                return urlStr; // パース失敗時はそのまま返す
+              }
+            });
 
             // 編集された時用に現在のURLプレビュー情報を削除
             await db
               .delete(messageUrlPreviews)
               .where(eq(messageUrlPreviews.messageId, messageId));
+
+            // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
+            const validUrls: string[] = [];
+            for (const urlStr of urlMatched) {
+              if (await Util.validateUrl.isValid(urlStr)) {
+                validUrls.push(urlStr);
+              }
+            }
 
             // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
             const fetchPromises = validUrls.map(async (url) => {
