@@ -570,7 +570,73 @@ describe("/message/file/get", async () => {
   });
 });
 
-describe("/message/url-thumbnail/:targetUrl", () => {
+describe("/message/url-thumbnail", () => {
+  it("GET: サムネイル取得成功", async () => {
+    const originalFetch = globalThis.fetch;
+    const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      if (input.toString() === testUrl) {
+        return new Response(sampleImg, {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        });
+      }
+      return originalFetch(input);
+    }) as typeof fetch;
+
+    try {
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("image/webp");
+
+      // クリーンアップ
+      const record = db
+        .select()
+        .from(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+        .get();
+      if (record) {
+        await Bun.file(`./STORAGE/thumbnail/${record.fileName}`)
+          .delete()
+          .catch(() => {});
+        await db
+          .delete(messageUrlPreviewThumbnails)
+          .where(eq(messageUrlPreviewThumbnails.url, testUrl));
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("GET: fetch失敗時 500", async () => {
+    const originalFetch = globalThis.fetch;
+    const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      if (input.toString() === testUrl) {
+        return new Response("Not found", { status: 404 });
+      }
+      return originalFetch(input);
+    }) as typeof fetch;
+
+    try {
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(500);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("サムネイル未キャッシュ時: URLから画像を取得しBun.Imageで圧縮・保存・DB登録される", async () => {
     const originalFetch = globalThis.fetch;
     const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
@@ -1652,5 +1718,4 @@ describe("/message/edit", async () => {
     //戻す
     GIRACLE_SERVER_CONFIG.MessageMaxLength = backup;
   });
-
 });
