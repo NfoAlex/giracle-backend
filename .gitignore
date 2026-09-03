@@ -51,8 +51,5 @@ package-lock.json
 /.idea
 
 # ユーザーのアップロード
-/STORAGE/file/*
-/STORAGE/icon/*
+/STORAGE/*
 !/STORAGE/icon/default.png
-/STORAGE/banner/*
-/STORAGE/custom-emoji/*

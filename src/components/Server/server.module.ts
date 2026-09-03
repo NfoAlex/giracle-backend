@@ -336,7 +336,10 @@ export const server = new Elysia({ prefix: "/server" })
   .get(
     "/log",
     async ({ query: { targetDate, cursorLogId } }) => {
-      const logs = await ServiceServer.GetLogs(new Date(targetDate), cursorLogId);
+      const logs = await ServiceServer.GetLogs(
+        new Date(targetDate),
+        cursorLogId,
+      );
 
       return {
         message: "Fetched request logs",

@@ -16,6 +16,10 @@ await mkdir("./STORAGE/file", { recursive: true }).catch((_) => {});
 await mkdir("./STORAGE/icon", { recursive: true }).catch((_) => {});
 await mkdir("./STORAGE/banner", { recursive: true }).catch((_) => {});
 await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((_) => {});
+await mkdir("./STORAGE/thumbnail", { recursive: true }).catch((_) => {});
+
+//cron適用
+import "./Cron";
 
 //DB設定 (Drizzle)
 export { db } from "./db";

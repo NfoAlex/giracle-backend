@@ -1,8 +1,14 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
-import { channelJoins, inboxes, messageFileAttached } from "../src/db/schema";
-import { FETCH, INIT } from "./util";
+import { ServiceMessage } from "../src/components/Message/message.service";
+import {
+  channelJoins,
+  inboxes,
+  messageFileAttached,
+  messageUrlPreviewThumbnails,
+} from "../src/db/schema";
+import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 let lastOgsOptions:
@@ -564,7 +570,143 @@ describe("/message/file/get", async () => {
   });
 });
 
-// /message/file/delete
+describe("/message/url-thumbnail", () => {
+  it("GET: サムネイル取得成功", async () => {
+    const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+    const restore = mockFetchFor(testUrl, sampleImg, "image/png");
+
+    try {
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("image/webp");
+
+      await cleanupThumbnail(testUrl);
+    } finally {
+      restore();
+    }
+  });
+
+  it("GET: fetch失敗時 500", async () => {
+    const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
+    const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
+
+    try {
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(500);
+    } finally {
+      restore();
+    }
+  });
+
+  it("サムネイル未キャッシュ時: URLから画像を取得しBun.Imageで圧縮・保存・DB登録される", async () => {
+    const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+    const restore = mockFetchFor(testUrl, sampleImg, "image/png");
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      if (!file) throw new Error("file must not be null");
+
+      expect(await file.exists()).toBeTrue();
+      expect(file.type).toBe("image/webp");
+
+      // DBに登録されていることを確認
+      const record = db
+        .select()
+        .from(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+        .get();
+      if (!record) throw new Error("record must not be undefined");
+      expect(file.name).toContain(record.fileName);
+
+      // キャッシュ後の再取得では既存ファイルが返ること
+      const cachedFile = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      if (!cachedFile) throw new Error("cachedFile must not be null");
+      expect(cachedFile.name).toBe(file.name);
+
+      await cleanupThumbnail(testUrl, file);
+    } finally {
+      restore();
+    }
+  });
+
+  it("fetch失敗時: nullが返りDBにも登録されない", async () => {
+    const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
+    const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      expect(file).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+  it("forFavicon=true時: 通常より小さいwebpで保存される", async () => {
+    const normalUrl = `https://example.com/normal-${crypto.randomUUID()}.png`;
+    const faviconUrl = `https://example.com/favicon-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+    const restoreFavicon = mockFetchFor(
+      faviconUrl,
+      sampleImg.slice(0),
+      "image/png",
+    );
+    const restoreNormal = mockFetchFor(
+      normalUrl,
+      sampleImg.slice(0),
+      "image/png",
+    );
+
+    try {
+      const normal = await ServiceMessage.GetUrlThumbnail(normalUrl, false);
+      if (!normal) throw new Error("normal must not be null");
+      const favicon = await ServiceMessage.GetUrlThumbnail(faviconUrl, true);
+      if (!favicon) throw new Error("favicon must not be null");
+
+      expect(favicon.type).toBe("image/webp");
+      expect((await favicon.arrayBuffer()).byteLength).toBeLessThan(
+        (await normal.arrayBuffer()).byteLength,
+      );
+
+      await cleanupThumbnail(normalUrl, normal);
+      await cleanupThumbnail(faviconUrl, favicon);
+    } finally {
+      restoreFavicon();
+      restoreNormal();
+    }
+  });
+
+  it("SVG時: 変換せずsvgのまま保存される", async () => {
+    const testUrl = `https://example.com/image-${crypto.randomUUID()}.svg`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"/>`;
+    const restore = mockFetchFor(testUrl, svg, "image/svg+xml");
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      if (!file) throw new Error("file must not be null");
+
+      expect(await file.exists()).toBeTrue();
+      expect(file.name?.endsWith(".svg")).toBeTrue();
+      expect(await file.text()).toBe(svg);
+
+      await cleanupThumbnail(testUrl, file);
+    } finally {
+      restore();
+    }
+  });
+});
 
 describe("/message/inbox", async () => {
   it("正常", async () => {

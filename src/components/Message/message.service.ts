@@ -23,6 +23,7 @@ import {
   messageReadTimes,
   messages,
   messageUrlPreviews,
+  messageUrlPreviewThumbnails,
   roleInfos,
   roleLinks,
 } from "../../db/schema";
@@ -357,6 +358,76 @@ export namespace ServiceMessage {
     }
 
     return fileData;
+  };
+
+  export const GetUrlThumbnail = async (
+    targetUrl: string,
+    forFavicon: boolean,
+  ) => {
+    const thumbnail = db
+      .select({ fileName: messageUrlPreviewThumbnails.fileName })
+      .from(messageUrlPreviewThumbnails)
+      .where(eq(messageUrlPreviewThumbnails.url, targetUrl))
+      .get();
+
+    // キャッシュ済みサムネイルがあれば返す
+    const cachedFile = thumbnail
+      ? Bun.file(`./STORAGE/thumbnail/${thumbnail.fileName}`)
+      : null;
+    if (cachedFile && (await cachedFile.exists())) {
+      return cachedFile;
+    }
+
+    // URLのプロトコル確認（無効なURL形式は fetch が弾くので接頭辞のみ判定）
+    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+      return null;
+    }
+
+    // URLから画像を取得
+    const response = await fetch(targetUrl, {
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => null);
+
+    if (!response?.ok) {
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    // ファイル名と保存パスを決める
+    const isSvg = response.headers.get("content-type")?.includes("image/svg");
+    const fileName = `${crypto.randomUUID()}.${isSvg ? "svg" : "webp"}`;
+    const filePath = `./STORAGE/thumbnail/${fileName}`;
+
+    try {
+      // SVG は Bun.Image 非対応のためバイト列をそのまま保存
+      if (isSvg) {
+        await Bun.write(filePath, new Uint8Array(arrayBuffer));
+      } else {
+        const image = new Bun.Image(arrayBuffer);
+        await image
+          .resize(forFavicon ? 32 : 512, undefined, { withoutEnlargement: true })
+          .webp({ quality: 95 })
+          .write(filePath);
+      }
+    } catch (e) {
+      console.error("message.service :: GetUrlThumbnail : 失敗", e);
+      return null;
+    }
+
+    // DBへ保存
+    await db
+      .insert(messageUrlPreviewThumbnails)
+      .values({
+        url: targetUrl,
+        fileName,
+      })
+      .onConflictDoUpdate({
+        target: messageUrlPreviewThumbnails.url,
+        set: { fileName, createdAt: new Date() },
+      });
+
+    return Bun.file(filePath);
   };
 
   export const Delete = async (messageId: string, _userId: string) => {
