@@ -378,8 +378,8 @@ export namespace ServiceMessage {
       return cachedFile;
     }
 
-    // URLのプロトコル確認（無効なURL形式は fetch が弾くので接頭辞のみ判定）
-    if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+    // 無効URL (内部IP・解決不能) は取得しない (SSRF対策)
+    if (!(await Util.validateUrl.isValid(targetUrl))) {
       return null;
     }
 
@@ -406,7 +406,9 @@ export namespace ServiceMessage {
       } else {
         const image = new Bun.Image(arrayBuffer);
         await image
-          .resize(forFavicon ? 32 : 512, undefined, { withoutEnlargement: true })
+          .resize(forFavicon ? 32 : 512, undefined, {
+            withoutEnlargement: true,
+          })
           .webp({ quality: 95 })
           .write(filePath);
       }
