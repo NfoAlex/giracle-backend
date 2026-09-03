@@ -395,7 +395,7 @@ export namespace ServiceMessage {
     try {
       const arrayBuffer = await response.arrayBuffer();
       const image = new Bun.Image(arrayBuffer);
-      await image.webp({ quality: 80 }).write(filePath);
+      await image.resize(256).webp({ quality: 80 }).write(filePath);
     } catch {
       return null;
     }
