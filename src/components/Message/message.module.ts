@@ -195,15 +195,15 @@ export const message = new Elysia({ prefix: "/message" })
     },
   )
   .get(
-    "/url-thumbnail/:targetUrl",
-    async ({ params: { targetUrl } }) => {
+    "/url-thumbnail",
+    async ({ query: { targetUrl } }) => {
       const image = await ServiceMessage.GetUrlThumbnail(targetUrl);
       if (image === null) throw status(500, "Internal Server Error");
 
       return image;
     },
     {
-      params: t.Object({
+      query: t.Object({
         targetUrl: t.String({ format: "uri" })
       }),
       detail: {
