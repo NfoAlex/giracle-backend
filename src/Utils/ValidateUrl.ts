@@ -3,15 +3,15 @@
 
 export namespace ValidateUrl {
   // プライベート/予約IPv4レンジ判定 (SSRF対策)
-  export const blockedIpv4Pattern =
+  const blockedIpv4Pattern =
     /^(0\.|10\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.(0\.(0|2)\.|168\.)|198\.(1[89]\.|51\.100\.)|203\.0\.113\.|2(2[4-9]|3\d)\.|2[4-5]\d\.)/;
 
   // 未指定/ループバック/NAT64/ドキュメント/ULA/リンクローカル/マルチキャストIPv6判定
-  export const blockedIpv6Pattern =
+  const blockedIpv6Pattern =
     /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/;
 
   // プレビュー取得禁止IP判定 (名前解決後アドレス用)
-  export function isBlockedIp(ip: string): boolean {
+  function isBlockedIp(ip: string): boolean {
     const lower = ip.toLowerCase();
 
     // IPv4-mapped IPv6は埋め込みIPv4部分で判定
@@ -21,7 +21,7 @@ export namespace ValidateUrl {
   }
 
   // リテラルIP (IPv4/IPv6) 判定
-  export function isLiteralIp(hostname: string): boolean {
+  function isLiteralIp(hostname: string): boolean {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
   }
 
