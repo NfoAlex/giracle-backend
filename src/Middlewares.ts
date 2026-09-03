@@ -12,6 +12,7 @@ import {
   roleLinks,
   tokens,
 } from "./db/schema";
+import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
 const tokenCache = new Map<
@@ -29,23 +30,6 @@ setInterval(() => {
     }
   }
 }, ONE_MINUITE);
-
-// URLプレビュー取得禁止IPレンジ（SSRF対策: 名前解決後のアドレスを判定）
-const isBlockedIp = (ip: string): boolean => {
-  const lower = ip.toLowerCase();
-  // IPv4-mapped IPv6 は埋め込まれたIPv4部分で判定
-  const v4 = lower.replace(/^::ffff:/, "");
-  return (
-    // loopback / private / link-local / CGNAT / 予約 / マルチキャスト
-    /^(0\.|10\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|127\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|192\.(0\.(0|2)\.|168\.)|198\.(1[89]\.|51\.100\.)|203\.0\.113\.|2(2[4-9]|3\d)\.|2[4-5]\d\.)/.test(
-      v4,
-    ) ||
-    // unspecified / loopback / NAT64 / discard / documentation / unique-local / link-local / multicast
-    /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/.test(
-      lower,
-    )
-  );
-};
 
 /**
  * 指定トークンのキャッシュを無効化する（サインアウト・セッション削除時に使用）
@@ -327,70 +311,17 @@ export namespace Middleware {
             const messageData = responseData;
             const messageId = messageData.id;
 
-            const urlRegex: RegExp =
-              /https?:\/\/[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#　-ヾ一-龠！-￣]+/g;
+            // URL抽出・正規化・SSRF検証まとめ取得
+            const validUrls = await Util.extractValidPreviewUrls.extract(
+              messageData.content ?? "",
+            );
 
-            // 重複したURLを排除（同じURLのOGPを何度も取得しないようにする）
-            let urlMatched = [
-              ...new Set(messageData.content?.match(urlRegex) ?? []),
-            ];
-
-            if (urlMatched.length === 0 && !messageData.isEdited) return;
-
-            // Twitter/Xのリンクをfxtwitterに置換（URLオブジェクトを使って安全にパース）
-            urlMatched = urlMatched.map((urlStr) => {
-              try {
-                const parsedUrl = new URL(urlStr);
-                const isTwitterOrX =
-                  parsedUrl.hostname === "twitter.com" ||
-                  parsedUrl.hostname === "www.twitter.com" ||
-                  parsedUrl.hostname === "x.com" ||
-                  parsedUrl.hostname === "www.x.com";
-
-                if (isTwitterOrX && parsedUrl.pathname.includes("/status/")) {
-                  parsedUrl.hostname = "fxtwitter.com";
-                  return parsedUrl.toString();
-                }
-                return urlStr;
-              } catch {
-                return urlStr; // パース失敗時はそのまま返す
-              }
-            });
+            if (validUrls.length === 0 && !messageData.isEdited) return;
 
             // 編集された時用に現在のURLプレビュー情報を削除
             await db
               .delete(messageUrlPreviews)
               .where(eq(messageUrlPreviews.messageId, messageId));
-
-            // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
-            const validUrls: string[] = [];
-            for (const urlStr of urlMatched) {
-              try {
-                const hostname = new URL(urlStr).hostname.replace(
-                  /^\[|\]$/g,
-                  "",
-                );
-
-                // リテラルIP（IPv4/IPv6）は除外
-                if (
-                  /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
-                  hostname.includes(":")
-                )
-                  continue;
-
-                // 名前解決し、全アドレスが公開IPであることを確認
-                const addresses = await Bun.dns.lookup(hostname);
-                if (
-                  addresses.length === 0 ||
-                  addresses.some((addr) => isBlockedIp(addr.address))
-                )
-                  continue;
-
-                validUrls.push(urlStr);
-              } catch {
-                // 無効なURL・解決不能なホスト名は除外
-              }
-            }
 
             // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
             const fetchPromises = validUrls.map(async (url) => {
