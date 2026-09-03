@@ -571,22 +571,45 @@ describe("/message/file/get", async () => {
 });
 
 describe("/message/url-thumbnail", () => {
-  it("GET: サムネイル取得成功", async () => {
+  // 指定URLへのfetchだけ差し替える。戻り値は復元関数
+  const mockFetch = (handler: (url: string) => Response | null) => {
     const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) =>
+      handler(input.toString()) ?? originalFetch(input)) as typeof fetch;
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
+  };
+
+  // 生成ファイルとDB行を掃除する
+  const cleanupThumbnail = async (testUrl: string) => {
+    const record = db
+      .select()
+      .from(messageUrlPreviewThumbnails)
+      .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+      .get();
+    if (record) {
+      await Bun.file(`./STORAGE/thumbnail/${record.fileName}`)
+        .delete()
+        .catch(() => {});
+      await db
+        .delete(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl));
+    }
+  };
+  it("GET: サムネイル取得成功", async () => {
     const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
     const sampleImg = await Bun.file(
       "./STORAGE/icon/default.png",
     ).arrayBuffer();
-
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      if (input.toString() === testUrl) {
-        return new Response(sampleImg, {
-          status: 200,
-          headers: { "Content-Type": "image/png" },
-        });
-      }
-      return originalFetch(input);
-    }) as typeof fetch;
+    const restore = mockFetch((url) =>
+      url === testUrl
+        ? new Response(sampleImg, {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          })
+        : null,
+    );
 
     try {
       const res = await FETCH({
@@ -596,35 +619,17 @@ describe("/message/url-thumbnail", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/webp");
 
-      // クリーンアップ
-      const record = db
-        .select()
-        .from(messageUrlPreviewThumbnails)
-        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
-        .get();
-      if (record) {
-        await Bun.file(`./STORAGE/thumbnail/${record.fileName}`)
-          .delete()
-          .catch(() => {});
-        await db
-          .delete(messageUrlPreviewThumbnails)
-          .where(eq(messageUrlPreviewThumbnails.url, testUrl));
-      }
+      await cleanupThumbnail(testUrl);
     } finally {
-      globalThis.fetch = originalFetch;
+      restore();
     }
   });
 
   it("GET: fetch失敗時 500", async () => {
-    const originalFetch = globalThis.fetch;
     const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
-
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      if (input.toString() === testUrl) {
-        return new Response("Not found", { status: 404 });
-      }
-      return originalFetch(input);
-    }) as typeof fetch;
+    const restore = mockFetch((url) =>
+      url === testUrl ? new Response("Not found", { status: 404 }) : null,
+    );
 
     try {
       const res = await FETCH({
@@ -633,30 +638,26 @@ describe("/message/url-thumbnail", () => {
       });
       expect(res.status).toBe(500);
     } finally {
-      globalThis.fetch = originalFetch;
+      restore();
     }
   });
 
   it("サムネイル未キャッシュ時: URLから画像を取得しBun.Imageで圧縮・保存・DB登録される", async () => {
-    const originalFetch = globalThis.fetch;
     const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
     const sampleImg = await Bun.file(
       "./STORAGE/icon/default.png",
     ).arrayBuffer();
-
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      if (input.toString() === testUrl) {
-        return new Response(sampleImg, {
-          status: 200,
-          headers: { "Content-Type": "image/png" },
-        });
-      }
-      return originalFetch(input);
-    }) as typeof fetch;
+    const restore = mockFetch((url) =>
+      url === testUrl
+        ? new Response(sampleImg, {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          })
+        : null,
+    );
 
     try {
-      const file = await ServiceMessage.GetUrlThumbnail(testUrl);
-      expect(file).not.toBeNull();
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
       if (!file) throw new Error("file must not be null");
 
       expect(await file.exists()).toBeTrue();
@@ -668,47 +669,92 @@ describe("/message/url-thumbnail", () => {
         .from(messageUrlPreviewThumbnails)
         .where(eq(messageUrlPreviewThumbnails.url, testUrl))
         .get();
-      expect(record).toBeDefined();
       if (!record) throw new Error("record must not be undefined");
       expect(file.name).toContain(record.fileName);
 
       // キャッシュ後の再取得では既存ファイルが返ること
-      const cachedFile = await ServiceMessage.GetUrlThumbnail(testUrl);
-      expect(cachedFile).not.toBeNull();
+      const cachedFile = await ServiceMessage.GetUrlThumbnail(testUrl, false);
       if (!cachedFile) throw new Error("cachedFile must not be null");
       expect(cachedFile.name).toBe(file.name);
 
-      // クリーンアップ
-      await file.delete().catch(() => {});
-      await db
-        .delete(messageUrlPreviewThumbnails)
-        .where(eq(messageUrlPreviewThumbnails.url, testUrl));
+      await cleanupThumbnail(testUrl);
     } finally {
-      globalThis.fetch = originalFetch;
+      restore();
     }
   });
 
   it("fetch失敗時: nullが返りDBにも登録されない", async () => {
-    const originalFetch = globalThis.fetch;
     const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
-
-    globalThis.fetch = (async (input: string | URL | Request) => {
-      if (input.toString() === testUrl) {
-        return new Response("Not found", { status: 404 });
-      }
-      return originalFetch(input);
-    }) as typeof fetch;
+    const restore = mockFetch((url) =>
+      url === testUrl ? new Response("Not found", { status: 404 }) : null,
+    );
 
     try {
-      const file = await ServiceMessage.GetUrlThumbnail(testUrl);
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
       expect(file).toBeNull();
     } finally {
-      globalThis.fetch = originalFetch;
+      restore();
+    }
+  });
+  it("forFavicon=true時: 通常より小さいwebpで保存される", async () => {
+    const normalUrl = `https://example.com/normal-${crypto.randomUUID()}.png`;
+    const faviconUrl = `https://example.com/favicon-${crypto.randomUUID()}.png`;
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+    const restore = mockFetch((url) =>
+      url === normalUrl || url === faviconUrl
+        ? new Response(sampleImg.slice(0), {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          })
+        : null,
+    );
+
+    try {
+      const normal = await ServiceMessage.GetUrlThumbnail(normalUrl, false);
+      if (!normal) throw new Error("normal must not be null");
+      const favicon = await ServiceMessage.GetUrlThumbnail(faviconUrl, true);
+      if (!favicon) throw new Error("favicon must not be null");
+
+      expect(favicon.type).toBe("image/webp");
+      expect((await favicon.arrayBuffer()).byteLength).toBeLessThan(
+        (await normal.arrayBuffer()).byteLength,
+      );
+
+      await cleanupThumbnail(normalUrl);
+      await cleanupThumbnail(faviconUrl);
+    } finally {
+      restore();
+    }
+  });
+
+  it("SVG時: 変換せずsvgのまま保存される", async () => {
+    const testUrl = `https://example.com/image-${crypto.randomUUID()}.svg`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"/>`;
+    const restore = mockFetch((url) =>
+      url === testUrl
+        ? new Response(svg, {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          })
+        : null,
+    );
+
+    try {
+      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
+      if (!file) throw new Error("file must not be null");
+
+      expect(await file.exists()).toBeTrue();
+      expect(file.name?.endsWith(".svg")).toBeTrue();
+      expect(await file.text()).toBe(svg);
+
+      await cleanupThumbnail(testUrl);
+    } finally {
+      restore();
     }
   });
 });
-
-// /message/file/delete
 
 describe("/message/inbox", async () => {
   it("正常", async () => {
