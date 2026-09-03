@@ -590,18 +590,12 @@ export namespace ServiceMessage {
     //スキップ数と取得数を設定
     const skip = (cursor - 1) * 30;
     const length = 30;
-    //メッセージが存在するか確認
+    //メッセージが存在するか確認 (チャンネル可視性判定にchannelIdだけ必要)
     const message = await db.query.messages.findFirst({
       where: eq(messages.id, messageId),
-      with: {
-        MessageReaction: {
-          offset: skip,
-          limit: length,
-          columns: {
-            userId: true,
-          },
-          where: eq(messageReactions.emojiCode, emojiCode),
-        },
+      columns: {
+        id: true,
+        channelId: true,
       },
     });
     if (message === undefined) {
@@ -617,7 +611,21 @@ export namespace ServiceMessage {
       throw status(400, "Message not found or is private");
     }
 
-    return message;
+    //ネストリレーションにoffset不可のため直接ページネーション取得
+    const reactions = await db.query.messageReactions.findMany({
+      where: and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.emojiCode, emojiCode),
+      ),
+      columns: {
+        userId: true,
+      },
+      orderBy: (t, { asc }) => asc(t.reactedAt),
+      limit: length,
+      offset: skip,
+    });
+
+    return { ...message, MessageReaction: reactions };
   };
 
   export const DeleteEmojiReaction = async (
