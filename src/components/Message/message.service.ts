@@ -852,7 +852,13 @@ export namespace ServiceMessage {
         isEdited: true,
       })
       .where(eq(messages.id, messageId))
-      .returning();
+      .returning({
+        id: messages.id,
+        channelId: messages.channelId,
+        content: messages.content,
+        isEdited: messages.isEdited,
+        userId: messages.userId,
+      });
 
     return msgUpdated;
   };
