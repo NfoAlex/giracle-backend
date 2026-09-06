@@ -596,7 +596,7 @@ export const botChannelPermissions = sqliteTable(
       table.botId,
       table.channelId,
     ),
-    index("BotChannelPermission_channelId_idx").on(table.channelId)
+    index("BotChannelPermission_channelId_idx").on(table.channelId),
   ],
 );
 

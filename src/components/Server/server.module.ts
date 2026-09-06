@@ -38,7 +38,30 @@ export const server = new Elysia({ prefix: "/server" })
   )
 
   .use(Middleware.CheckToken)
+
+  .get(
+    "/bot/me",
+    async ({ query: { cursorBotId }, CheckToken: { _userId } }) => {
+      const myBots = await ServiceServer.GetBotMe(_userId, cursorBotId);
+
+      return {
+        message: "Fetched my bots",
+        data: myBots,
+      };
+    },
+    {
+      query: t.Object({
+        cursorBotId: t.Optional(t.String()),
+      }),
+      detail: {
+        description: "自分のBot一覧取得",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+
   .use(Middleware.CheckRoleTerm)
+
   .get(
     "/get-invite",
     async () => {
@@ -412,6 +435,27 @@ export const server = new Elysia({ prefix: "/server" })
             ),
           }),
         }),
+      },
+      checkRoleTerm: "manageServer",
+    },
+  )
+  .get(
+    "/bot/all",
+    async ({ query: { cursorBotId } }) => {
+      const bots = await ServiceServer.GetBot(cursorBotId);
+
+      return {
+        message: "Bot fetched",
+        data: bots,
+      };
+    },
+    {
+      query: t.Object({
+        cursorBotId: t.Optional(t.String()),
+      }),
+      detail: {
+        description: "ボットの一覧を取得",
+        tags: ["Server", "Bot"],
       },
       checkRoleTerm: "manageServer",
     },

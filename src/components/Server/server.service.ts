@@ -1,11 +1,22 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  lt,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
+  botManages,
   channelJoinOnDefaults,
   customEmojis,
   invitations,
@@ -53,6 +64,40 @@ export namespace ServiceServer {
     }
 
     throw status(404, "Banner not found");
+  };
+
+  export const GetBotMe = async (userId: string, cursorBotId?: string) => {
+    let queryFromCursor: SQL | undefined;
+    if (cursorBotId) {
+      const cursorBot = db
+        .select({ createdAt: botManages.createdAt })
+        .from(botManages)
+        .where(eq(botManages.id, cursorBotId))
+        .get();
+      if (cursorBot === undefined)
+        throw status(400, "Cursor bot does not exists");
+      queryFromCursor = or(
+        lt(botManages.createdAt, cursorBot.createdAt),
+        and(
+          eq(botManages.createdAt, cursorBot.createdAt),
+          lt(botManages.id, cursorBotId),
+        ),
+      );
+    }
+
+    const mybot = await db
+      .select({
+        id: botManages.id,
+        botName: botManages.botName,
+        createdAt: botManages.createdAt,
+        createdBy: botManages.createdBy,
+      })
+      .from(botManages)
+      .where(and(queryFromCursor, eq(botManages.createdBy, userId)))
+      .limit(50)
+      .orderBy(desc(botManages.createdAt), desc(botManages.id));
+
+    return mybot;
   };
 
   export const GetInvite = async () => {
@@ -421,5 +466,40 @@ export namespace ServiceServer {
       group: logByGroup,
       firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
     };
+  };
+
+  export const GetBot = async (cursorBotId?: string) => {
+    let queryFromCursor: SQL | undefined;
+    if (cursorBotId) {
+      const cursorBot = db
+        .select({ createdAt: botManages.createdAt })
+        .from(botManages)
+        .where(eq(botManages.id, cursorBotId))
+        .get();
+      if (cursorBot === undefined)
+        throw status(400, "Cursor bot does not exists");
+      queryFromCursor = or(
+        lt(botManages.createdAt, cursorBot.createdAt),
+        and(
+          eq(botManages.createdAt, cursorBot.createdAt),
+          lt(botManages.id, cursorBotId),
+        ),
+      );
+    }
+
+    const bot = await db
+      .select({
+        id: botManages.id,
+        botName: botManages.botName,
+        createdAt: botManages.createdAt,
+        createdBy: botManages.createdBy,
+      })
+      .from(botManages)
+      .where(queryFromCursor)
+      .limit(50)
+      //新しい順で取得する
+      .orderBy(desc(botManages.createdAt), desc(botManages.id));
+
+    return bot;
   };
 }
