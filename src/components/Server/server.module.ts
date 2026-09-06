@@ -459,4 +459,34 @@ export const server = new Elysia({ prefix: "/server" })
       },
       checkRoleTerm: "manageServer",
     },
+  )
+  .patch(
+    "/bot/approval",
+    async ({ body: { botId, approvalValue } }) => {
+      const botIdUpdated = await ServiceServer.PatchBotApproval(
+        botId,
+        approvalValue,
+      );
+
+      return {
+        message: "Bot approval updated",
+        data: botIdUpdated,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        approvalValue: t.UnionEnum([
+          "APPROVED",
+          "BLOCKED",
+          "PENDING",
+          "DENIED",
+        ]),
+      }),
+      detail: {
+        description: "ボットの承認状況を更新する",
+        tags: ["Server", "Bot"],
+      },
+      checkRoleTerm: "manageServer",
+    },
   );

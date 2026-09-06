@@ -1,21 +1,12 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import {
-  and,
-  desc,
-  eq,
-  gte,
-  lt,
-  lte,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
+  type BotManage,
   botManages,
   channelJoinOnDefaults,
   customEmojis,
@@ -501,5 +492,24 @@ export namespace ServiceServer {
       .orderBy(desc(botManages.createdAt), desc(botManages.id));
 
     return bot;
+  };
+
+  export const PatchBotApproval = async (
+    botId: string,
+    newStatus: BotManage["approveStatus"],
+  ) => {
+    const [botManageUpdated] = await db
+      .update(botManages)
+      .set({
+        approveStatus: newStatus,
+      })
+      .where(eq(botManages.id, botId))
+      .returning({ id: botManages.id });
+
+    if (botManageUpdated === undefined) {
+      throw status(404, "Bot not found");
+    }
+
+    return botManageUpdated.id;
   };
 }
