@@ -199,7 +199,6 @@ describe("GET /server/bot", () => {
       method: "GET",
     });
     const j = await res.json();
-    console.log("j", j);
     expect(j.data.length).toBe(3);
     expect(j.data[0].botName).toBe("BOT_TEST_3");
     expect(j.data[1].botName).toBe("BOT_TEST_2");
@@ -210,6 +209,35 @@ describe("GET /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot/all",
       method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+  });
+});
+
+describe("PATCH /server/bot/approval", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        approvalValue: "APPROVED",
+      },
+    });
+    const j = await res.json();
+    console.log("j", j);
+    expect(j.data).toBe("TESTBOT1");
+  });
+
+  it("権限無し", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        approvalValue: "APPROVED",
+      },
       useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
