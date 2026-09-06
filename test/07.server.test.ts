@@ -166,3 +166,52 @@ describe("POST /server/change-config", () => {
     expect(res.ok).toBe(false);
   });
 });
+
+describe("GET /server/bot/me", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+    });
+    const j = await res.json();
+    // GetBotMeはdesc(createdAt)順(新しい順)
+    expect(j.data.length).toBe(2);
+    expect(j.data[0].botName).toBe("BOT_TEST_2");
+    expect(j.data[1].botName).toBe("BOT_TEST_1");
+  });
+
+  it("正常 :: secondary", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_3");
+  });
+});
+
+describe("GET /server/bot", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+    });
+    const j = await res.json();
+    console.log("j", j);
+    expect(j.data.length).toBe(3);
+    expect(j.data[0].botName).toBe("BOT_TEST_3");
+    expect(j.data[1].botName).toBe("BOT_TEST_2");
+    expect(j.data[2].botName).toBe("BOT_TEST_1");
+  });
+
+  it("権限無し", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+  });
+});

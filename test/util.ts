@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { app } from "../src";
 import { db } from "../src/db";
 import {
+  botChannelPermissions,
+  botManages,
   channelJoinOnDefaults,
   channelJoins,
   channelMutes,
@@ -58,6 +60,8 @@ export async function INIT() {
   await db.delete(messageUrlPreviewThumbnails);
   await db.delete(messageUrlPreviews);
   await db.delete(messages);
+  await db.delete(botChannelPermissions);
+  await db.delete(botManages);
   await db.delete(roleLinks);
   await db.delete(roleInfos);
   await db.delete(channels);
@@ -72,6 +76,9 @@ export async function INIT() {
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_1", name: "testbotuser", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_2", name: "testbotuser2", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_3", name: "testbotuser3", selfIntroduction: "" },
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
@@ -219,6 +226,37 @@ export async function INIT() {
   await db
     .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
+    .onConflictDoNothing();
+
+  // --- 07.server: サーバー用データ追加
+  // ボット
+  // id・createdAtを固定しないとrandomUUID+同msで順序が不定になる
+  const botBase = Date.now();
+  await db
+    .insert(botManages)
+    .values([
+      {
+        id: "TESTBOT1",
+        botName: "BOT_TEST_1",
+        createdBy: "TESTUSER",
+        remoteUserId: "TESTUSER_BOT_1",
+        createdAt: new Date(botBase),
+      },
+      {
+        id: "TESTBOT2",
+        botName: "BOT_TEST_2",
+        createdBy: "TESTUSER",
+        remoteUserId: "TESTUSER_BOT_2",
+        createdAt: new Date(botBase + 1),
+      },
+      {
+        id: "TESTBOT3",
+        botName: "BOT_TEST_3",
+        createdBy: "TESTUSER2",
+        remoteUserId: "TESTUSER_BOT_3",
+        createdAt: new Date(botBase + 2),
+      },
+    ])
     .onConflictDoNothing();
 }
 
