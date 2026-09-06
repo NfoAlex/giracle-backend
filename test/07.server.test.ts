@@ -230,6 +230,20 @@ describe("PATCH /server/bot/approval", () => {
     expect(j.data).toBe("TESTBOT1");
   });
 
+  it("存在しないBotデータ", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT999",
+        approvalValue: "APPROVED",
+      },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot not found");
+  });
+
   it("権限無し", async () => {
     const res = await FETCH({
       path: "/server/bot/approval",
