@@ -462,10 +462,10 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .patch(
     "/bot/approval",
-    async ({ body: { botId, approvalValue } }) => {
+    async ({ body: { botId, approvalStatus } }) => {
       const botIdUpdated = await ServiceServer.PatchBotApproval(
         botId,
-        approvalValue,
+        approvalStatus,
       );
 
       return {
@@ -476,7 +476,7 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         botId: t.String(),
-        approvalValue: t.UnionEnum([
+        approvalStatus: t.UnionEnum([
           "APPROVED",
           "BLOCKED",
           "PENDING",

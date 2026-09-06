@@ -496,12 +496,12 @@ export namespace ServiceServer {
 
   export const PatchBotApproval = async (
     botId: string,
-    newStatus: BotManage["approveStatus"],
+    approvalStatus: BotManage["approveStatus"],
   ) => {
     const [botManageUpdated] = await db
       .update(botManages)
       .set({
-        approveStatus: newStatus,
+        approveStatus: approvalStatus,
       })
       .where(eq(botManages.id, botId))
       .returning({ id: botManages.id });
