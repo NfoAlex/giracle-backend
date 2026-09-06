@@ -268,7 +268,7 @@ export async function FETCH({
   excludeCredential = false,
 }: {
   path: `/${string}`;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   // biome-ignore lint/suspicious/noExplicitAny: for test
   body?: any;
   useSecondaryUser?: boolean;
