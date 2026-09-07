@@ -103,6 +103,7 @@ export const app = new Elysia({
   .use(message)
   .use(server)
   .use(notification)
+  .use(externalApi)
   .listen(3000);
 
 console.log("Server running at http://localhost:3000");
