@@ -25,18 +25,16 @@ export namespace ExtMiddleware {
 
       const botManage = await db.query.botManages.findFirst({
         where: eq(botManages.tokenCode, authorization),
+        columns: { tokenCode: false }
       });
       if (botManage === undefined)
         throw status(401, "Authorization header is invalid");
       if (botManage.approveStatus !== "APPROVED")
         throw status(401, "Your bot is not approved");
 
-      //tokenCodeを取り除く
-      const { tokenCode, ...botManageLimited } = botManage;
-
       return {
         CheckApiCode: {
-          ...botManageLimited,
+          ...botManage,
         },
       };
     });
