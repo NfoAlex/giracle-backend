@@ -53,6 +53,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - 認証必須ルート: module の先頭で `.use(Middleware.CheckToken)`。ハンドラでは `CheckToken: { _userId }` がコンテキストに注入される。トークンは 5 分キャッシュされる（[src/Middlewares.ts](src/Middlewares.ts)）ため、BAN 反映等に最大 5 分の遅延があり得る。
 - 権限チェック: `.use(Middleware.CheckRoleTerm)` を併用し、ルートオプションに `checkRoleTerm: "manageChannel"` のように指定する（macro 実装）。権限は `manageServer` / `manageChannel` / `manageRole` / `manageUser` / `manageEmoji` の 5 種。`manageServer` は全チェックを通過する。
 - **管理系ルートに `checkRoleTerm` を付け忘れると「ログイン済みなら誰でも実行可」になる。** 追加時は必ず確認。
+- **macro と事前ミドルウェアの併用（二重処理の有無）**: `CheckRoleTerm`（内部で `.use(Middleware.CheckToken)`）や `ExtMiddleware.CheckPermission`（内部で `.use(CheckApiCode)`）のように macro 定義側で事前ミドルウェアを `.use()` していても、各 module 側で `.use(CheckToken).use(CheckRoleTerm)`（または `.use(CheckApiCode).use(CheckPermission)`）と併用して二重処理にはならない。Elysia の同一インスタンス/名前による重複排除に加え、`as: "scoped"` は孫モジュールへ自動伝播しないため。module 側の `.use(CheckToken)` はコンテキスト注入と検証実行に必須で、macro 側の `.use(CheckToken)` は macro 内の型解決に必要。
 
 ### WebSocket 通知
 
