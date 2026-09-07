@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "09bfef8d-821b-4a03-8554-102dce9c4a23",
+  "id": "e7438de6-b826-4efb-a9e7-c2272cd6b795",
   "prevId": "787b5ea2-d093-409c-a52f-9626f86f116d",
   "tables": {
     "BlockedIPAddress": {
@@ -178,6 +178,13 @@
           "autoincrement": false,
           "default": "'PENDING'"
         },
+        "tokenCode": {
+          "name": "tokenCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "canFetchUserinfo": {
           "name": "canFetchUserinfo",
           "type": "integer",
@@ -239,6 +246,13 @@
           "name": "BotManage_remoteUserId_unique",
           "columns": [
             "remoteUserId"
+          ],
+          "isUnique": true
+        },
+        "BotManage_tokenCode_unique": {
+          "name": "BotManage_tokenCode_unique",
+          "columns": [
+            "tokenCode"
           ],
           "isUnique": true
         }
