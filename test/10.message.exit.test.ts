@@ -5,7 +5,7 @@ beforeAll(async () => {
   await INIT();
 });
 
-describe("GET /ext/message/:messageId", async () => {
+describe("GET /ext/message/:messageId", () => {
   it("正常", async () => {
     const res = await FETCH({
       path: "/ext/message/TESTMESSAGE1",

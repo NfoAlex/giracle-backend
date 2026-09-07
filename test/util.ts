@@ -303,7 +303,7 @@ export async function FETCH({
       credentials: "include",
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...(headers ? headers : {}),
+        ...(headers ?? {}),
         Cookie: excludeCredential ? "" : `token=${tokenUsing}`,
       },
       body: isFormData ? body : JSON.stringify(body),
