@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { status } from "elysia";
-import { db } from "../../../db";
+import { db } from "../../../";
 import { botChannelPermissions, messages } from "../../../db/schema";
 
 export namespace ExtServiceMessage {
