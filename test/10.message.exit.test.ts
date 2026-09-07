@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, mock } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
