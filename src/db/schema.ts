@@ -556,6 +556,10 @@ export const botManages = sqliteTable(
     })
       .notNull()
       .default("PENDING"),
+    tokenCode: text("tokenCode")
+      .notNull()
+      .unique()
+      .$defaultFn(() => crypto.randomUUID()),
     canFetchUserinfo: integer("canFetchUserinfo", { mode: "boolean" })
       .notNull()
       .default(false),
