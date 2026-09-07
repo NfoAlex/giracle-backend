@@ -68,6 +68,8 @@ export async function INIT() {
   await db.delete(invitations);
   await db.delete(users);
   await db.delete(serverConfigs);
+  await db.delete(botManages);
+  await db.delete(botChannelPermissions);
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await fs.rm("./STORAGE/thumbnail", { recursive: true, force: true });
@@ -241,14 +243,19 @@ export async function INIT() {
         botName: "BOT_TEST_1",
         createdBy: "TESTUSER",
         remoteUserId: "TESTUSER_BOT_1",
+        approveStatus: "APPROVED",
         createdAt: new Date(botBase),
+        tokenCode: "TESTTOKEN1",
+        canReadMessage: true
       },
       {
         id: "TESTBOT2",
         botName: "BOT_TEST_2",
         createdBy: "TESTUSER",
         remoteUserId: "TESTUSER_BOT_2",
+        approveStatus: "APPROVED",
         createdAt: new Date(botBase + 1),
+        tokenCode: "TESTTOKEN2",
       },
       {
         id: "TESTBOT3",
@@ -259,12 +266,23 @@ export async function INIT() {
       },
     ])
     .onConflictDoNothing();
+  await db
+    .insert(botChannelPermissions)
+    .values([
+      {
+        id: 1,
+        channelId: "TESTCHANNEL1",
+        botId: "TESTBOT1",
+      },
+    ])
+    .onConflictDoNothing();
 }
 
 export async function FETCH({
   path,
   method,
   body,
+  headers,
   useSecondaryUser = false,
   excludeCredential = false,
 }: {
@@ -272,6 +290,7 @@ export async function FETCH({
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   // biome-ignore lint/suspicious/noExplicitAny: for test
   body?: any;
+  headers?: Record<string, string>;
   useSecondaryUser?: boolean;
   excludeCredential?: boolean;
 }): Promise<Response> {
@@ -284,6 +303,7 @@ export async function FETCH({
       credentials: "include",
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(headers ? headers : {}),
         Cookie: excludeCredential ? "" : `token=${tokenUsing}`,
       },
       body: isFormData ? body : JSON.stringify(body),
