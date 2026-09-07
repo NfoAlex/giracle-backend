@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { $ } from "bun";
 import { eq } from "drizzle-orm";
-import { app } from "../src";
+import { app, reloadServerConfig } from "../src";
 import { db } from "../src/db";
 import {
   botChannelPermissions,
@@ -71,7 +71,8 @@ export async function INIT() {
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await fs.rm("./STORAGE/thumbnail", { recursive: true, force: true });
-  await $`bun ./src/db/seeds.ts`;
+  await $`bun run ./src/db/seeds.ts`;
+  await reloadServerConfig(); //ServerConfigを初期化する
 
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },

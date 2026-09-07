@@ -51,7 +51,22 @@ export const ConstWebPush = {
 
 import { db } from "./db";
 import { serverConfigs } from "./db/schema";
-export const [GIRACLE_SERVER_CONFIG] = await db.select().from(serverConfigs);
+import { externalApi } from "./external/external.module";
+export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect =
+  {} as typeof serverConfigs.$inferSelect;
+
+export async function reloadServerConfig() {
+  const [config] = await db.select().from(serverConfigs);
+  if (config) Object.assign(GIRACLE_SERVER_CONFIG, config);
+}
+
+try {
+  await reloadServerConfig();
+} catch {
+  // DB未初期化時（マイグレーション前やテストロード時）は握りつぶす
+}
+
+/////////////////////////////////////////////////////////////////
 
 export const app = new Elysia({
   //16MB
