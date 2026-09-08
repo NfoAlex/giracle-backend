@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
+import { eq } from "drizzle-orm";
+import { db } from "../src";
+import { inboxes } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -122,5 +125,64 @@ describe("POST /ext/message/send", () => {
     expect(j.MessageUrlPreview.length).toBeGreaterThan(0);
     expect(j.MessageUrlPreview[0].url).toBe("https://example.com");
     expect(j.MessageUrlPreview[0].title).toBe("Mock OG Title");
+  });
+
+  //メンションはチャンネル参加者(TESTUSER)のみinbox化される
+  it("正常 :: メンション付き送信", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "@<TESTUSER> hello" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j).toContainKey("id");
+    const rows = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.messageId, j.id));
+    expect(rows.length).toBe(1);
+    expect(rows[0].userId).toBe("TESTUSER");
+    expect(rows[0].type).toBe("mention");
+  });
+
+  it("正常 :: 同一ユーザーへの重複メンションは1件", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "@<TESTUSER> @<TESTUSER> hi",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j).toContainKey("id");
+    const rows = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.messageId, j.id));
+    expect(rows.length).toBe(1);
+  });
+
+  it("存在しない・未参加ユーザーへのメンションはinbox化されない", async () => {
+    for (const userId of ["GHOSTUSER999", "TESTUSER2"]) {
+      const res = await FETCH({
+        path: "/ext/message/send",
+        method: "POST",
+        body: { channelId: "TESTCHANNEL1", message: `@<${userId}> hello` },
+        headers: { authorization: "TESTTOKEN1" },
+        excludeCredential: true,
+      });
+      const j = await res.json();
+      expect(j).toContainKey("id");
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(eq(inboxes.messageId, j.id));
+      expect(rows.length).toBe(0);
+    }
   });
 });
