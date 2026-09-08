@@ -245,8 +245,16 @@ export namespace ExtServiceMessage {
     }
 
     //Botのアクセス許可
-    const isPermitted = db.select({ id: botChannelPermissions.id }).from(botChannelPermissions)
-      .where(eq(botChannelPermissions.channelId, messageEditing.channelId)).get();
+    const isPermitted = db
+      .select({ id: botChannelPermissions.id })
+      .from(botChannelPermissions)
+      .where(
+        and(
+          eq(botChannelPermissions.channelId, messageEditing.channelId),
+          eq(botChannelPermissions.botId, botId),
+        ),
+      )
+      .get();
     if (isPermitted === undefined) {
       throw status(403, "Channel not permitted");
     }

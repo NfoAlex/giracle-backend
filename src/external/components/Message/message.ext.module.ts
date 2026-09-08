@@ -70,12 +70,13 @@ export const extMessage = new Elysia({ prefix: "/message" })
     "/edit",
     async ({
       body: { message, targetMessageId },
-      CheckApiCode: { remoteUserId },
+      CheckApiCode: { id, remoteUserId },
       server,
     }) => {
       const msg = await ExtServiceMessage.Edit(
         targetMessageId,
         message,
+        id,
         remoteUserId,
       );
 
