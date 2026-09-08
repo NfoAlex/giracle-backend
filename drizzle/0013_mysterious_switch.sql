@@ -30,6 +30,7 @@ CREATE TABLE `BotManage` (
 CREATE UNIQUE INDEX `BotManage_botName_unique` ON `BotManage` (`botName`);--> statement-breakpoint
 CREATE UNIQUE INDEX `BotManage_remoteUserId_unique` ON `BotManage` (`remoteUserId`);--> statement-breakpoint
 CREATE UNIQUE INDEX `BotManage_tokenCode_unique` ON `BotManage` (`tokenCode`);--> statement-breakpoint
+ALTER TABLE `Message` ADD `isBot` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `ServerConfig` ADD `BotEnabled` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `ServerConfig` ADD `BotAutoApprove` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `User` ADD `isBot` integer DEFAULT false NOT NULL;--> statement-breakpoint

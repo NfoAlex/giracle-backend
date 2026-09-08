@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e7438de6-b826-4efb-a9e7-c2272cd6b795",
+  "id": "f8c62a73-d3a0-451d-9943-db0b2500beef",
   "prevId": "787b5ea2-d093-409c-a52f-9626f86f116d",
   "tables": {
     "BlockedIPAddress": {
@@ -1326,6 +1326,14 @@
         },
         "isEdited": {
           "name": "isEdited",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "isBot": {
+          "name": "isBot",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
