@@ -185,4 +185,45 @@ describe("POST /ext/message/send", () => {
       expect(rows.length).toBe(0);
     }
   });
+
+  //返信先(TESTMESSAGE1の送信者TESTUSER)へreply通知される
+  it("正常 :: 返信付き送信", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "reply test",
+        replyingMessageId: "TESTMESSAGE1",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j).toContainKey("id");
+    expect(j.replyingMessageId).toBe("TESTMESSAGE1");
+    const rows = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.messageId, j.id));
+    expect(rows.length).toBe(1);
+    expect(rows[0].userId).toBe("TESTUSER");
+    expect(rows[0].type).toBe("reply");
+  });
+
+  it("存在しないメッセージへの返信", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "reply test",
+        replyingMessageId: "TESTMESSAGE999",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Replying message not found");
+  });
 });
