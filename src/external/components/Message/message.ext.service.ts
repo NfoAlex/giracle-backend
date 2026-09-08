@@ -222,4 +222,51 @@ export namespace ExtServiceMessage {
 
     return messageSaved;
   };
+
+  export const Edit = async (
+    messageId: string,
+    message: string,
+    remoteUserId: string
+  ) => {
+    const messageEditing = await db.query.messages.findFirst({
+      where: eq(messages.id, messageId),
+    });
+    //メッセージが無かった時エラー
+    if (messageEditing === undefined) {
+      throw status(404, "Message not found");
+    }
+    //送信者が自分と違うならエラー
+    if (messageEditing.userId !== remoteUserId) {
+      throw status(403, "You are not sender of this message");
+    }
+    //内容が同じならエラー
+    if (messageEditing.content === message) {
+      throw status(400, "Message is already same");
+    }
+
+    //Botのアクセス許可
+    const isPermitted = db.select({ id: botChannelPermissions.id }).from(botChannelPermissions)
+      .where(eq(botChannelPermissions.channelId, messageEditing.channelId)).get();
+    if (isPermitted === undefined) {
+      throw status(403, "Channel not permitted");
+    }
+
+    //メッセージデータを更新する
+    const [msgUpdated] = await db
+      .update(messages)
+      .set({
+        content: message,
+        isEdited: true,
+      })
+      .where(eq(messages.id, messageId))
+      .returning({
+        id: messages.id,
+        channelId: messages.channelId,
+        content: messages.content,
+        isEdited: messages.isEdited,
+        userId: messages.userId,
+      });
+
+    return msgUpdated;
+  };
 }

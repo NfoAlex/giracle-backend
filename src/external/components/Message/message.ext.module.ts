@@ -65,4 +65,40 @@ export const extMessage = new Elysia({ prefix: "/message" })
       },
       bindUrlPreview: true,
     },
+  )
+  .post(
+    "/edit",
+    async ({
+      body: { message, targetMessageId },
+      CheckApiCode: { remoteUserId },
+      server,
+    }) => {
+      const msg = await ExtServiceMessage.Edit(
+        targetMessageId,
+        message,
+        remoteUserId,
+      );
+
+      server?.publish(
+        `channel::${msg.channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
+          data: msg,
+        }),
+      );
+
+      return msg;
+    },
+    {
+      checkPermission: "canSendMessage",
+      body: t.Object({
+        targetMessageId: t.String(),
+        message: t.String(),
+      }),
+      detail: {
+        description: "メッセージを編集します。",
+        tags: ["External", "Message"],
+      },
+      bindUrlPreview: true,
+    },
   );
