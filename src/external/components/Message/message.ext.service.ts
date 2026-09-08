@@ -226,8 +226,22 @@ export namespace ExtServiceMessage {
   export const Edit = async (
     messageId: string,
     message: string,
-    remoteUserId: string
+    botId: string,
+    remoteUserId: string,
   ) => {
+    const spaceCount =
+      (message.match(/ /g) || "").length +
+      (message.match(/　/g) || "").length +
+      (message.match(/\n/g) || "").length;
+    if (spaceCount === message.length) throw status(400, "Message is empty");
+
+    if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+      throw status(
+        400,
+        `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
+      );
+    }
+
     const messageEditing = await db.query.messages.findFirst({
       where: eq(messages.id, messageId),
     });
