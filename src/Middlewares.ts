@@ -294,9 +294,15 @@ export namespace Middleware {
         channelId: t.String({ minLength: 1 }),
         message: t.String({ minLength: 1 }),
       }),
-      response: t.Object({
-        data: t.Union([t.Unsafe<Message>(), t.Undefined()]),
-      }),
+      response: t.Union([
+        t.Undefined(),
+        //Bot用の返答
+        t.Unsafe<Message>(),
+        //通常メッセージハンドラの返答
+        t.Object({
+          data: t.Union([t.Unsafe<Message>(), t.Undefined()]),
+        }),
+      ]),
     })
     .onError(({ error }) => {
       console.error("Middleware :: urlPreviewControl : エラー->", error);
@@ -305,7 +311,11 @@ export namespace Middleware {
       bindUrlPreview(isEnabled: boolean) {
         return {
           async afterResponse({ server, responseValue }) {
-            const responseData = responseValue?.data;
+            if (responseValue === undefined) return;
+
+            //messageを取り出す
+            const responseData =
+              "data" in responseValue ? responseValue.data : responseValue;
             if (!isEnabled || responseData === undefined) return;
 
             const messageData = responseData;

@@ -25,7 +25,7 @@ export namespace ExtMiddleware {
 
       const botManage = await db.query.botManages.findFirst({
         where: eq(botManages.tokenCode, authorization),
-        columns: { tokenCode: false }
+        columns: { tokenCode: false },
       });
       if (botManage === undefined)
         throw status(401, "Authorization header is invalid");
