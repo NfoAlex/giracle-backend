@@ -26,6 +26,8 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - [test/util.ts](test/util.ts) の `INIT()` が全テスト共通の前処理（migrate → 全テーブル削除 → seeds 投入 → `TESTUSER` / `TESTUSER2` とトークン作成）。各テストファイルの `beforeAll` で呼ぶ。多重呼び出しはフラグで抑止される。
 - リクエストは `FETCH({ path, method, body })` ヘルパー経由（内部で `app.handle(new Request(...))`）。デフォルトで `TESTUSER` の Cookie が付く。`useSecondaryUser: true` で `TESTUSER2`、`excludeCredential: true` で未認証リクエストになる。
 - `NODE_ENV=test` のとき index.ts の `.onError()` はエラーログを抑制する。
+- リクエストヘッダが必要な場合は `FETCH({ headers })` を使う。`PATCH` も可。
+- Bot 用テストユーザー（`TESTUSER_BOT_1..3`）と `TESTBOT1..3`（BotManage）、`TESTBOT1` と `TESTCHANNEL1` のチャンネル許可が `INIT()` で作られる。Bot 関連テストはこれを使う（`tokenCode` は `TESTTOKEN1` / `TESTTOKEN2`）。
 - 機能を追加したら対応するテストファイルに追記する。
 
 ## アーキテクチャの約束事
@@ -38,6 +40,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - DB のパスは環境変数 `DATABASE_URL`（`file:` プレフィックスは除去される。既定は `./dev.db`）。
 - テーブル定義・relations・型 export は [src/db/schema.ts](src/db/schema.ts) にまとめてある。relational query (`db.query.<table>.findFirst/findMany`) を使うため `drizzle(sqlite, { schema })` で初期化されている。
 - `db.query.*.findFirst` は該当なしで `undefined` を返す（Prisma の `null` とは異なるので `!== undefined` で判定する）。`update`/`delete` は対象0件でも例外を投げない（事前 `findFirst` か `.returning()` の行数で判定する）。
+- `GIRACLE_SERVER_CONFIG` は起動時に select した値を**ミュータブルなオブジェクト**で保持する（旧来の「起動時の `const [config] = ...`」とは別物）。ServerConfig を書き換えたら index.ts の `reloadServerConfig()` を呼んでメモリを更新すること。テストの `INIT()` でも呼ばれる。DB 未初期化（マイグレーション前・テストロード時）でも起動が落ちないよう try/catch で握り潰している。
 
 ### モジュール構成: module（ルーティング）+ service（ロジック）
 
@@ -54,6 +57,17 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - 権限チェック: `.use(Middleware.CheckRoleTerm)` を併用し、ルートオプションに `checkRoleTerm: "manageChannel"` のように指定する（macro 実装）。権限は `manageServer` / `manageChannel` / `manageRole` / `manageUser` / `manageEmoji` の 5 種。`manageServer` は全チェックを通過する。
 - **管理系ルートに `checkRoleTerm` を付け忘れると「ログイン済みなら誰でも実行可」になる。** 追加時は必ず確認。
 - **macro と事前ミドルウェアの併用（二重処理の有無）**: `CheckRoleTerm`（内部で `.use(Middleware.CheckToken)`）や `ExtMiddleware.CheckPermission`（内部で `.use(CheckApiCode)`）のように macro 定義側で事前ミドルウェアを `.use()` していても、各 module 側で `.use(CheckToken).use(CheckRoleTerm)`（または `.use(CheckApiCode).use(CheckPermission)`）と併用して二重処理にはならない。Elysia の同一インスタンス/名前による重複排除に加え、`as: "scoped"` は孫モジュールへ自動伝播しないため。module 側の `.use(CheckToken)` はコンテキスト注入と検証実行に必須で、macro 側の `.use(CheckToken)` は macro 内の型解決に必要。
+
+### Bot（外部 API）
+
+Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.ts](src/external/external.module.ts)）経由で操作する。module/service 構成は通常の `src/components/<Name>/` と同じ。**Bot は `remoteUserId`（紐付いた users の行。`users.isBot` が true）経由でユーザーアカウントを持つ。** メッセージ送信・編集などの操作もすべて `remoteUserId` 名義で行う（`messages.userId = remoteUserId` かつ `isBot: true`）。
+
+- 認証: `ExtMiddleware.CheckApiCode`（[Middleware.ext.ts](src/external/Middleware.ext.ts)）。`Authorization` ヘッダで `BotManage.tokenCode` を照合し、`approveStatus === "APPROVED"` でないと 401。コンテキストに `CheckApiCode: { ...BotManage }` が注入される。
+- 権限: `ExtMiddleware.CheckPermission` macro + ルートオプション `checkPermission: "canSendMessage"` 等で `can*` フラグ（6 種）をチェック。認証同様 module 側で `.use(CheckApiCode).use(CheckPermission)` を併用する。
+- チャンネル許可は `botChannelPermissions`（Bot × Channel の複合）。許可のないチャンネルへの読み書きは 403/404。
+- 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me`。
+- ServerConfig に `BotEnabled` / `BotAutoApprove` 列がある（現状 schema のみで参照コードなし。Bot 機能の有効化・自動承認向けの予定地）。
+- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/ws.ts](src/ws.ts) の open/close で分岐）。`user::${remoteUserId}` と許可チャンネルを購読する。
 
 ### WebSocket 通知
 
