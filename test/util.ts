@@ -246,7 +246,8 @@ export async function INIT() {
         approveStatus: "APPROVED",
         createdAt: new Date(botBase),
         tokenCode: "TESTTOKEN1",
-        canReadMessage: true
+        canReadMessage: true,
+        canSendMessage: true,
       },
       {
         id: "TESTBOT2",
