@@ -50,7 +50,7 @@ export namespace ExtServiceMessage {
     server?: Bun.Server<unknown> | null,
   ) => {
     // メッセージが空白のみならエラー
-    if ((message.match(/[ 　\n]/g) || []).length === message.length) {
+    if (message.trim().length === 0) {
       throw status(400, "Message is empty");
     }
 
@@ -229,11 +229,9 @@ export namespace ExtServiceMessage {
     botId: string,
     remoteUserId: string,
   ) => {
-    const spaceCount =
-      (message.match(/ /g) || "").length +
-      (message.match(/　/g) || "").length +
-      (message.match(/\n/g) || "").length;
-    if (spaceCount === message.length) throw status(400, "Message is empty");
+    if (message.trim().length === 0) {
+      throw status(400, "Message is empty");
+    }
 
     if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
       throw status(
