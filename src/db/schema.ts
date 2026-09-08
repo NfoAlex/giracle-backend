@@ -90,6 +90,7 @@ export const messages = sqliteTable(
       .notNull()
       .default(false),
     isEdited: integer("isEdited", { mode: "boolean" }).notNull().default(false),
+    isBot: integer("isBot", { mode: "boolean" }).notNull().default(false),
     replyingMessageId: text("replyingMessageId"),
     userId: text("userId")
       .notNull()
