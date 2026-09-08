@@ -103,7 +103,6 @@ describe("POST /ext/message/send", () => {
       headers: { authorization: "TESTTOKEN1" },
       excludeCredential: true,
     });
-    console.log("t->", await res.clone().text());
     const j = await res.json();
     expect(j).toContainKey("id");
     TEST__MESSAGE_ID_WITH_URL = j.id;
