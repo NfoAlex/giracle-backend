@@ -227,3 +227,95 @@ describe("POST /ext/message/send", () => {
     expect(await res.text()).toBe("Replying message not found");
   });
 });
+
+describe("POST /ext/message/edit", () => {
+  let TEST__BOT_MESSAGE_ID = "";
+  it("正常 :: 送信", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "edit me" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    TEST__BOT_MESSAGE_ID = (await res.json()).id;
+    expect(TEST__BOT_MESSAGE_ID).toBeString();
+  });
+
+  it("正常 :: 編集", async () => {
+    const res = await FETCH({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        targetMessageId: TEST__BOT_MESSAGE_ID,
+        message: "edited by bot",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j.id).toBe(TEST__BOT_MESSAGE_ID);
+    expect(j.content).toBe("edited by bot");
+    expect(j.isEdited).toBeTrue();
+  });
+
+  it("正常 :: GETで永続化確認", async () => {
+    const res = await FETCH({
+      path: `/ext/message/${TEST__BOT_MESSAGE_ID}`,
+      method: "GET",
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j.content).toBe("edited by bot");
+  });
+
+  it("同一内容", async () => {
+    const res = await FETCH({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        targetMessageId: TEST__BOT_MESSAGE_ID,
+        message: "edited by bot",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Message is already same");
+  });
+
+  it("他人のメッセージ", async () => {
+    const res = await FETCH({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        targetMessageId: "TESTMESSAGE1",
+        message: "hijack",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not sender of this message");
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        targetMessageId: "TESTMESSAGE999",
+        message: "ghost edit",
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Message not found");
+  });
+});
