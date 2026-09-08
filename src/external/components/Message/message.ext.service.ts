@@ -196,6 +196,7 @@ export namespace ExtServiceMessage {
 
     //「全通知」モードのユーザー向け: チャンネル参加者へ配信
     //除外対象: 送信者本人 / mention 済 / reply 対象 (二重通知防止)
+    //TODO :: Util.SendPushNotificationに移動
     {
       const channelMembers = await db.query.channelJoins.findMany({
         where: eq(channelJoins.channelId, channelId),
