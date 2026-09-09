@@ -5,9 +5,11 @@ import { db } from "../src/db";
 import {
   channelJoinOnDefaults,
   invitations,
+  messages,
   roleInfos,
   roleLinks,
   serverConfigs,
+  users,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -193,6 +195,7 @@ describe("GET /server/bot/me", () => {
 });
 
 let TEST__deletingBotId = "";
+let TEST__deletingBotRemoteUserId = "";
 describe("PUT /server/bot", () => {
   it("正常", async () => {
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
@@ -204,6 +207,7 @@ describe("PUT /server/bot", () => {
     const j = await res.json();
     expect(j.data.botName).toBe("newBot");
     TEST__deletingBotId = j.data.id;
+    TEST__deletingBotRemoteUserId = j.data.remoteUserId;
   });
 
   it("ボット利用が許可されてないない", async () => {
@@ -218,7 +222,15 @@ describe("PUT /server/bot", () => {
 });
 
 describe("DELETE /server/bot", () => {
-  it("正常", async () => {
+  it("正常 :: メッセージを送ったBotも削除できる", async () => {
+    // Botがメッセージを送った状態にする(投稿済みメッセージは削除で消えないこと)
+    await db.insert(messages).values({
+      content: "bot message",
+      userId: TEST__deletingBotRemoteUserId,
+      channelId: "TESTCHANNEL1",
+      isBot: true,
+    });
+
     const res = await FETCH({
       path: "/server/bot",
       method: "DELETE",
@@ -226,6 +238,18 @@ describe("DELETE /server/bot", () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Bot deleted");
+
+    // ユーザーはソフトデリートされ、メッセージは残る
+    const [botUser] = await db
+      .select({ isDeleted: users.isDeleted })
+      .from(users)
+      .where(eq(users.id, TEST__deletingBotRemoteUserId));
+    expect(botUser?.isDeleted).toBe(true);
+    const remain = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.userId, TEST__deletingBotRemoteUserId));
+    expect(remain.length).toBe(1);
   });
 
   it("他人のBotは削除できない", async () => {
