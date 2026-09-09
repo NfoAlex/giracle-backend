@@ -179,7 +179,7 @@ export namespace ServiceServer {
         canSendMessage: botManages.canSendMessage,
       })
       .from(botManages)
-      .where(eq(botManages.id, botId))
+      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
       .get();
     if (currentBotPermissions === undefined) {
       throw status(404, "Bot not found");
@@ -206,6 +206,9 @@ export namespace ServiceServer {
       })
       .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
       .returning();
+    if (bot === undefined) {
+      throw status(500, "Bot data should be available");
+    }
 
     const { tokenCode, ...botTrimmed } = bot;
     return botTrimmed;
