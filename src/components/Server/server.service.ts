@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   type BotManage,
+  botChannelPermissions,
   botManages,
   channelJoinOnDefaults,
   customEmojis,
@@ -15,6 +16,7 @@ import {
   serverConfigs,
   users,
 } from "../../db/schema";
+import CheckChannelVisibility from "../../Utils/CheckChannelVisibility";
 import { WSDisconnectUser } from "../../ws";
 
 export namespace ServiceServer {
@@ -95,6 +97,8 @@ export namespace ServiceServer {
   export const PutBot = async (
     name: string,
     _userId: string,
+    permissionChannelIds: string[] = [],
+    useAllChannel: boolean = false,
     permissionConfig: {
       canFetchUserinfo?: boolean;
       canFetchRoleinfo?: boolean;
@@ -107,6 +111,17 @@ export namespace ServiceServer {
     if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
       throw status(400, "Using or creating bot is not allowed");
     }
+    //チャンネル全透過じゃないならチャンネル検査
+    if (!useAllChannel) {
+      if (permissionChannelIds.length > 100) {
+        throw status(400, "Too many channels to listen");
+      }
+      //TODO: どうにかしたい
+      for (const channelId of permissionChannelIds) {
+        if (!(await CheckChannelVisibility(channelId, _userId)))
+          throw status(400, "You cannot use a channel you cannot see");
+      }
+    }
 
     let botCreated: BotManage | undefined;
     await db.transaction(async (trx) => {
@@ -118,6 +133,7 @@ export namespace ServiceServer {
           isBot: true,
         })
         .returning();
+
       const [bot] = await trx
         .insert(botManages)
         .values({
@@ -125,13 +141,26 @@ export namespace ServiceServer {
           createdBy: _userId,
           remoteUserId: userForBot.id,
           approveStatus: "PENDING",
+          useAllChannel: useAllChannel,
           ...permissionConfig,
         })
         .returning();
       if (bot === undefined) throw status(500, "Bot creation failed");
+
+      //チャンネル登録
+      if (!useAllChannel && permissionChannelIds.length !== 0) {
+        await trx.insert(botChannelPermissions).values(
+          permissionChannelIds.map((channelId) => {
+            return {
+              botId: bot.id,
+              channelId: channelId,
+            };
+          }),
+        );
+      }
+
       botCreated = { ...bot };
     });
-
     return botCreated;
   };
 

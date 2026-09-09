@@ -64,6 +64,8 @@ export const server = new Elysia({ prefix: "/server" })
     async ({
       body: {
         name,
+        permissionChannelIds,
+        useAllChannel,
         canFetchUserinfo,
         canFetchRoleinfo,
         canManageUser,
@@ -73,15 +75,20 @@ export const server = new Elysia({ prefix: "/server" })
       },
       CheckToken: { _userId },
     }) => {
-      //TODO: チャンネル許可設定も申請
-      const newBot = await ServiceServer.PutBot(name, _userId, {
-        canFetchUserinfo,
-        canFetchRoleinfo,
-        canManageUser,
-        canManageServerConfig,
-        canReadMessage,
-        canSendMessage,
-      });
+      const newBot = await ServiceServer.PutBot(
+        name,
+        _userId,
+        permissionChannelIds,
+        useAllChannel,
+        {
+          canFetchUserinfo,
+          canFetchRoleinfo,
+          canManageUser,
+          canManageServerConfig,
+          canReadMessage,
+          canSendMessage,
+        },
+      );
 
       return {
         message: "Bot created",
@@ -91,6 +98,8 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         name: t.String(),
+        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1 })),
+        useAllChannel: t.Optional(t.Boolean()),
         canFetchUserinfo: t.Optional(t.Boolean()),
         canFetchRoleinfo: t.Optional(t.Boolean()),
         canManageUser: t.Optional(t.Boolean()),
