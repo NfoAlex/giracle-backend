@@ -51,9 +51,7 @@ export default async function CheckChannelVisibility(
     .select({ userId: roleLinks.userId })
     .from(roleLinks)
     .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
-    .where(
-      and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
-    )
+    .where(and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)))
     .get();
 
   if (userAdminRole) {
