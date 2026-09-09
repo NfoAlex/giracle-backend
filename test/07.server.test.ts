@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
 import {
+  botChannelPermissions,
   botManages,
   channelJoinOnDefaults,
   invitations,
@@ -203,22 +204,63 @@ describe("PUT /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PUT",
-      body: { name: "newBot", canFetchUserinfo: true, canManageUser: true },
+      body: {
+        name: "newBot",
+        canFetchUserinfo: true,
+        canManageUser: true,
+        permissionChannelIds: ["TESTCHANNEL1"],
+      },
     });
     const j = await res.json();
     expect(j.data.botName).toBe("newBot");
+    expect(j.data.useAllChannel).toBeFalse();
+    expect(j.data.canFetchUserinfo).toBeTrue();
+
+    //チャンネル透過もできていることを確認
+    const d = db
+      .select({ channelId: botChannelPermissions.channelId })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, j.data.id))
+      .get();
+    expect(d?.channelId).toBe("TESTCHANNEL1");
+
     TEST__deletingBotId = j.data.id;
     TEST__deletingBotRemoteUserId = j.data.remoteUserId;
   });
 
-  it("ボット利用が許可されてないない", async () => {
+  it("正常2 :: 全チャンネル透過", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot2", useAllChannel: true },
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot2");
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(j.data.canFetchUserinfo).toBeFalse();
+  });
+
+  it("見えないチャンネルでBot作成しようとする", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot2", permissionChannelIds: ["TESTCHANNEL3"] },
+      useSecondaryUser: true,
+    });
+    const t = await res.text();
+    expect(t).toBe("You cannot use a channel you cannot see");
+  });
+
+  it("ボット利用が許可されてないないときの作成", async () => {
     GIRACLE_SERVER_CONFIG.BotEnabled = false;
     const res = await FETCH({
       path: "/server/bot",
       method: "PUT",
-      body: { name: "newbot2", canFetchUserinfo: true, canManageUser: true },
+      body: { name: "newbotX", canFetchUserinfo: true, canManageUser: true },
     });
     expect(res.ok).toBe(false);
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
   });
 });
 
@@ -271,10 +313,10 @@ describe("GET /server/bot", () => {
       method: "GET",
     });
     const j = await res.json();
-    expect(j.data.length).toBe(3);
-    expect(j.data[0].botName).toBe("BOT_TEST_3");
-    expect(j.data[1].botName).toBe("BOT_TEST_2");
-    expect(j.data[2].botName).toBe("BOT_TEST_1");
+    expect(j.data.length).toBe(4);
+    expect(j.data[0].botName).toBe("newBot2");
+    expect(j.data[1].botName).toBe("BOT_TEST_3");
+    expect(j.data[2].botName).toBe("BOT_TEST_2");
   });
 
   it("権限無し", async () => {
@@ -298,7 +340,6 @@ describe("PATCH /server/bot/approval", () => {
       },
     });
     const j = await res.json();
-    console.log("j", j);
     expect(j.data).toBe("TESTBOT1");
   });
 
