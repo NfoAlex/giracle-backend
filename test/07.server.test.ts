@@ -224,7 +224,6 @@ describe("DELETE /server/bot", () => {
       method: "DELETE",
       body: { botId: TEST__deletingBotId },
     });
-    console.log("t", await res.clone().text());
     const j = await res.json();
     expect(j.message).toBe("Bot deleted");
   });
