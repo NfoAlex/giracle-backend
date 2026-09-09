@@ -155,7 +155,7 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         botId: t.String(),
-        name: t.String(),
+        name: t.String({ minLength: 1, maxLength: 64 }),
         canFetchUserinfo: t.Optional(t.Boolean()),
         canFetchRoleinfo: t.Optional(t.Boolean()),
         canManageUser: t.Optional(t.Boolean()),
