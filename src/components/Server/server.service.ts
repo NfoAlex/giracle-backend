@@ -103,8 +103,8 @@ export namespace ServiceServer {
       canSendMessage?: boolean;
     },
   ) => {
-    if (GIRACLE_SERVER_CONFIG.BotEnabled) {
-      throw status(400, "Using bot is not allowed");
+    if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+      throw status(400, "Using or creating bot is not allowed");
     }
 
     let botCreated: BotManage | undefined;
