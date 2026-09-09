@@ -15,6 +15,7 @@ import {
   serverConfigs,
   users,
 } from "../../db/schema";
+import { WSDisconnectUser } from "../../ws";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -148,6 +149,9 @@ export namespace ServiceServer {
         .set({ isDeleted: true })
         .where(eq(users.id, bot.remoteUserId));
     });
+
+    //削除済みBotのWS接続を切断(接続し続けるとpublishを受け取れ続ける)
+    WSDisconnectUser(bot.remoteUserId, "bot was deleted");
 
     return true;
   };

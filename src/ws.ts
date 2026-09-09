@@ -278,7 +278,7 @@ function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
  * @param userId
  * @returns
  */
-export function WSDisconnectUser(userId: string) {
+export function WSDisconnectUser(userId: string, reason = "you are banned") {
   const currentInstance = userWSInstance.get(userId);
   //存在しない場合スルー
   if (!currentInstance) {
@@ -289,7 +289,7 @@ export function WSDisconnectUser(userId: string) {
     ws.send(
       JSON.stringify({
         signal: "ERROR",
-        data: "you are banned",
+        data: reason,
       }),
     );
     ws.close();
