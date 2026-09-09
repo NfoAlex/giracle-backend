@@ -91,6 +91,49 @@ export namespace ServiceServer {
     return mybot;
   };
 
+  export const PutBot = async (
+    name: string,
+    _userId: string,
+    permissionConfig: {
+      canFetchUserinfo?: boolean;
+      canFetchRoleinfo?: boolean;
+      canManageUser?: boolean;
+      canManageServerConfig?: boolean;
+      canReadMessage?: boolean;
+      canSendMessage?: boolean;
+    },
+  ) => {
+    if (GIRACLE_SERVER_CONFIG.BotEnabled) {
+      throw status(400, "Using bot is not allowed");
+    }
+
+    let botCreated: BotManage | undefined;
+    await db.transaction(async (trx) => {
+      const [userForBot] = await trx
+        .insert(users)
+        .values({
+          name,
+          selfIntroduction: "I am a bot",
+          isBot: true,
+        })
+        .returning();
+      const [bot] = await trx
+        .insert(botManages)
+        .values({
+          botName: name,
+          createdBy: _userId,
+          remoteUserId: userForBot.id,
+          approveStatus: "PENDING",
+          ...permissionConfig
+        })
+        .returning();
+      if (bot === undefined) throw status(500, "Bot creation failed");
+      botCreated = {...bot};
+    });
+
+    return botCreated;
+  };
+
   export const GetInvite = async () => {
     const invites = await db.query.invitations.findMany();
     return invites;

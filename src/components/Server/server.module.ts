@@ -59,6 +59,50 @@ export const server = new Elysia({ prefix: "/server" })
       },
     },
   )
+  .put(
+    "/bot",
+    async ({
+      body: {
+        name,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      },
+      CheckToken: { _userId },
+    }) => {
+      const newBot = await ServiceServer.PutBot(name, _userId, {
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      });
+
+      return {
+        message: "Bot created",
+        data: newBot,
+      };
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        canFetchUserinfo: t.Optional(t.Boolean()),
+        canFetchRoleinfo: t.Optional(t.Boolean()),
+        canManageUser: t.Optional(t.Boolean()),
+        canManageServerConfig: t.Optional(t.Boolean()),
+        canReadMessage: t.Optional(t.Boolean()),
+        canSendMessage: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        description: "自分のBot一覧取得",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
 
   .use(Middleware.CheckRoleTerm)
 
