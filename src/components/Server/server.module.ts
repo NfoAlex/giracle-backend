@@ -73,6 +73,7 @@ export const server = new Elysia({ prefix: "/server" })
       },
       CheckToken: { _userId },
     }) => {
+      //TODO: チャンネル許可設定も申請
       const newBot = await ServiceServer.PutBot(name, _userId, {
         canFetchUserinfo,
         canFetchRoleinfo,
