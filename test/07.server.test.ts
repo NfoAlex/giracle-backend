@@ -192,6 +192,54 @@ describe("GET /server/bot/me", () => {
   });
 });
 
+let TEST__deletingBotId = "";
+describe("PUT /server/bot", () => {
+  it("正常", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot", canFetchUserinfo: true, canManageUser: true },
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot");
+    TEST__deletingBotId = j.data.id;
+  });
+
+  it("ボット利用が許可されてないない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newbot2", canFetchUserinfo: true, canManageUser: true },
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe("DELETE /server/bot", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "DELETE",
+      body: { botId: TEST__deletingBotId },
+    });
+    console.log("t", await res.clone().text());
+    const j = await res.json();
+    expect(j.message).toBe("Bot deleted");
+  });
+
+  it("他人のBotは削除できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "DELETE",
+      body: { botId: TEST__deletingBotId },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
 describe("GET /server/bot", () => {
   it("正常", async () => {
     const res = await FETCH({
