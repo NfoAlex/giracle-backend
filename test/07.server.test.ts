@@ -242,10 +242,11 @@ describe("PUT /server/bot", () => {
   });
 
   it("見えないチャンネルでBot作成しようとする", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
     const res = await FETCH({
       path: "/server/bot",
       method: "PUT",
-      body: { name: "newBot2", permissionChannelIds: ["TESTCHANNEL3"] },
+      body: { name: "newBotDeny", permissionChannelIds: ["TESTCHANNEL3"] },
       useSecondaryUser: true,
     });
     const t = await res.text();
@@ -293,6 +294,13 @@ describe("DELETE /server/bot", () => {
       .from(messages)
       .where(eq(messages.userId, TEST__deletingBotRemoteUserId));
     expect(remain.length).toBe(1);
+
+    // チャンネル権限は botId cascade で消えていること
+    const perms = await db
+      .select({ id: botChannelPermissions.id })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, TEST__deletingBotId));
+    expect(perms.length).toBe(0);
   });
 
   it("他人のBotは削除できない", async () => {
@@ -317,6 +325,7 @@ describe("GET /server/bot", () => {
     expect(j.data[0].botName).toBe("newBot2");
     expect(j.data[1].botName).toBe("BOT_TEST_3");
     expect(j.data[2].botName).toBe("BOT_TEST_2");
+    expect(j.data[3].botName).toBe("BOT_TEST_1");
   });
 
   it("権限無し", async () => {
