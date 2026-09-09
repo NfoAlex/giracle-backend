@@ -561,6 +561,9 @@ export const botManages = sqliteTable(
       .notNull()
       .unique()
       .$defaultFn(() => crypto.randomUUID()),
+    useAllChannel: integer("useAllChannel", { mode: "boolean" })
+      .notNull()
+      .default(false),
     canFetchUserinfo: integer("canFetchUserinfo", { mode: "boolean" })
       .notNull()
       .default(false),

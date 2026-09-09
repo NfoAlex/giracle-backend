@@ -16,6 +16,7 @@ CREATE TABLE `BotManage` (
 	`createdAt` integer NOT NULL,
 	`status` text DEFAULT 'PENDING' NOT NULL,
 	`tokenCode` text NOT NULL,
+	`useAllChannel` integer DEFAULT false NOT NULL,
 	`canFetchUserinfo` integer DEFAULT false NOT NULL,
 	`canFetchRoleinfo` integer DEFAULT false NOT NULL,
 	`canManageUser` integer DEFAULT false NOT NULL,
