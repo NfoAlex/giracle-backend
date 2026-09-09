@@ -2,13 +2,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../../../";
 import {
-  botChannelPermissions,
   channelJoins,
   inboxes,
   type Message,
   messages,
 } from "../../../db/schema";
 import { Util } from "../../../Util";
+import { ExtUtil } from "../../Util.ext";
 
 export namespace ExtServiceMessage {
   export const GetMessage = async (messageId: string, botId: string) => {
@@ -23,17 +23,7 @@ export namespace ExtServiceMessage {
     if (messageData === undefined) {
       throw status(404, "Message not found");
     }
-    const isChannelPermitted = db
-      .select({ id: botChannelPermissions.channelId })
-      .from(botChannelPermissions)
-      .where(
-        and(
-          eq(botChannelPermissions.channelId, messageData.channelId),
-          eq(botChannelPermissions.botId, botId),
-        ),
-      )
-      .get();
-    if (isChannelPermitted === undefined) {
+    if (!ExtUtil.isChannelPermitted(messageData.channelId, botId)) {
       throw status(404, "Message not found");
     }
 
@@ -65,17 +55,7 @@ export namespace ExtServiceMessage {
     }
 
     // チャンネル送信権限確認
-    const isChannelPermitted = db
-      .select({ id: botChannelPermissions.channelId })
-      .from(botChannelPermissions)
-      .where(
-        and(
-          eq(botChannelPermissions.channelId, channelId),
-          eq(botChannelPermissions.botId, botId),
-        ),
-      )
-      .get();
-    if (isChannelPermitted === undefined) {
+    if (!ExtUtil.isChannelPermitted(channelId, botId)) {
       throw status(403, "Channel not permitted");
     }
 
@@ -257,17 +237,7 @@ export namespace ExtServiceMessage {
     }
 
     //Botのアクセス許可
-    const isPermitted = db
-      .select({ id: botChannelPermissions.id })
-      .from(botChannelPermissions)
-      .where(
-        and(
-          eq(botChannelPermissions.channelId, messageEditing.channelId),
-          eq(botChannelPermissions.botId, botId),
-        ),
-      )
-      .get();
-    if (isPermitted === undefined) {
+    if (!ExtUtil.isChannelPermitted(messageEditing.channelId, botId)) {
       throw status(403, "Channel not permitted");
     }
 
