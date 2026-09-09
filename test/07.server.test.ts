@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
 import {
+  botManages,
   channelJoinOnDefaults,
   invitations,
   messages,
@@ -326,5 +327,66 @@ describe("PATCH /server/bot/approval", () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
+  });
+});
+
+// ファイル末尾に置く(TESTBOT1のbotNameを書き換えるため、GET /server/bot/all の期待値と干渉する)
+describe("PATCH /server/bot", () => {
+  it("正常 :: 権限変更でapproveStatusがPENDINGに戻る", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        name: "BOT_TEST_1_RENAMED",
+        canSendMessage: true,
+        canManageUser: true,
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED");
+    expect(j.data.canManageUser).toBeTrue();
+    expect(j.data.approveStatus).toBe("PENDING");
+    // tokenCodeは返らない
+    expect(j.data.tokenCode).toBeUndefined();
+  });
+
+  it("正常 :: 権限変更なし(名前のみ)はapproveStatus維持", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", name: "BOT_TEST_1_RENAMED2" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED2");
+    expect(j.data.approveStatus).toBe("APPROVED");
+  });
+
+  it("他人のBotは更新できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", name: "hijack" },
+    });
+    expect(res.ok).toBeFalse();
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT999", name: "ghost" },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot not found");
   });
 });
