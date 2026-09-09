@@ -98,7 +98,26 @@ export const server = new Elysia({ prefix: "/server" })
         canSendMessage: t.Optional(t.Boolean()),
       }),
       detail: {
-        description: "自分のBot一覧取得",
+        description: "Botを作成(申請)する",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+  .delete(
+    "/bot",
+    async ({ body: { botId }, CheckToken: { _userId } }) => {
+      await ServiceServer.DeleteBot(botId, _userId);
+
+      return {
+        message: "Bot deleted",
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+      }),
+      detail: {
+        description: "自分のBotを削除",
         tags: ["Server", "Bot"],
       },
     },

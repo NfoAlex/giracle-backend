@@ -124,14 +124,32 @@ export namespace ServiceServer {
           createdBy: _userId,
           remoteUserId: userForBot.id,
           approveStatus: "PENDING",
-          ...permissionConfig
+          ...permissionConfig,
         })
         .returning();
       if (bot === undefined) throw status(500, "Bot creation failed");
-      botCreated = {...bot};
+      botCreated = { ...bot };
     });
 
     return botCreated;
+  };
+
+  export const DeleteBot = async (botId: string, _userId: string) => {
+    const [bot] = await db
+      .select({ remoteUserId: botManages.remoteUserId })
+      .from(botManages)
+      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)));
+    if (bot === undefined) throw status(404, "Bot not found");
+
+    await db.transaction(async (trx) => {
+      await trx.delete(botManages).where(eq(botManages.id, botId));
+      await trx
+        .update(users)
+        .set({ isDeleted: true })
+        .where(eq(users.id, bot.remoteUserId));
+    });
+
+    return true;
   };
 
   export const GetInvite = async () => {
