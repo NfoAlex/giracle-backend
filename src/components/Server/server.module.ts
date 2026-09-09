@@ -122,6 +122,53 @@ export const server = new Elysia({ prefix: "/server" })
       },
     },
   )
+  .patch(
+    "/bot",
+    async ({
+      body: {
+        botId,
+        name,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      },
+      CheckToken: { _userId },
+    }) => {
+      const bot = await ServiceServer.PatchBot(botId, _userId, {
+        name,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      });
+
+      return {
+        message: "Bot updated",
+        data: bot,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        name: t.String(),
+        canFetchUserinfo: t.Optional(t.Boolean()),
+        canFetchRoleinfo: t.Optional(t.Boolean()),
+        canManageUser: t.Optional(t.Boolean()),
+        canManageServerConfig: t.Optional(t.Boolean()),
+        canReadMessage: t.Optional(t.Boolean()),
+        canSendMessage: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        description: "自分のBot情報を更新",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
 
   .use(Middleware.CheckRoleTerm)
 

@@ -156,6 +156,61 @@ export namespace ServiceServer {
     return true;
   };
 
+  export const PatchBot = async (
+    botId: string,
+    _userId: string,
+    updateValue: {
+      name: string;
+      canFetchUserinfo?: boolean;
+      canFetchRoleinfo?: boolean;
+      canManageUser?: boolean;
+      canManageServerConfig?: boolean;
+      canReadMessage?: boolean;
+      canSendMessage?: boolean;
+    },
+  ) => {
+    const currentBotPermissions = db
+      .select({
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        canFetchRoleinfo: botManages.canFetchRoleinfo,
+        canManageUser: botManages.canManageUser,
+        canManageServerConfig: botManages.canManageServerConfig,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+      })
+      .from(botManages)
+      .where(eq(botManages.id, botId))
+      .get();
+    if (currentBotPermissions === undefined) {
+      throw status(404, "Bot not found");
+    }
+
+    //許可設定を変えているなら申請状況を初期化
+    const { name, ...permissions } = updateValue;
+    const changedPermissions = (
+      Object.keys(
+        currentBotPermissions,
+      ) as (keyof typeof currentBotPermissions)[]
+    ).filter(
+      (key) =>
+        permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
+        permissions[key] !== currentBotPermissions[key],
+    );
+
+    const [bot] = await db
+      .update(botManages)
+      .set({
+        botName: name,
+        approveStatus: changedPermissions.length !== 0 ? "PENDING" : undefined,
+        ...permissions,
+      })
+      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
+      .returning();
+
+    const { tokenCode, ...botTrimmed } = bot;
+    return botTrimmed;
+  };
+
   export const GetInvite = async () => {
     const invites = await db.query.invitations.findMany();
     return invites;
