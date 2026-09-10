@@ -319,3 +319,65 @@ describe("POST /ext/message/edit", () => {
     expect(await res.text()).toBe("Message not found");
   });
 });
+
+describe("DELETE /ext/message/delete", () => {
+  let TEST__BOT_MESSAGE_ID = "";
+  it("正常 :: 送信", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "delete me" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    TEST__BOT_MESSAGE_ID = (await res.json()).id;
+    expect(TEST__BOT_MESSAGE_ID).toBeString();
+  });
+
+  it("正常 :: 削除", async () => {
+    const res = await FETCH({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { targetMessageId: TEST__BOT_MESSAGE_ID },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j.id).toBe(TEST__BOT_MESSAGE_ID);
+    expect(j.channelId).toBe("TESTCHANNEL1");
+  });
+
+  it("正常 :: GETで削除確認", async () => {
+    const res = await FETCH({
+      path: `/ext/message/${TEST__BOT_MESSAGE_ID}`,
+      method: "GET",
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("他人のメッセージ", async () => {
+    const res = await FETCH({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { targetMessageId: "TESTMESSAGE1" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not sender of this message");
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { targetMessageId: "TESTMESSAGE999" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Message not found");
+  });
+});
