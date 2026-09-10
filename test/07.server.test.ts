@@ -340,6 +340,47 @@ describe("GET /server/bot", () => {
   });
 });
 
+describe("GET /server/bot/me/:botId", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Fetched my bot info");
+    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.botName).toBe("BOT_TEST_1");
+    // tokenCodeは返らない
+    expect(j.data.tokenCode).toBeUndefined();
+    // remoteUserIdで紐付いたユーザーが展開される
+    expect(j.data.user.id).toBe("TESTUSER_BOT_1");
+    // チャンネル透過も展開される
+    expect(j.data.channelPermissions.length).toBe(1);
+    expect(j.data.channelPermissions[0].channelId).toBe("TESTCHANNEL1");
+  });
+
+  it("他人のBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT3",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data).toBeUndefined();
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT999",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data).toBeUndefined();
+  });
+});
+
 describe("PATCH /server/bot/approval", () => {
   it("正常", async () => {
     const res = await FETCH({
