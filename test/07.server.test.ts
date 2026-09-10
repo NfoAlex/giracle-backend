@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
@@ -420,6 +420,26 @@ describe("PATCH /server/bot", () => {
     expect(j.data.approveStatus).toBe("PENDING");
   });
 
+  it("正常 :: 概要の変更だけだとPENDINGにならない", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", description: "testing new description" },
+    });
+    const j = await res.json();
+    console.log("07.server :: PATCH /server/bot : ", j);
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.botDescription).toBe("testing new description");
+    expect(j.data.approveStatus).toBe("APPROVED");
+  });
+
   it("既存のBot名には変更できない", async () => {
     const res = await FETCH({
       path: "/server/bot",
@@ -450,4 +470,12 @@ describe("PATCH /server/bot", () => {
     const t = await res.text();
     expect(t).toBe("Bot not found");
   });
+});
+
+// PATCHは共有状態(TESTBOT1のbotName/approveStatus)を書き換えるため、後続のテストファイルへ漏らさないよう戻す
+afterAll(async () => {
+  await db
+    .update(botManages)
+    .set({ botName: "BOT_TEST_1", approveStatus: "APPROVED" })
+    .where(eq(botManages.id, "TESTBOT1"));
 });
