@@ -189,7 +189,8 @@ export namespace ServiceServer {
     botId: string,
     _userId: string,
     updateValue: {
-      name: string;
+      name?: string;
+      description?: string;
       canFetchUserinfo?: boolean;
       canFetchRoleinfo?: boolean;
       canManageUser?: boolean;
@@ -214,10 +215,11 @@ export namespace ServiceServer {
     if (currentBot === undefined) {
       throw status(404, "Bot not found");
     }
+
     const { botName: currentBotName, ...currentBotPermissions } = currentBot;
+    const { name, description, ...permissions } = updateValue;
 
     //許可設定かBot名を変えているなら再申請扱いにして審査状況を初期化
-    const { name, ...permissions } = updateValue;
     const permissionChanged = (
       Object.keys(
         currentBotPermissions,
@@ -227,12 +229,14 @@ export namespace ServiceServer {
         permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
         permissions[key] !== currentBotPermissions[key],
     );
-    const needsReapproval = name !== currentBotName || permissionChanged;
+    const needsReapproval =
+      name !== undefined && (name !== currentBotName || permissionChanged);
 
     const [bot] = await db
       .update(botManages)
       .set({
         botName: name,
+        botDescription: description,
         approveStatus: needsReapproval ? "PENDING" : undefined,
         ...permissions,
       })

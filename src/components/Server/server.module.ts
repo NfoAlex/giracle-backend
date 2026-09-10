@@ -138,6 +138,7 @@ export const server = new Elysia({ prefix: "/server" })
       body: {
         botId,
         name,
+        description,
         canFetchUserinfo,
         canFetchRoleinfo,
         canManageUser,
@@ -149,6 +150,7 @@ export const server = new Elysia({ prefix: "/server" })
     }) => {
       const bot = await ServiceServer.PatchBot(botId, _userId, {
         name,
+        description,
         canFetchUserinfo,
         canFetchRoleinfo,
         canManageUser,
@@ -165,7 +167,8 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         botId: t.String(),
-        name: t.String({ minLength: 1, maxLength: 64 }),
+        name: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
+        description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
         canFetchUserinfo: t.Optional(t.Boolean()),
         canFetchRoleinfo: t.Optional(t.Boolean()),
         canManageUser: t.Optional(t.Boolean()),
