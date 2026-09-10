@@ -365,9 +365,8 @@ describe("GET /server/bot/me/:botId", () => {
       path: "/server/bot/me/TESTBOT3",
       method: "GET",
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data).toBeUndefined();
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not owner of this bot");
   });
 
   it("存在しないBot", async () => {
@@ -375,9 +374,8 @@ describe("GET /server/bot/me/:botId", () => {
       path: "/server/bot/me/TESTBOT999",
       method: "GET",
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data).toBeUndefined();
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
   });
 });
 
