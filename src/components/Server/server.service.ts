@@ -94,6 +94,19 @@ export namespace ServiceServer {
     return mybot;
   };
 
+  export const GetBotById = async (botId: string, _userId: string) => {
+    const myBot = await db.query.botManages.findFirst({
+      where: and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)),
+      columns: { tokenCode: false },
+      with: {
+        channelPermissions: true,
+        user: true,
+      },
+    });
+
+    return myBot;
+  };
+
   export const PutBot = async (
     name: string,
     description: string | undefined = undefined,
