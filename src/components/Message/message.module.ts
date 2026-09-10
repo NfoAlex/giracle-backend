@@ -196,9 +196,15 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .get(
     "/url-thumbnail",
-    async ({ query: { targetUrl, forFavicon } }) => {
+    async ({ query: { targetUrl, forFavicon }, set }) => {
       const image = await ServiceMessage.GetUrlThumbnail(targetUrl, forFavicon);
-      if (image === null) throw status(500, "Internal Server Error");
+      if (image === null) throw status(400, "Failed to fetch thumbnail");
+
+      //画像のキャッシュ期間を設定
+      set.headers["Cache-Control"] = "public, max-age=604800"; // 1週間
+      //格納型XSS対策: インライン実行を防ぐ
+      set.headers["Content-Disposition"] = "attachment";
+      set.headers["X-Content-Type-Options"] = "nosniff";
 
       return image;
     },
@@ -207,6 +213,10 @@ export const message = new Elysia({ prefix: "/message" })
         targetUrl: t.String({ format: "uri" }),
         forFavicon: t.Boolean({ default: false }),
       }),
+      response: {
+        200: t.Any(),
+        400: t.Literal("Failed to fetch thumbnail"),
+      },
       detail: {
         description: "URLプレビュー用に圧縮されたサムネイルを取得します",
         tags: ["Message"],

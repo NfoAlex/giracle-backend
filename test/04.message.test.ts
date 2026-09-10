@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
+import { imageSize } from "image-size";
+import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ServiceMessage } from "../src/components/Message/message.service";
 import {
@@ -586,6 +588,9 @@ describe("/message/url-thumbnail", () => {
       });
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/webp");
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=604800");
+      expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+      expect(res.headers.get("Content-Disposition")).toBe("attachment");
 
       await cleanupThumbnail(testUrl);
     } finally {
@@ -593,7 +598,7 @@ describe("/message/url-thumbnail", () => {
     }
   });
 
-  it("GET: fetch失敗時 500", async () => {
+  it("GET: サムネイル取得失敗時 400", async () => {
     const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
     const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
 
@@ -602,7 +607,8 @@ describe("/message/url-thumbnail", () => {
         path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
         method: "GET",
       });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
+      expect(await res.text()).toBe("Failed to fetch thumbnail");
     } finally {
       restore();
     }
@@ -653,20 +659,23 @@ describe("/message/url-thumbnail", () => {
       restore();
     }
   });
-  it("forFavicon=true時: 通常より小さいwebpで保存される", async () => {
+  it("forFavicon=true時: 512px / 32pxに縮小されたwebpで保存される", async () => {
     const normalUrl = `https://example.com/normal-${crypto.randomUUID()}.png`;
     const faviconUrl = `https://example.com/favicon-${crypto.randomUUID()}.png`;
-    const sampleImg = await Bun.file(
-      "./STORAGE/icon/default.png",
-    ).arrayBuffer();
+    const bigPng = await sharp({
+      create: {
+        width: 1024,
+        height: 1024,
+        channels: 3,
+        background: { r: 10, g: 20, b: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const restoreNormal = mockFetchFor(normalUrl, bigPng.slice(0), "image/png");
     const restoreFavicon = mockFetchFor(
       faviconUrl,
-      sampleImg.slice(0),
-      "image/png",
-    );
-    const restoreNormal = mockFetchFor(
-      normalUrl,
-      sampleImg.slice(0),
+      bigPng.slice(0),
       "image/png",
     );
 
@@ -676,16 +685,100 @@ describe("/message/url-thumbnail", () => {
       const favicon = await ServiceMessage.GetUrlThumbnail(faviconUrl, true);
       if (!favicon) throw new Error("favicon must not be null");
 
-      expect(favicon.type).toBe("image/webp");
-      expect((await favicon.arrayBuffer()).byteLength).toBeLessThan(
-        (await normal.arrayBuffer()).byteLength,
+      const normalSize = imageSize(new Uint8Array(await normal.arrayBuffer()));
+      const faviconSize = imageSize(
+        new Uint8Array(await favicon.arrayBuffer()),
       );
+      expect(normalSize.width).toBe(512);
+      expect(normalSize.height).toBe(512);
+      expect(faviconSize.width).toBe(32);
+      expect(faviconSize.height).toBe(32);
 
       await cleanupThumbnail(normalUrl, normal);
       await cleanupThumbnail(faviconUrl, favicon);
     } finally {
-      restoreFavicon();
       restoreNormal();
+      restoreFavicon();
+    }
+  });
+
+  it("非画像Content-Typeは取得しない", async () => {
+    const testUrl = `https://example.com/html-${crypto.randomUUID()}.png`;
+    //デコード自体は可能なPNGを text/html として返し、Content-Type判定だけを検証する
+    const sampleImg = await Bun.file(
+      "./STORAGE/icon/default.png",
+    ).arrayBuffer();
+    const restore = mockFetchFor(testUrl, sampleImg, "text/html", 200);
+
+    try {
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toBe("Failed to fetch thumbnail");
+
+      const record = db
+        .select()
+        .from(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+        .get();
+      expect(record).toBeUndefined();
+    } finally {
+      restore();
+    }
+  });
+
+  it("上限超過ボディは取得しない", async () => {
+    const testUrl = `https://example.com/huge-${crypto.randomUUID()}.png`;
+    const controlUrl = `https://example.com/under-limit-${crypto.randomUUID()}.png`;
+    //末尾にpaddingを足したPNG (デコードは可能)。Content-Lengthが付かないストリームで渡す
+    const basePng = await sharp({
+      create: {
+        width: 64,
+        height: 64,
+        channels: 3,
+        background: { r: 1, g: 2, b: 3 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const streamOf = (buffer: Buffer) =>
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(buffer));
+          controller.close();
+        },
+      });
+    const restoreHuge = mockFetchFor(
+      testUrl,
+      streamOf(Buffer.concat([basePng, Buffer.alloc(6 * 1024 * 1024)])),
+      "image/png",
+    );
+    const restoreControl = mockFetchFor(
+      controlUrl,
+      streamOf(Buffer.concat([basePng, Buffer.alloc(1024 * 1024)])),
+      "image/png",
+    );
+
+    try {
+      //上限未満なら同じpadding付きPNGが200になる (400がデコード失敗由来でないことの対照)
+      const controlRes = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(controlUrl)}`,
+        method: "GET",
+      });
+      expect(controlRes.status).toBe(200);
+      await cleanupThumbnail(controlUrl);
+
+      const res = await FETCH({
+        path: `/message/url-thumbnail?targetUrl=${encodeURIComponent(testUrl)}`,
+        method: "GET",
+      });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toBe("Failed to fetch thumbnail");
+    } finally {
+      restoreHuge();
+      restoreControl();
     }
   });
 
