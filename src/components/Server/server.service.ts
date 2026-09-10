@@ -198,8 +198,9 @@ export namespace ServiceServer {
       canSendMessage?: boolean;
     },
   ) => {
-    const currentBotPermissions = db
+    const currentBot = db
       .select({
+        botName: botManages.botName,
         canFetchUserinfo: botManages.canFetchUserinfo,
         canFetchRoleinfo: botManages.canFetchRoleinfo,
         canManageUser: botManages.canManageUser,
@@ -210,31 +211,42 @@ export namespace ServiceServer {
       .from(botManages)
       .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
       .get();
-    if (currentBotPermissions === undefined) {
+    if (currentBot === undefined) {
       throw status(404, "Bot not found");
     }
+    const { botName: currentBotName, ...currentBotPermissions } = currentBot;
 
-    //許可設定を変えているなら申請状況を初期化
+    //許可設定かBot名を変えているなら再申請扱いにして審査状況を初期化
     const { name, ...permissions } = updateValue;
-    const changedPermissions = (
+    const permissionChanged = (
       Object.keys(
         currentBotPermissions,
       ) as (keyof typeof currentBotPermissions)[]
-    ).filter(
+    ).some(
       (key) =>
         permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
         permissions[key] !== currentBotPermissions[key],
     );
+    const needsReapproval = name !== currentBotName || permissionChanged;
 
     const [bot] = await db
       .update(botManages)
       .set({
         botName: name,
-        approveStatus: changedPermissions.length !== 0 ? "PENDING" : undefined,
+        approveStatus: needsReapproval ? "PENDING" : undefined,
         ...permissions,
       })
       .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
-      .returning();
+      .returning()
+      .catch((e) => {
+        if (
+          e instanceof Error &&
+          e.message.includes("UNIQUE constraint failed")
+        ) {
+          throw status(400, "Bot name already exists");
+        }
+        throw status(500, "Database error");
+      });
     if (bot === undefined) {
       throw status(500, "Bot data should be available");
     }
