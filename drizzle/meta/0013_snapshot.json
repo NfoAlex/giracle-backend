@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e48865e5-709b-4ef4-8b76-a6cc02affb1a",
+  "id": "d6989ee8-46f9-4a10-85d9-1f1d12c5efb0",
   "prevId": "787b5ea2-d093-409c-a52f-9626f86f116d",
   "tables": {
     "BlockedIPAddress": {
@@ -154,6 +154,13 @@
           "type": "text(64)",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "botDescription": {
+          "name": "botDescription",
+          "type": "text(255)",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "remoteUserId": {

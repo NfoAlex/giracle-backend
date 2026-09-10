@@ -545,6 +545,7 @@ export const botManages = sqliteTable(
       .notNull()
       .references(() => users.id),
     botName: text("botName", { length: 64 }).notNull().unique(),
+    botDescription: text("botDescription", { length: 255 }),
     remoteUserId: text("remoteUserId")
       .notNull()
       .unique()

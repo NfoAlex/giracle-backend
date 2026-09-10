@@ -12,6 +12,7 @@ CREATE TABLE `BotManage` (
 	`id` text PRIMARY KEY NOT NULL,
 	`createdBy` text NOT NULL,
 	`botName` text(64) NOT NULL,
+	`botDescription` text(255),
 	`remoteUserId` text NOT NULL,
 	`createdAt` integer NOT NULL,
 	`status` text DEFAULT 'PENDING' NOT NULL,
