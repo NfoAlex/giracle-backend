@@ -1,3 +1,4 @@
+import { unlink } from "node:fs/promises";
 import { and, eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../../../";
@@ -5,7 +6,10 @@ import {
   channelJoins,
   inboxes,
   type Message,
+  messageFileAttached,
+  messageReactions,
   messages,
+  messageUrlPreviews,
 } from "../../../db/schema";
 import { Util } from "../../../Util";
 import { ExtUtil } from "../../Util.ext";
@@ -258,5 +262,60 @@ export namespace ExtServiceMessage {
       });
 
     return msgUpdated;
+  };
+
+  export const Delete = async (
+    messageId: string,
+    botId: string,
+    remoteUserId: string,
+  ) => {
+    //メッセージ取得
+    const messageData = await db.query.messages.findFirst({
+      columns: { id: true, userId: true, channelId: true },
+      where: eq(messages.id, messageId),
+    });
+    //メッセージが無かった時エラー
+    if (messageData === undefined) {
+      throw status(404, "Message not found");
+    }
+    //送信者が自分(Bot)と違うならエラー
+    if (messageData.userId !== remoteUserId) {
+      throw status(403, "You are not sender of this message");
+    }
+    //Botのアクセス許可
+    if (!ExtUtil.isChannelPermitted(messageData.channelId, botId)) {
+      throw status(403, "Channel not permitted");
+    }
+
+    //削除するファイルデータを予め取得
+    const fileData = await db.query.messageFileAttached.findMany({
+      where: eq(messageFileAttached.messageId, messageId),
+    });
+
+    //DB上の関連データをまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
+    db.transaction((tx) => {
+      tx.delete(messageUrlPreviews)
+        .where(eq(messageUrlPreviews.messageId, messageId))
+        .run();
+      tx.delete(messageReactions)
+        .where(eq(messageReactions.messageId, messageId))
+        .run();
+      tx.delete(messageFileAttached)
+        .where(eq(messageFileAttached.messageId, messageId))
+        .run();
+      tx.delete(inboxes).where(eq(inboxes.messageId, messageId)).run();
+      tx.delete(messages).where(eq(messages.id, messageId)).run();
+    });
+
+    //ファイル削除
+    for (const file of fileData) {
+      try {
+        await unlink(`./STORAGE/file/${file.channelId}/${file.savedFileName}`);
+      } catch (e) {
+        console.error("message.ext.service :: Delete : 削除エラー->", e);
+      }
+    }
+
+    return messageData;
   };
 }

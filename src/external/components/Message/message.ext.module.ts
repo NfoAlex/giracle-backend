@@ -102,4 +102,43 @@ export const extMessage = new Elysia({ prefix: "/message" })
       },
       bindUrlPreview: true,
     },
+  )
+  .delete(
+    "/delete",
+    async ({
+      body: { targetMessageId },
+      CheckApiCode: { id, remoteUserId },
+      server,
+    }) => {
+      const msg = await ExtServiceMessage.Delete(
+        targetMessageId,
+        id,
+        remoteUserId,
+      );
+
+      //WSで通知(内部 /message/delete と同一シグナル)
+      server?.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "message::MessageDeleted",
+          data: {
+            messageId: msg.id,
+            channelId: msg.channelId,
+          },
+        }),
+      );
+
+      return msg;
+    },
+    {
+      checkPermission: "canSendMessage",
+      body: t.Object({
+        targetMessageId: t.String(),
+      }),
+      detail: {
+        description:
+          "メッセージを削除します。(自分のBotが送信したメッセージのみ)",
+        tags: ["External", "Message"],
+      },
+    },
   );
