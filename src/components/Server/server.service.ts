@@ -96,13 +96,16 @@ export namespace ServiceServer {
 
   export const GetBotById = async (botId: string, _userId: string) => {
     const myBot = await db.query.botManages.findFirst({
-      where: and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)),
+      where: and(eq(botManages.id, botId)),
       columns: { tokenCode: false },
       with: {
         channelPermissions: true,
         user: true,
       },
     });
+    if (myBot === undefined) throw status(404, "Bot not found");
+    if (myBot.createdBy !== _userId)
+      throw status(403, "You are not owner of this bot");
 
     return myBot;
   };
