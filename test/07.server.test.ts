@@ -402,7 +402,7 @@ describe("PATCH /server/bot", () => {
     expect(j.data.tokenCode).toBeUndefined();
   });
 
-  it("正常 :: 権限変更なし(名前のみ)はapproveStatus維持", async () => {
+  it("正常 :: 名前変更でもapproveStatusがPENDINGに戻る", async () => {
     // 申請承認済みの状態に戻す
     await db
       .update(botManages)
@@ -417,7 +417,18 @@ describe("PATCH /server/bot", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.botName).toBe("BOT_TEST_1_RENAMED2");
-    expect(j.data.approveStatus).toBe("APPROVED");
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
+
+  it("既存のBot名には変更できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", name: "BOT_TEST_2" },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot name already exists");
   });
 
   it("他人のBotは更新できない", async () => {
