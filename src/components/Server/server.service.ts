@@ -96,6 +96,7 @@ export namespace ServiceServer {
 
   export const PutBot = async (
     name: string,
+    description: string | undefined = undefined,
     _userId: string,
     permissionChannelIds: string[] = [],
     useAllChannel: boolean = false,
@@ -138,6 +139,7 @@ export namespace ServiceServer {
         .insert(botManages)
         .values({
           botName: name,
+          botDescription: description,
           createdBy: _userId,
           remoteUserId: userForBot.id,
           approveStatus: "PENDING",
