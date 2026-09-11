@@ -453,7 +453,7 @@ export namespace ServiceMessage {
           .resize(forFavicon ? 32 : 512, undefined, {
             withoutEnlargement: true,
           })
-          .webp({ quality: 95 })
+          .webp({ quality: 90 })
           .write(filePath);
       }
     } catch (e) {
