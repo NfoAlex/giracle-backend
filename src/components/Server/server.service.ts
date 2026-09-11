@@ -18,7 +18,7 @@ import {
   users,
 } from "../../db/schema";
 import { Util } from "../../Util";
-import { WSDisconnectUser } from "../../ws";
+import { WSDisconnectUser, WSSubscribe, WSUnsubscribe } from "../../ws";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -248,6 +248,8 @@ export namespace ServiceServer {
     updateValue: {
       name?: string;
       description?: string;
+      permissionChannelIds?: string[];
+      useAllChannel?: boolean;
       canFetchUserinfo?: boolean;
       canFetchRoleinfo?: boolean;
       canManageUser?: boolean;
@@ -260,6 +262,7 @@ export namespace ServiceServer {
       .select({
         botName: botManages.botName,
         approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
         canFetchUserinfo: botManages.canFetchUserinfo,
         canFetchRoleinfo: botManages.canFetchRoleinfo,
         canManageUser: botManages.canManageUser,
@@ -277,9 +280,69 @@ export namespace ServiceServer {
     const {
       botName: currentBotName,
       approveStatus: currentApproveStatus,
+      useAllChannel: currentUseAllChannel,
       ...currentBotPermissions
     } = currentBot;
-    const { name, description, ...permissions } = updateValue;
+    const {
+      name,
+      description,
+      permissionChannelIds,
+      useAllChannel,
+      ...permissions
+    } = updateValue;
+
+    //現在許可されているチャンネルId(変更差分の判定とWS購読の更新に使う)
+    const currentChannelIds = db
+      .select({ channelId: botChannelPermissions.channelId })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, botId))
+      .all()
+      .map((permission) => permission.channelId);
+    //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
+    const uniqueChannelIds =
+      permissionChannelIds === undefined
+        ? undefined
+        : [...new Set(permissionChannelIds)];
+    //変更後の全透過設定(未指定なら現状維持)
+    const effectiveUseAllChannel = useAllChannel ?? currentUseAllChannel;
+
+    //チャンネル許可を指定された場合は作成時と同じ検査をする
+    //(全透過なら許可リストは使われないため不要)
+    if (uniqueChannelIds !== undefined && !effectiveUseAllChannel) {
+      if (uniqueChannelIds.length > 100) {
+        throw status(400, "Too many channels to listen");
+      }
+      //TODO: どうにかしたい
+      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+      //実在しないチャンネルIdも素通りしてしまう。ここで弾かないと許可テーブルの
+      //channelIdがFK違反になり500になる
+      for (const channelId of uniqueChannelIds) {
+        const channelExists =
+          db
+            .select({ id: channels.id })
+            .from(channels)
+            .where(eq(channels.id, channelId))
+            .get() !== undefined;
+        if (
+          !channelExists ||
+          !(await Util.checkChannelVisibility(channelId, _userId))
+        )
+          throw status(400, "You cannot use a channel you cannot see");
+      }
+    }
+
+    //全透過設定の変更
+    const useAllChannelChanged =
+      useAllChannel !== undefined && useAllChannel !== currentUseAllChannel;
+    //許可チャンネルリストの変更(全透過中はリストに実効性が無いため数えない)
+    const channelListChanged =
+      uniqueChannelIds !== undefined &&
+      !effectiveUseAllChannel &&
+      (uniqueChannelIds.length !== currentChannelIds.length ||
+        uniqueChannelIds.some(
+          (channelId) => !currentChannelIds.includes(channelId),
+        ));
+    const channelPermissionChanged = useAllChannelChanged || channelListChanged;
 
     //再承認が必要かどうかフラグ
     let needsReapproval = false;
@@ -295,7 +358,9 @@ export namespace ServiceServer {
           permissions[key] !== currentBotPermissions[key],
       );
       needsReapproval =
-        (name !== undefined && name !== currentBotName) || permissionChanged;
+        (name !== undefined && name !== currentBotName) ||
+        permissionChanged ||
+        channelPermissionChanged;
     }
 
     //最終的な承認状態
@@ -321,6 +386,7 @@ export namespace ServiceServer {
             //例外を投げて500になる。botNameは必ず書く値なので現状値で埋める
             botName: name ?? currentBotName,
             botDescription: description,
+            useAllChannel: useAllChannel,
             approveStatus: newApproveStatus,
             ...permissions,
           })
@@ -331,6 +397,31 @@ export namespace ServiceServer {
           .get();
         if (updated === undefined) {
           throw status(500, "Bot data should be available");
+        }
+
+        //チャンネル許可の差し替え
+        //全透過に切り替えた場合は許可リストが実効性を失うため消す(残すと後で
+        //非透過に戻した時に古い許可が復活してしまう)
+        if (effectiveUseAllChannel || uniqueChannelIds !== undefined) {
+          trx
+            .delete(botChannelPermissions)
+            .where(eq(botChannelPermissions.botId, botId))
+            .run();
+          if (
+            !effectiveUseAllChannel &&
+            uniqueChannelIds !== undefined &&
+            uniqueChannelIds.length !== 0
+          ) {
+            trx
+              .insert(botChannelPermissions)
+              .values(
+                uniqueChannelIds.map((channelId) => ({
+                  botId: botId,
+                  channelId: channelId,
+                })),
+              )
+              .run();
+          }
         }
 
         //改名時は紐付いたユーザー行の名前も揃える
@@ -358,6 +449,31 @@ export namespace ServiceServer {
     //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
     if (bot.approveStatus !== "APPROVED") {
       WSDisconnectUser(bot.remoteUserId, "Your bot is not approved yet");
+    } else if (channelPermissionChanged) {
+      //チャンネル許可が変わったなら、接続中のWSの購読を新しい許可に合わせる
+      //(解除しないと許可を失ったチャンネルの配信を受け続けてしまう)
+      //全透過のBotは接続時に全チャンネルを購読しているため、その一覧も必要になる
+      const allChannelIds =
+        currentUseAllChannel || bot.useAllChannel
+          ? db
+              .select({ id: channels.id })
+              .from(channels)
+              .all()
+              .map((channel) => channel.id)
+          : [];
+      const subscribedChannelIds = currentUseAllChannel
+        ? allChannelIds
+        : currentChannelIds;
+      const notifyChannelIds = bot.useAllChannel
+        ? allChannelIds
+        : (uniqueChannelIds ?? currentChannelIds);
+
+      for (const channelId of subscribedChannelIds) {
+        WSUnsubscribe(bot.remoteUserId, `channel::${channelId}`);
+      }
+      for (const channelId of notifyChannelIds) {
+        WSSubscribe(bot.remoteUserId, `channel::${channelId}`);
+      }
     }
 
     const { tokenCode, ...botTrimmed } = bot;
