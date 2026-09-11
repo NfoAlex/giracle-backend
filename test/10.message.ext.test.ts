@@ -1,7 +1,7 @@
-import { beforeAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../src";
-import { inboxes } from "../src/db/schema";
+import { botManages, inboxes } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -379,5 +379,63 @@ describe("DELETE /ext/message/delete", () => {
     });
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Message not found");
+  });
+});
+
+describe("全透過Bot(useAllChannel)", () => {
+  beforeAll(async () => {
+    // TESTBOT2 は既定で権限フラグを持たないため、全透過 + 読み書き許可を一時的に付与する
+    await db
+      .update(botManages)
+      .set({ useAllChannel: true, canReadMessage: true, canSendMessage: true })
+      .where(eq(botManages.id, "TESTBOT2"));
+  });
+
+  afterAll(async () => {
+    await db
+      .update(botManages)
+      .set({
+        useAllChannel: false,
+        canReadMessage: false,
+        canSendMessage: false,
+      })
+      .where(eq(botManages.id, "TESTBOT2"));
+  });
+
+  it("チャンネル許可が無くても全チャンネルのメッセージを取得できる", async () => {
+    // TESTBOT2 は botChannelPermissions に行を持たない
+    const res = await FETCH({
+      path: "/ext/message/TESTMESSAGE2",
+      method: "GET",
+      headers: { authorization: "TESTTOKEN2" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).id).toBe("TESTMESSAGE2");
+  });
+
+  it("非透過Botは許可の無いチャンネルのメッセージを取得できない", async () => {
+    // TESTBOT1 は TESTCHANNEL1 のみ許可
+    const res = await FETCH({
+      path: "/ext/message/TESTMESSAGE2",
+      method: "GET",
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("全透過Botはチャンネル許可が無くても送信できる", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL2", message: "useAllChannel send" },
+      headers: { authorization: "TESTTOKEN2" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.channelId).toBe("TESTCHANNEL2");
+    expect(j.userId).toBe("TESTUSER_BOT_2");
   });
 });

@@ -12,10 +12,11 @@ import {
   messageUrlPreviews,
 } from "../../../db/schema";
 import { Util } from "../../../Util";
+import type { TBotCredential } from "../../Middleware.ext";
 import { ExtUtil } from "../../Util.ext";
 
 export namespace ExtServiceMessage {
-  export const GetMessage = async (messageId: string, botId: string) => {
+  export const GetMessage = async (messageId: string, bot: TBotCredential) => {
     const messageData = await db.query.messages.findFirst({
       where: eq(messages.id, messageId),
       with: {
@@ -27,7 +28,7 @@ export namespace ExtServiceMessage {
     if (messageData === undefined) {
       throw status(404, "Message not found");
     }
-    if (!ExtUtil.isChannelPermitted(messageData.channelId, botId)) {
+    if (!ExtUtil.isChannelPermitted(messageData.channelId, bot)) {
       throw status(404, "Message not found");
     }
 
@@ -37,9 +38,7 @@ export namespace ExtServiceMessage {
   export const SendMessage = async (
     channelId: string,
     message: string,
-    botId: string,
-    botName: string,
-    remoteUserId: string,
+    bot: TBotCredential,
     replyingMessageId?: string,
     server?: Bun.Server<unknown> | null,
   ) => {
@@ -59,7 +58,7 @@ export namespace ExtServiceMessage {
     }
 
     // チャンネル送信権限確認
-    if (!ExtUtil.isChannelPermitted(channelId, botId)) {
+    if (!ExtUtil.isChannelPermitted(channelId, bot)) {
       throw status(403, "Channel not permitted");
     }
 
@@ -81,7 +80,7 @@ export namespace ExtServiceMessage {
       .insert(messages)
       .values({
         channelId,
-        userId: remoteUserId,
+        userId: bot.remoteUserId,
         content: message,
         replyingMessageId: replyingMessageId ?? undefined,
         isBot: true,
@@ -114,7 +113,7 @@ export namespace ExtServiceMessage {
     const replyTargetUserId =
       replyingMessageId &&
       messageReplyingTo &&
-      messageReplyingTo.userId !== remoteUserId
+      messageReplyingTo.userId !== bot.remoteUserId
         ? messageReplyingTo.userId
         : null;
 
@@ -169,7 +168,7 @@ export namespace ExtServiceMessage {
           channelId,
           eventType: "reply",
           payload: {
-            title: `${botName} さんからの返信`,
+            title: `${bot.botName} さんからの返信`,
             body,
             tag: `reply-${messageSaved.id}`,
             data: { type: "reply", messageId: messageSaved.id, channelId },
@@ -186,7 +185,7 @@ export namespace ExtServiceMessage {
         where: eq(channelJoins.channelId, channelId),
         columns: { userId: true },
       });
-      const excluded = new Set<string>([remoteUserId, ...mentionedUserIds]);
+      const excluded = new Set<string>([bot.remoteUserId, ...mentionedUserIds]);
       if (replyTargetUserId) excluded.add(replyTargetUserId);
       for (const { userId: memberId } of channelMembers) {
         if (excluded.has(memberId)) continue;
@@ -195,7 +194,7 @@ export namespace ExtServiceMessage {
           channelId,
           eventType: "message",
           payload: {
-            title: `${botName} さんからのメッセージ`,
+            title: `${bot.botName} さんからのメッセージ`,
             body,
             tag: `message-${messageSaved.id}`,
             data: { type: "message", messageId: messageSaved.id, channelId },
@@ -210,8 +209,7 @@ export namespace ExtServiceMessage {
   export const Edit = async (
     messageId: string,
     message: string,
-    botId: string,
-    remoteUserId: string,
+    bot: TBotCredential,
   ) => {
     if (message.trim().length === 0) {
       throw status(400, "Message is empty");
@@ -232,7 +230,7 @@ export namespace ExtServiceMessage {
       throw status(404, "Message not found");
     }
     //送信者が自分と違うならエラー
-    if (messageEditing.userId !== remoteUserId) {
+    if (messageEditing.userId !== bot.remoteUserId) {
       throw status(403, "You are not sender of this message");
     }
     //内容が同じならエラー
@@ -241,7 +239,7 @@ export namespace ExtServiceMessage {
     }
 
     //Botのアクセス許可
-    if (!ExtUtil.isChannelPermitted(messageEditing.channelId, botId)) {
+    if (!ExtUtil.isChannelPermitted(messageEditing.channelId, bot)) {
       throw status(403, "Channel not permitted");
     }
 
@@ -264,11 +262,7 @@ export namespace ExtServiceMessage {
     return msgUpdated;
   };
 
-  export const Delete = async (
-    messageId: string,
-    botId: string,
-    remoteUserId: string,
-  ) => {
+  export const Delete = async (messageId: string, bot: TBotCredential) => {
     //メッセージ取得
     const messageData = await db.query.messages.findFirst({
       columns: { id: true, userId: true, channelId: true },
@@ -279,11 +273,11 @@ export namespace ExtServiceMessage {
       throw status(404, "Message not found");
     }
     //送信者が自分(Bot)と違うならエラー
-    if (messageData.userId !== remoteUserId) {
+    if (messageData.userId !== bot.remoteUserId) {
       throw status(403, "You are not sender of this message");
     }
     //Botのアクセス許可
-    if (!ExtUtil.isChannelPermitted(messageData.channelId, botId)) {
+    if (!ExtUtil.isChannelPermitted(messageData.channelId, bot)) {
       throw status(403, "Channel not permitted");
     }
 

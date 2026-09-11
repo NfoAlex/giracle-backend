@@ -14,6 +14,12 @@ type TBotManagePermission = Pick<
   | "canSendMessage"
 >;
 
+// CheckApiCode がコンテキストへ注入するBot認証情報（tokenCode は秘匿するため型に含めない）
+export type TBotCredential = Pick<
+  BotManage,
+  "id" | "botName" | "remoteUserId" | "useAllChannel"
+>;
+
 export namespace ExtMiddleware {
   export const CheckApiCode = new Elysia({ name: "CheckApiCode" })
     .guard({

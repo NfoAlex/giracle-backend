@@ -8,8 +8,8 @@ export const extMessage = new Elysia({ prefix: "/message" })
   .use(ExtMiddleware.CheckPermission)
   .get(
     "/:messageId",
-    async ({ params: { messageId }, CheckApiCode: { id } }) => {
-      const msg = await ExtServiceMessage.GetMessage(messageId, id);
+    async ({ params: { messageId }, CheckApiCode }) => {
+      const msg = await ExtServiceMessage.GetMessage(messageId, CheckApiCode);
       return msg;
     },
     {
@@ -29,15 +29,13 @@ export const extMessage = new Elysia({ prefix: "/message" })
     "/send",
     async ({
       body: { channelId, message, replyingMessageId },
-      CheckApiCode: { id, botName, remoteUserId },
+      CheckApiCode,
       server,
     }) => {
       const msg = await ExtServiceMessage.SendMessage(
         channelId,
         message,
-        id,
-        botName,
-        remoteUserId,
+        CheckApiCode,
         replyingMessageId,
         server,
       );
@@ -68,16 +66,11 @@ export const extMessage = new Elysia({ prefix: "/message" })
   )
   .post(
     "/edit",
-    async ({
-      body: { message, targetMessageId },
-      CheckApiCode: { id, remoteUserId },
-      server,
-    }) => {
+    async ({ body: { message, targetMessageId }, CheckApiCode, server }) => {
       const msg = await ExtServiceMessage.Edit(
         targetMessageId,
         message,
-        id,
-        remoteUserId,
+        CheckApiCode,
       );
 
       server?.publish(
@@ -105,16 +98,8 @@ export const extMessage = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/delete",
-    async ({
-      body: { targetMessageId },
-      CheckApiCode: { id, remoteUserId },
-      server,
-    }) => {
-      const msg = await ExtServiceMessage.Delete(
-        targetMessageId,
-        id,
-        remoteUserId,
-      );
+    async ({ body: { targetMessageId }, CheckApiCode, server }) => {
+      const msg = await ExtServiceMessage.Delete(targetMessageId, CheckApiCode);
 
       //WSで通知(内部 /message/delete と同一シグナル)
       server?.publish(
