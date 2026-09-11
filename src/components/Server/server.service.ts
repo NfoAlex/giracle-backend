@@ -130,65 +130,80 @@ export namespace ServiceServer {
     if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
       throw status(400, "Using or creating bot is not allowed");
     }
+    //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
+    const uniqueChannelIds = [...new Set(permissionChannelIds)];
     //チャンネル全透過じゃないならチャンネル検査
     if (!useAllChannel) {
-      if (permissionChannelIds.length > 100) {
+      if (uniqueChannelIds.length > 100) {
         throw status(400, "Too many channels to listen");
       }
       //TODO: どうにかしたい
-      for (const channelId of permissionChannelIds) {
+      for (const channelId of uniqueChannelIds) {
         if (!(await Util.checkChannelVisibility(channelId, _userId)))
           throw status(400, "You cannot use a channel you cannot see");
       }
     }
 
-    const botCreated = db.transaction((trx) => {
-      const userForBot = trx
-        .insert(users)
-        .values({
-          name,
-          selfIntroduction: "I am a bot",
-          isBot: true,
-        })
-        .returning()
-        .get();
-      //returning().get() は対象0件で undefined になるため型を絞る
-      if (userForBot === undefined) throw status(500, "Bot creation failed");
+    let botCreated: BotManage;
+    try {
+      botCreated = db.transaction((trx) => {
+        const userForBot = trx
+          .insert(users)
+          .values({
+            name,
+            selfIntroduction: "I am a bot",
+            isBot: true,
+          })
+          .returning()
+          .get();
+        //returning().get() は対象0件で undefined になるため型を絞る
+        if (userForBot === undefined) throw status(500, "Bot creation failed");
 
-      const bot = trx
-        .insert(botManages)
-        .values({
-          botName: name,
-          botDescription: description,
-          createdBy: _userId,
-          remoteUserId: userForBot.id,
-          approveStatus: GIRACLE_SERVER_CONFIG.BotAutoApprove
-            ? "APPROVED"
-            : "PENDING",
-          useAllChannel: useAllChannel,
-          ...permissionConfig,
-        })
-        .returning()
-        .get();
-      if (bot === undefined) throw status(500, "Bot creation failed");
+        const bot = trx
+          .insert(botManages)
+          .values({
+            botName: name,
+            botDescription: description,
+            createdBy: _userId,
+            remoteUserId: userForBot.id,
+            approveStatus: GIRACLE_SERVER_CONFIG.BotAutoApprove
+              ? "APPROVED"
+              : "PENDING",
+            useAllChannel: useAllChannel,
+            ...permissionConfig,
+          })
+          .returning()
+          .get();
+        if (bot === undefined) throw status(500, "Bot creation failed");
 
-      //チャンネル登録
-      if (!useAllChannel && permissionChannelIds.length !== 0) {
-        trx
-          .insert(botChannelPermissions)
-          .values(
-            permissionChannelIds.map((channelId) => {
-              return {
-                botId: bot.id,
-                channelId: channelId,
-              };
-            }),
-          )
-          .run();
+        //チャンネル登録
+        if (!useAllChannel && uniqueChannelIds.length !== 0) {
+          trx
+            .insert(botChannelPermissions)
+            .values(
+              uniqueChannelIds.map((channelId) => {
+                return {
+                  botId: bot.id,
+                  channelId: channelId,
+                };
+              }),
+            )
+            .run();
+        }
+
+        return bot;
+      });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.includes("UNIQUE constraint failed")
+      ) {
+        //users.nameとbotNameはどちらもUNIQUEなので重複は同じ400に寄せる
+        throw status(400, "Bot name already exists");
       }
+      throw e;
+    }
 
-      return bot;
-    });
     return botCreated;
   };
 

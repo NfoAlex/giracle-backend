@@ -220,7 +220,8 @@ describe("PUT /server/bot", () => {
         description: "This is a new bot",
         canFetchUserinfo: true,
         canManageUser: true,
-        permissionChannelIds: ["TESTCHANNEL1"],
+        //同じチャンネルの重複指定(UNIQUE制約で落ちず1件に畳まれること)
+        permissionChannelIds: ["TESTCHANNEL1", "TESTCHANNEL1"],
       },
     });
     const j = await res.json();
@@ -230,12 +231,13 @@ describe("PUT /server/bot", () => {
     expect(j.data.canFetchUserinfo).toBeTrue();
 
     //チャンネル透過もできていることを確認
-    const d = db
+    const perms = db
       .select({ channelId: botChannelPermissions.channelId })
       .from(botChannelPermissions)
       .where(eq(botChannelPermissions.botId, j.data.id))
-      .get();
-    expect(d?.channelId).toBe("TESTCHANNEL1");
+      .all();
+    expect(perms.length).toBe(1);
+    expect(perms[0].channelId).toBe("TESTCHANNEL1");
 
     TEST__deletingBotId = j.data.id;
     TEST__deletingBotRemoteUserId = j.data.remoteUserId;
@@ -301,13 +303,32 @@ describe("PUT /server/bot", () => {
       method: "PUT",
       body: { name: "BOT_TEST_1" },
     });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
 
+    //トランザクションが巻き戻り、Bot用のユーザー行が孤児として残らない
     const orphan = await db
       .select({ id: users.id })
       .from(users)
       .where(eq(users.name, "BOT_TEST_1"));
     expect(orphan.length).toBe(0);
+  });
+
+  it("既存ユーザー名と衝突するBotは作成できない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "testsystemuser2" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
+
+    const orphan = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, "testsystemuser2"));
+    expect(orphan.length).toBe(1);
   });
 });
 
