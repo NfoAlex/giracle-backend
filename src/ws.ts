@@ -41,6 +41,7 @@ export const wsHandler = new Elysia().ws("/ws", {
           channelPermissions: {
             columns: { channelId: true },
           },
+          user: { columns: { isBanned: true, isDeleted: true } },
         },
         limit: 1,
       });
@@ -56,6 +57,15 @@ export const wsHandler = new Elysia().ws("/ws", {
         ws.send({
           signal: "ERROR",
           data: "Your bot is not approved yet",
+        });
+        ws.close();
+        return;
+      }
+
+      if (botData.user?.isBanned || botData.user?.isDeleted) {
+        ws.send({
+          signal: "ERROR",
+          data: "This bot is disabled",
         });
         ws.close();
         return;

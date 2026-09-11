@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 // 循環import(ws.ts→index.ts→ws.ts)のため、まず../srcを完全評価してからwsHandlerを取る
 import { db } from "../src";
-import { botManages } from "../src/db/schema";
+import { botManages, users } from "../src/db/schema";
 import { wsHandler } from "../src/ws";
 import { INIT } from "./util";
 
@@ -92,4 +92,26 @@ describe("WS (Bot)", () => {
     expect(messages.some((m) => m.includes("not valid"))).toBe(true);
     expect(closed).toBe(true);
   });
+
+  const setBotUserFlag = (flag: "isBanned" | "isDeleted", value: boolean) =>
+    db
+      .update(users)
+      .set({ [flag]: value })
+      .where(eq(users.id, "TESTUSER_BOT_1"));
+
+  // BANと論理削除は同じ拒否経路のため同一ケースを共有する
+  for (const flag of ["isBanned", "isDeleted"] as const) {
+    test(`${flag} のBotは接続できない`, async () => {
+      try {
+        await setBotUserFlag(flag, true);
+        const { messages, closed } = await connectBot("TESTTOKEN1");
+        expect(messages.some((m) => m.includes("This bot is disabled"))).toBe(
+          true,
+        );
+        expect(closed).toBe(true);
+      } finally {
+        await setBotUserFlag(flag, false);
+      }
+    });
+  }
 });

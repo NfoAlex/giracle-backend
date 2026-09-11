@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../src";
-import { botManages, inboxes } from "../src/db/schema";
+import { botManages, inboxes, users } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -438,4 +438,38 @@ describe("全透過Bot(useAllChannel)", () => {
     expect(j.channelId).toBe("TESTCHANNEL2");
     expect(j.userId).toBe("TESTUSER_BOT_2");
   });
+});
+
+describe("無効化されたBotの拒否", () => {
+  const getAsTestBot1 = () =>
+    FETCH({
+      path: "/ext/message/TESTMESSAGE1",
+      method: "GET",
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+
+  const setBotUserFlag = (flag: "isBanned" | "isDeleted", value: boolean) =>
+    db
+      .update(users)
+      .set({ [flag]: value })
+      .where(eq(users.id, "TESTUSER_BOT_1"));
+
+  // BANと論理削除は同じ拒否経路のため同一ケースを共有する
+  for (const flag of ["isBanned", "isDeleted"] as const) {
+    it(`${flag} のBotは401で拒否され、解除で復帰する`, async () => {
+      try {
+        await setBotUserFlag(flag, true);
+        const res = await getAsTestBot1();
+        expect(res.status).toBe(401);
+        expect(await res.text()).toBe("This bot is disabled");
+      } finally {
+        await setBotUserFlag(flag, false);
+      }
+
+      const res = await getAsTestBot1();
+      expect(res.status).toBe(200);
+      expect((await res.json()).id).toBe("TESTMESSAGE1");
+    });
+  }
 });

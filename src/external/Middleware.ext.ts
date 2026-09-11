@@ -32,11 +32,19 @@ export namespace ExtMiddleware {
       const botManage = await db.query.botManages.findFirst({
         where: eq(botManages.tokenCode, authorization),
         columns: { tokenCode: false },
+        with: {
+          user: { columns: { isBanned: true, isDeleted: true } },
+        },
       });
       if (botManage === undefined)
         throw status(401, "Authorization header is invalid");
       if (botManage.approveStatus !== "APPROVED")
         throw status(401, "Your bot is not approved");
+
+      // BAN・論理削除された Bot のユーザーは操作させない
+      if (botManage.user?.isBanned || botManage.user?.isDeleted) {
+        throw status(401, "This bot is disabled");
+      }
 
       return {
         CheckApiCode: {
