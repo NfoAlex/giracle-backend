@@ -271,6 +271,7 @@ export namespace ServiceServer {
     }
 
     //最終的な承認状態
+    //BLOCKED(管理者による制裁)は所有者の編集で解除させない
     const newApproveStatus =
       currentApproveStatus === "BLOCKED"
         ? "BLOCKED"
