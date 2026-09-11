@@ -5,6 +5,7 @@ import { db } from ".";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
 import {
   blockedIPAddresses,
+  botManages,
   messages,
   messageUrlPreviews,
   requestLog,
@@ -191,6 +192,8 @@ export namespace Middleware {
     async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
+      //Bot認証(tokenCode)単位のバケットを使うかどうか
+      let isBot = false;
       //識別キー
       let key: string = (token.value as string | undefined) ?? "anonymous";
 
@@ -198,7 +201,21 @@ export namespace Middleware {
 
       //トークンがあってもキャッシュ・DBに実在しないなら無効なので匿名扱いにする(なりすましによるIPブロック回避防止)
       if (tokenValue === undefined) {
-        isAnonymous = true;
+        //BotはCookieではなくAuthorizationヘッダで認証する。
+        //実在確認をしないとヘッダ偽装でBot用バケットを無限に作られレート制限を回避される
+        const authorization = request.headers.get("authorization");
+        const botExists = authorization
+          ? await db.query.botManages.findFirst({
+              where: eq(botManages.tokenCode, authorization),
+              columns: { id: true },
+            })
+          : undefined;
+        if (botExists === undefined) {
+          isAnonymous = true;
+        } else {
+          isBot = true;
+          key = `bot:${authorization}`;
+        }
       } else {
         const cachedToken = tokenCache.get(tokenValue);
         let tokenValid = cachedToken !== undefined;
@@ -258,14 +275,15 @@ export namespace Middleware {
         //ブロックされるけどカウント増加
         bucket.count += 1;
 
-        //認証済みで制限を超えたならトークンを無効化
-        if (!isAnonymous) {
+        //制限を超えた場合、認証済みユーザーならトークンを無効化する(Botはセッショントークンを持たないので対象外)
+        if (!isAnonymous && !isBot) {
           await db.delete(tokens).where(eq(tokens.token, key));
           //キャッシュにも残っていると最大5分間有効なままになるため合わせて無効化
           invalidateTokenCache(key);
-        } else {
+        } else if (isAnonymous) {
           //匿名の場合の処理
           //カウントがプラス10を超過している場合はIPアドレスでブロック
+          //(BotのバケットキーはIPではないため対象外)
           if (bucket.count > configUsing.limit + 10) {
             await db
               .insert(blockedIPAddresses)
@@ -445,6 +463,20 @@ export namespace Middleware {
 
       if (request.method === "OPTIONS") return;
 
+      //BotのCheckApiCodeはonAfterResponseのコンテキストに現れないため、
+      //Authorizationヘッダ(tokenCode)からBotのユーザーIdを解決する
+      let userId = CheckToken?._userId ?? null;
+      if (userId === null) {
+        const authorization = request.headers.get("authorization");
+        if (authorization) {
+          const botManage = await db.query.botManages.findFirst({
+            where: eq(botManages.tokenCode, authorization),
+            columns: { remoteUserId: true },
+          });
+          userId = botManage?.remoteUserId ?? null;
+        }
+      }
+
       let path: string;
       try {
         path = new URL(request.url).pathname;
@@ -454,7 +486,7 @@ export namespace Middleware {
 
       try {
         await db.insert(requestLog).values({
-          userId: CheckToken?._userId ?? null,
+          userId,
           method: request.method,
           path,
           status:

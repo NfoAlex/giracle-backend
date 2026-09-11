@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../src";
-import { botManages, inboxes, users } from "../src/db/schema";
+import { botManages, inboxes, requestLog, users } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -472,4 +472,23 @@ describe("無効化されたBotの拒否", () => {
       expect((await res.json()).id).toBe("TESTMESSAGE1");
     });
   }
+
+  it("Botの操作はBotのユーザーIdでrequestLogに記録される", async () => {
+    const whereLog = and(
+      eq(requestLog.path, "/ext/message/TESTMESSAGE1"),
+      eq(requestLog.method, "GET"),
+    );
+    const findLog = () => db.query.requestLog.findFirst({ where: whereLog });
+
+    await db.delete(requestLog).where(whereLog);
+    await getAsTestBot1();
+
+    // afterResponseはhandle完了後に走るため、記録されるまで待つ
+    let log = await findLog();
+    for (let i = 0; log === undefined && i < 40; i++) {
+      await Bun.sleep(25);
+      log = await findLog();
+    }
+    expect(log?.userId).toBe("TESTUSER_BOT_1");
+  });
 });
