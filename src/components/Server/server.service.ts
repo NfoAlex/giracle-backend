@@ -83,6 +83,8 @@ export namespace ServiceServer {
       .select({
         id: botManages.id,
         botName: botManages.botName,
+        //申請者は自分のBotの審査状況を確認できる必要がある
+        approveStatus: botManages.approveStatus,
         createdAt: botManages.createdAt,
         createdBy: botManages.createdBy,
       })
@@ -708,6 +710,15 @@ export namespace ServiceServer {
       .select({
         id: botManages.id,
         botName: botManages.botName,
+        //承認者が申請内容(審査状況・要求権限)を確認できるようにする
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        canFetchRoleinfo: botManages.canFetchRoleinfo,
+        canManageUser: botManages.canManageUser,
+        canManageServerConfig: botManages.canManageServerConfig,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
         createdAt: botManages.createdAt,
         createdBy: botManages.createdBy,
       })

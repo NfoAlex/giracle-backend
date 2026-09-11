@@ -190,6 +190,9 @@ describe("GET /server/bot/me", () => {
     expect(j.data.length).toBe(2);
     expect(j.data[0].botName).toBe("BOT_TEST_2");
     expect(j.data[1].botName).toBe("BOT_TEST_1");
+    //申請者が自分のBotの審査状況を確認できる
+    expect(j.data[0].approveStatus).toBe("APPROVED");
+    expect(j.data[1].approveStatus).toBe("APPROVED");
   });
 
   it("正常 :: secondary", async () => {
@@ -370,6 +373,14 @@ describe("GET /server/bot", () => {
     expect(j.data[2].botName).toBe("BOT_TEST_3");
     expect(j.data[3].botName).toBe("BOT_TEST_2");
     expect(j.data[4].botName).toBe("BOT_TEST_1");
+
+    //承認者が審査状況と要求権限を確認できる
+    const target = j.data.find((b: { id: string }) => b.id === "TESTBOT1");
+    expect(target.approveStatus).toBe("APPROVED");
+    expect(target.useAllChannel).toBeFalse();
+    expect(target.canReadMessage).toBeTrue();
+    //全透過の申請もそのまま見える
+    expect(j.data[0].useAllChannel).toBeTrue();
   });
 
   it("権限無し", async () => {
