@@ -52,6 +52,8 @@ export const ConstWebPush = {
 import { db } from "./db";
 import { serverConfigs } from "./db/schema";
 import { externalApi } from "./external/external.module";
+
+//グローバルに使えるGiracleサーバーの設定
 export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect =
   {} as typeof serverConfigs.$inferSelect;
 
