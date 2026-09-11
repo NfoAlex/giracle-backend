@@ -403,7 +403,7 @@ describe("PATCH /server/bot/approval", () => {
       method: "PATCH",
       body: {
         botId: "TESTBOT1",
-        approvalValue: "APPROVED",
+        approvalStatus: "APPROVED",
       },
     });
     const j = await res.json();
@@ -416,7 +416,7 @@ describe("PATCH /server/bot/approval", () => {
       method: "PATCH",
       body: {
         botId: "TESTBOT999",
-        approvalValue: "APPROVED",
+        approvalStatus: "APPROVED",
       },
     });
     expect(res.ok).toBeFalse();
@@ -430,7 +430,7 @@ describe("PATCH /server/bot/approval", () => {
       method: "PATCH",
       body: {
         botId: "TESTBOT1",
-        approvalValue: "APPROVED",
+        approvalStatus: "APPROVED",
       },
       useSecondaryUser: true,
     });
