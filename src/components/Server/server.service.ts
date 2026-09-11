@@ -140,18 +140,20 @@ export namespace ServiceServer {
       }
     }
 
-    let botCreated: BotManage | undefined;
-    await db.transaction(async (trx) => {
-      const [userForBot] = await trx
+    const botCreated = db.transaction((trx) => {
+      const userForBot = trx
         .insert(users)
         .values({
           name,
           selfIntroduction: "I am a bot",
           isBot: true,
         })
-        .returning();
+        .returning()
+        .get();
+      //returning().get() は対象0件で undefined になるため型を絞る
+      if (userForBot === undefined) throw status(500, "Bot creation failed");
 
-      const [bot] = await trx
+      const bot = trx
         .insert(botManages)
         .values({
           botName: name,
@@ -162,22 +164,26 @@ export namespace ServiceServer {
           useAllChannel: useAllChannel,
           ...permissionConfig,
         })
-        .returning();
+        .returning()
+        .get();
       if (bot === undefined) throw status(500, "Bot creation failed");
 
       //チャンネル登録
       if (!useAllChannel && permissionChannelIds.length !== 0) {
-        await trx.insert(botChannelPermissions).values(
-          permissionChannelIds.map((channelId) => {
-            return {
-              botId: bot.id,
-              channelId: channelId,
-            };
-          }),
-        );
+        trx
+          .insert(botChannelPermissions)
+          .values(
+            permissionChannelIds.map((channelId) => {
+              return {
+                botId: bot.id,
+                channelId: channelId,
+              };
+            }),
+          )
+          .run();
       }
 
-      botCreated = { ...bot };
+      return bot;
     });
     return botCreated;
   };
@@ -189,12 +195,13 @@ export namespace ServiceServer {
       .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)));
     if (bot === undefined) throw status(404, "Bot not found");
 
-    await db.transaction(async (trx) => {
-      await trx.delete(botManages).where(eq(botManages.id, botId));
-      await trx
+    db.transaction((trx) => {
+      trx.delete(botManages).where(eq(botManages.id, botId)).run();
+      trx
         .update(users)
         .set({ isDeleted: true })
-        .where(eq(users.id, bot.remoteUserId));
+        .where(eq(users.id, bot.remoteUserId))
+        .run();
     });
 
     //削除済みBotのWS接続を切断(接続し続けるとpublishを受け取れ続ける)

@@ -265,6 +265,23 @@ describe("PUT /server/bot", () => {
     expect(res.ok).toBe(false);
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
   });
+
+  it("Bot作成失敗時にユーザー行が残らない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    //BOT_TEST_1 は INIT() が作る TESTBOT1 の botName と衝突する
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "BOT_TEST_1" },
+    });
+    expect(res.status).toBe(500);
+
+    const orphan = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, "BOT_TEST_1"));
+    expect(orphan.length).toBe(0);
+  });
 });
 
 describe("DELETE /server/bot", () => {
