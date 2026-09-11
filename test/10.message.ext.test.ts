@@ -456,6 +456,31 @@ describe("全透過Bot(useAllChannel)", () => {
     expect(j.channelId).toBe("TESTCHANNEL2");
     expect(j.userId).toBe("TESTUSER_BOT_2");
   });
+
+  it("存在しないチャンネルへの送信は404(全透過でもFK違反で500にしない)", async () => {
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "NO_SUCH_CHANNEL", message: "ghost" },
+      headers: { authorization: "TESTTOKEN2" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
+  });
+
+  it("非透過Botでは存在しないチャンネルは403(存在確認のクエリを増やさない)", async () => {
+    // 非透過Botは許可テーブルにFKがあるため、許可行が無い時点で存在しないと確定する
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "NO_SUCH_CHANNEL", message: "ghost" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("Channel not permitted");
+  });
 });
 
 describe("無効化されたBotの拒否", () => {

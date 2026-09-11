@@ -57,7 +57,7 @@ export namespace ExtServiceMessage {
       );
     }
 
-    // チャンネル送信権限確認
+    // チャンネル送信権限確認(存在しないチャンネルは ExtUtil 側で404になる)
     if (!ExtUtil.isChannelPermitted(channelId, bot)) {
       throw status(403, "Channel not permitted");
     }
