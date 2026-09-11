@@ -449,10 +449,10 @@ export namespace ServiceMessage {
         await Bun.write(filePath, bytes);
       } else {
         const image = new Bun.Image(bytes, { maxPixels: MAX_THUMBNAIL_PIXELS });
+        // 長辺を枠内に収める (縦長パノラマの肥大化防止。幅のみ指定だと高さが無制限に残る)
+        const box = forFavicon ? 32 : 512;
         await image
-          .resize(forFavicon ? 32 : 512, undefined, {
-            withoutEnlargement: true,
-          })
+          .resize(box, box, { fit: "inside", withoutEnlargement: true })
           .webp({ quality: 90 })
           .write(filePath);
       }
