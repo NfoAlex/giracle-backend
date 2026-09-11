@@ -27,7 +27,8 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - リクエストは `FETCH({ path, method, body })` ヘルパー経由（内部で `app.handle(new Request(...))`）。デフォルトで `TESTUSER` の Cookie が付く。`useSecondaryUser: true` で `TESTUSER2`、`excludeCredential: true` で未認証リクエストになる。
 - `NODE_ENV=test` のとき index.ts の `.onError()` はエラーログを抑制する。
 - リクエストヘッダが必要な場合は `FETCH({ headers })` を使う。`PATCH` も可。
-- Bot 用テストユーザー（`TESTUSER_BOT_1..3`）と `TESTBOT1..3`（BotManage）、`TESTBOT1` と `TESTCHANNEL1` のチャンネル許可が `INIT()` で作られる。Bot 関連テストはこれを使う（`tokenCode` は `TESTTOKEN1` / `TESTTOKEN2`）。
+- Bot 用テストユーザー（`TESTUSER_BOT_1..3`）と `TESTBOT1..3`（BotManage）、`TESTBOT1` と `TESTCHANNEL1` のチャンネル許可が `INIT()` で作られる。Bot 関連テストはこれを使う（`tokenCode` は `TESTTOKEN1` / `TESTTOKEN2`）。`TESTBOT1` / `TESTBOT2` は `APPROVED`、`TESTBOT3` は既定の `PENDING`。
+- **Bot 作成テストは `GIRACLE_SERVER_CONFIG.BotEnabled = true` を直接立てる必要がある**（seed 直後は false。`INIT()` の `reloadServerConfig()` で DB の値に戻るため、テスト内で毎回設定する）。
 - 機能を追加したら対応するテストファイルに追記する。
 
 ## アーキテクチャの約束事
@@ -60,14 +61,38 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 
 ### Bot（外部 API）
 
-Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.ts](src/external/external.module.ts)）経由で操作する。module/service 構成は通常の `src/components/<Name>/` と同じ。**Bot は `remoteUserId`（紐付いた users の行。`users.isBot` が true）経由でユーザーアカウントを持つ。** メッセージ送信・編集などの操作もすべて `remoteUserId` 名義で行う（`messages.userId = remoteUserId` かつ `isBot: true`）。
+Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.ts](src/external/external.module.ts)）経由で操作する。module/service 構成は通常の `src/components/<Name>/` と同じ。**Bot 自身の操作（メッセージ送受信など）は `/ext` 配下、Bot の管理（作成・承認・一覧）は `src/components/Server/` 配下の `/server/bot*` にある。** **Bot は `remoteUserId`（紐付いた users の行。`users.isBot` が true）経由でユーザーアカウントを持つ。** メッセージ送信・編集などの操作もすべて `remoteUserId` 名義で行う（`messages.userId = remoteUserId` かつ `isBot: true`）。
 
 - 認証: `ExtMiddleware.CheckApiCode`（[Middleware.ext.ts](src/external/Middleware.ext.ts)）。`Authorization` ヘッダで `BotManage.tokenCode` を照合し、`approveStatus === "APPROVED"` でないと 401。コンテキストに `CheckApiCode: { ...BotManage }` が注入される。
 - 権限: `ExtMiddleware.CheckPermission` macro + ルートオプション `checkPermission: "canSendMessage"` 等で `can*` フラグ（6 種）をチェック。認証同様 module 側で `.use(CheckApiCode).use(CheckPermission)` を併用する。
-- チャンネル許可は `botChannelPermissions`（Bot × Channel の複合）。許可のないチャンネルへの読み書きは 403/404。
-- 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me`。
-- ServerConfig に `BotEnabled` / `BotAutoApprove` 列がある（現状 schema のみで参照コードなし。Bot 機能の有効化・自動承認向けの予定地）。
-- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/ws.ts](src/ws.ts) の open/close で分岐）。`user::${remoteUserId}` と許可チャンネルを購読する。
+- チャンネル許可は `botChannelPermissions`（Bot × Channel の複合）。判定は [src/external/Util.ext.ts](src/external/Util.ext.ts) の `ExtUtil.isChannelPermitted` に集約している。許可のないチャンネルへの読み書きは 403。
+  - 全透過（`useAllChannel: true`）は許可テーブルを引かず無条件で許可するが、**存在しないチャンネルは同関数が 404 `Channel not found` を投げる**（存在確認しないと `messages` への INSERT が FK 違反で 500 になるため）。
+  - 非透過は `botChannelPermissions.channelId` の FK により、許可行があればチャンネルの存在が保証されるので存在確認クエリを足さない（存在しないチャンネルは 403 のまま）。
+- 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me` と `/server/bot/me/:botId`。
+- 一覧系は審査に必要な情報を返す。`GetBotMe` は `approveStatus`、管理者用 `GetBot`（`/server/bot/all`）は `approveStatus` + `useAllChannel` + `can*`（要求権限を伏せたまま承認させないため）。
+- **Bot を承認済みでない状態にする・無効化する操作は、接続中の WS も切断する**（`WSDisconnectUser`）。該当は `PatchBotApproval`（BLOCKED/DENIED/PENDING へ変更時）、`PatchBot`（再申請で PENDING に戻った時）、`DeleteBot`（`users.isDeleted` で無効化）。切断しないと接続済み Bot が `channel::*` の配信を受け続ける。
+- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/ws.ts](src/ws.ts) の open）。
+- Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
+- `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
+- ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
+  - `BotEnabled`: false の間は `PUT /server/bot` が 400 `Using or creating bot is not allowed` になる。**既定 false なので、有効化しない限り Bot は作成できない。**
+  - `BotAutoApprove`: 承認レビュー自体を省く設定。true なら新規作成は `PENDING` ではなく `APPROVED` で作られる（`PutBot`）。
+- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/ws.ts](src/ws.ts) の open/close で分岐）。`user::${remoteUserId}` と許可チャンネル（全透過は既存の全チャンネル）を購読する。
+
+#### `BotAutoApprove` と更新時の `approveStatus`
+
+`PatchBot`（`PATCH /server/bot`）で Bot を更新したときの `approveStatus` は次のとおり。**`BLOCKED` は管理者による制裁なので据え置き、`BotAutoApprove: true` なら `DENIED` も `APPROVED` に戻る。**
+
+| 更新前の状態 | `BotAutoApprove: true` | `BotAutoApprove: false` |
+|---|---|---|
+| `BLOCKED` | `BLOCKED` のまま | `BLOCKED` のまま |
+| `DENIED` | `APPROVED` | 差分があれば `PENDING`、無ければ `DENIED` のまま |
+| `PENDING` | `APPROVED` | 差分があれば `PENDING`、無ければ `PENDING` のまま |
+| `APPROVED` | `APPROVED` | 差分があれば `PENDING`、無ければ `APPROVED` のまま |
+
+- 「差分」= Bot 名の変更、または `can*` 権限フラグの実際の変更。`description` のみの変更は再申請にしない。
+- 差分が無い場合は `approveStatus` を UPDATE の対象に含めない（据え置き）。
+- `BLOCKED` の判定は他の分岐より先に行うため、`BotAutoApprove` の値に関わらず解除されない。
 
 ### WebSocket 通知
 
@@ -98,6 +123,9 @@ server?.publish(
 
 呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisibility` → `Util.checkChannelVisibility`）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
 
+- Bot 外部 API 専用のヘルパは [src/external/Util.ext.ts](src/external/Util.ext.ts) の `ExtUtil` namespace に置く（`src/Util.ts` の `Util` とは別系統なので追記先を間違えない）。
+- `ExtUtil.isChannelPermitted` は権限なしを `false` で返しエラーは呼び出し側が投げるが、チャンネル不在は文言が全ルート共通なので同関数が 404 を投げる（前述の Bot 節を参照）。
+
 ## DB（Drizzle / bun:sqlite）
 
 - スキーマは [src/db/schema.ts](src/db/schema.ts)。
@@ -117,9 +145,10 @@ server?.publish(
 
 ## 変更時のチェックリスト
 
-1. ルート追加 → `t.Object` バリデーション + `response` スキーマ + `detail` を必ず定義
+1. ルート追加 → `t.Object` バリデーション + `detail` を必ず定義
 2. 認証が必要か → `Middleware.CheckToken`、管理操作か → `checkRoleTerm`
 3. 状態変化をクライアントへ通知するか → `server?.publish` の WS シグナル追加
 4. README のエンドポイント表・WS シグナル表・環境変数表を更新
 5. `test/` の対応するテストファイルにケースを追記し、`NODE_ENV=test bun test` を通す
 6. `bunx biome check --write .` を通す
+7. Bot の承認・権限フローを変えたら、`APPROVED` でなくなった時の WS 切断（`WSDisconnectUser`）と、改名時の `users.name` 同期を確認する
