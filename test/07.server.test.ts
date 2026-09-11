@@ -503,6 +503,14 @@ describe("PATCH /server/bot", () => {
     expect(j.data.approveStatus).toBe("PENDING");
     // tokenCodeは返らない
     expect(j.data.tokenCode).toBeUndefined();
+
+    // 表示名を参照するusers.name側も揃っている(乖離すると改名が画面に出ない)
+    const botUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .get();
+    expect(botUser?.name).toBe("BOT_TEST_1_RENAMED");
   });
 
   it("正常 :: 名前変更でもapproveStatusがPENDINGに戻る", async () => {
@@ -644,4 +652,9 @@ afterAll(async () => {
     .update(botManages)
     .set({ botName: "BOT_TEST_1", approveStatus: "APPROVED" })
     .where(eq(botManages.id, "TESTBOT1"));
+  // 改名でusers.nameも書き換わるため揃えて戻す
+  await db
+    .update(users)
+    .set({ name: "testbotuser" })
+    .where(eq(users.id, "TESTUSER_BOT_1"));
 });

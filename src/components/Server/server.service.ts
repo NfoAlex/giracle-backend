@@ -280,27 +280,48 @@ export namespace ServiceServer {
             ? "PENDING"
             : undefined;
 
-    const [bot] = await db
-      .update(botManages)
-      .set({
-        botName: name,
-        botDescription: description,
-        approveStatus: newApproveStatus,
-        ...permissions,
-      })
-      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
-      .returning()
-      .catch((e) => {
-        if (
-          e instanceof Error &&
-          e.message.includes("UNIQUE constraint failed")
-        ) {
-          throw status(400, "Bot name already exists");
+    //botManagesの更新とusers.nameの更新を1トランザクションにまとめる
+    //(表示名はusers.name側を参照するため、片方だけ更新されると乖離する)
+    let bot: BotManage;
+    try {
+      bot = db.transaction((trx) => {
+        const updated = trx
+          .update(botManages)
+          .set({
+            botName: name,
+            botDescription: description,
+            approveStatus: newApproveStatus,
+            ...permissions,
+          })
+          .where(
+            and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)),
+          )
+          .returning()
+          .get();
+        if (updated === undefined) {
+          throw status(500, "Bot data should be available");
         }
-        throw status(500, "Database error");
+
+        //改名時は紐付いたユーザー行の名前も揃える
+        if (name !== undefined) {
+          trx
+            .update(users)
+            .set({ name })
+            .where(eq(users.id, updated.remoteUserId))
+            .run();
+        }
+
+        return updated;
       });
-    if (bot === undefined) {
-      throw status(500, "Bot data should be available");
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.includes("UNIQUE constraint failed")
+      ) {
+        //botNameとusers.nameはどちらもUNIQUEなので重複は同じ400に寄せる
+        throw status(400, "Bot name already exists");
+      }
+      throw e;
     }
 
     //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
