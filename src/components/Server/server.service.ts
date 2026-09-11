@@ -160,7 +160,9 @@ export namespace ServiceServer {
           botDescription: description,
           createdBy: _userId,
           remoteUserId: userForBot.id,
-          approveStatus: "PENDING",
+          approveStatus: GIRACLE_SERVER_CONFIG.BotAutoApprove
+            ? "APPROVED"
+            : "PENDING",
           useAllChannel: useAllChannel,
           ...permissionConfig,
         })
@@ -227,6 +229,7 @@ export namespace ServiceServer {
     const currentBot = db
       .select({
         botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
         canFetchUserinfo: botManages.canFetchUserinfo,
         canFetchRoleinfo: botManages.canFetchRoleinfo,
         canManageUser: botManages.canManageUser,
@@ -241,28 +244,46 @@ export namespace ServiceServer {
       throw status(404, "Bot not found");
     }
 
-    const { botName: currentBotName, ...currentBotPermissions } = currentBot;
+    const {
+      botName: currentBotName,
+      approveStatus: currentApproveStatus,
+      ...currentBotPermissions
+    } = currentBot;
     const { name, description, ...permissions } = updateValue;
 
+    //再承認が必要かどうかフラグ
+    let needsReapproval = false;
     //許可設定かBot名を変えているなら再申請扱いにして審査状況を初期化
-    const permissionChanged = (
-      Object.keys(
-        currentBotPermissions,
-      ) as (keyof typeof currentBotPermissions)[]
-    ).some(
-      (key) =>
-        permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
-        permissions[key] !== currentBotPermissions[key],
-    );
-    const needsReapproval =
-      (name !== undefined && name !== currentBotName) || permissionChanged;
+    if (!GIRACLE_SERVER_CONFIG.BotAutoApprove) {
+      const permissionChanged = (
+        Object.keys(
+          currentBotPermissions,
+        ) as (keyof typeof currentBotPermissions)[]
+      ).some(
+        (key) =>
+          permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
+          permissions[key] !== currentBotPermissions[key],
+      );
+      needsReapproval =
+        (name !== undefined && name !== currentBotName) || permissionChanged;
+    }
+
+    //最終的な承認状態
+    const newApproveStatus =
+      currentApproveStatus === "BLOCKED"
+        ? "BLOCKED"
+        : GIRACLE_SERVER_CONFIG.BotAutoApprove
+          ? "APPROVED"
+          : needsReapproval
+            ? "PENDING"
+            : undefined;
 
     const [bot] = await db
       .update(botManages)
       .set({
         botName: name,
         botDescription: description,
-        approveStatus: needsReapproval ? "PENDING" : undefined,
+        approveStatus: newApproveStatus,
         ...permissions,
       })
       .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))

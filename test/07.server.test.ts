@@ -251,6 +251,22 @@ describe("PUT /server/bot", () => {
     expect(j.data.canFetchUserinfo).toBeFalse();
   });
 
+  it("正常3 :: 自動透過時には勝手にApproved", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot3", useAllChannel: true },
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot3");
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(j.data.canFetchUserinfo).toBeFalse();
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+  });
+
   it("見えないチャンネルでBot作成しようとする", async () => {
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
     const res = await FETCH({
@@ -348,11 +364,12 @@ describe("GET /server/bot", () => {
       method: "GET",
     });
     const j = await res.json();
-    expect(j.data.length).toBe(4);
-    expect(j.data[0].botName).toBe("newBot2");
-    expect(j.data[1].botName).toBe("BOT_TEST_3");
-    expect(j.data[2].botName).toBe("BOT_TEST_2");
-    expect(j.data[3].botName).toBe("BOT_TEST_1");
+    expect(j.data.length).toBe(5);
+    expect(j.data[0].botName).toBe("newBot3");
+    expect(j.data[1].botName).toBe("newBot2");
+    expect(j.data[2].botName).toBe("BOT_TEST_3");
+    expect(j.data[3].botName).toBe("BOT_TEST_2");
+    expect(j.data[4].botName).toBe("BOT_TEST_1");
   });
 
   it("権限無し", async () => {
@@ -493,6 +510,53 @@ describe("PATCH /server/bot", () => {
     expect(res.ok).toBe(true);
     expect(j.data.botName).toBe("BOT_TEST_1_RENAMED2");
     expect(j.data.approveStatus).toBe("PENDING");
+  });
+
+  it("正常 :: サーバー設定が自動承諾になっているなら承諾のまま", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", name: "BOT_TEST_1_RENAMED3" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+  });
+
+  it("自動承諾でもブロック済みのBotは復活しない", async () => {
+    // 管理者によるBLOCKEDは制裁なので、所有者の変更操作で解除されてはならない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "BLOCKED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      // 権限を実際に変えてもステータスは据え置き
+      body: { botId: "TESTBOT1", canReadMessage: false, canFetchRoleinfo: true },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("BLOCKED");
+    expect(j.data.canFetchRoleinfo).toBeTrue();
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+
+    // 後続のテストへ漏らさないよう戻す(serviceを経由しないので再申請は走らない)
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
   });
 
   it("正常 :: 概要の変更だけだとPENDINGにならない", async () => {
