@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import type { ServerWebSocket } from "elysia/ws/bun";
 import { db } from ".";
-import { botManages, tokens } from "./db/schema";
+import { botManages, channels, tokens } from "./db/schema";
 
 //ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
 // biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
@@ -72,9 +72,17 @@ export const wsHandler = new Elysia().ws("/ws", {
       }
 
       ws.subscribe(`user::${botData.remoteUserId}`);
-      //チャンネル用ハンドラのリンク
-      for (const channelData of botData.channelPermissions) {
-        ws.subscribe(`channel::${channelData.channelId}`);
+      if (botData.useAllChannel) {
+        // 全透過Botは既存の全チャンネルを購読する（Bunのpub/subにワイルドカードが無いため）
+        const allChannels = await db.select({ id: channels.id }).from(channels);
+        for (const { id } of allChannels) {
+          ws.subscribe(`channel::${id}`);
+        }
+      } else {
+        //チャンネル用ハンドラのリンク
+        for (const channelData of botData.channelPermissions) {
+          ws.subscribe(`channel::${channelData.channelId}`);
+        }
       }
 
       //BotとしてユーザーWSインスタンス保存
@@ -321,6 +329,22 @@ export function WSSubscribe(userId: string, wsChannel: `${string}::${string}`) {
   }
   for (const ws of currentInstance) {
     ws.subscribe(wsChannel);
+  }
+}
+
+/**
+ * useAllChannel の Bot に新規チャンネルの購読を追加する（接続後に作られたチャンネルへ追従させるため）
+ */
+export async function WSSubscribeAllChannelBots(channelId: string) {
+  const bots = await db
+    .select({ remoteUserId: botManages.remoteUserId })
+    .from(botManages)
+    .where(eq(botManages.useAllChannel, true));
+
+  for (const { remoteUserId } of bots) {
+    for (const ws of userWSInstance.get(remoteUserId) ?? []) {
+      ws.subscribe(`channel::${channelId}`);
+    }
   }
 }
 

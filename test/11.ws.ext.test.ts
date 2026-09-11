@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../src";
 import { botManages, users } from "../src/db/schema";
 import { wsHandler } from "../src/ws";
-import { INIT } from "./util";
+import { FETCH, INIT } from "./util";
 
 describe("WS (Bot)", () => {
   let server: ReturnType<typeof Bun.serve>;
@@ -93,11 +93,25 @@ describe("WS (Bot)", () => {
     expect(closed).toBe(true);
   });
 
+  /** 期待するメッセージが届くまで待つ。届かなければ最後まで待って呼び出し側の expect が落ちる */
+  const waitForMessage = async (messages: string[], probe: string) => {
+    for (let i = 0; i < 40 && !messages.some((m) => m.includes(probe)); i++) {
+      await Bun.sleep(25);
+    }
+  };
+
   const setBotUserFlag = (flag: "isBanned" | "isDeleted", value: boolean) =>
     db
       .update(users)
       .set({ [flag]: value })
       .where(eq(users.id, "TESTUSER_BOT_1"));
+
+  /** TESTBOT2 の全透過フラグを切り替える(呼び出し側で必ず戻す) */
+  const setAllChannel = (value: boolean) =>
+    db
+      .update(botManages)
+      .set({ useAllChannel: value })
+      .where(eq(botManages.id, "TESTBOT2"));
 
   // BANと論理削除は同じ拒否経路のため同一ケースを共有する
   for (const flag of ["isBanned", "isDeleted"] as const) {
@@ -114,4 +128,66 @@ describe("WS (Bot)", () => {
       }
     });
   }
+
+  test("非透過Botは許可されたチャンネルのみ受信する", async () => {
+    // TESTBOT1 は TESTCHANNEL1 のみ許可
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    server.publish(
+      "channel::TESTCHANNEL2",
+      JSON.stringify({ signal: "test::ProbeRandom", data: "x" }),
+    );
+    server.publish(
+      "channel::TESTCHANNEL1",
+      JSON.stringify({ signal: "test::ProbeGeneral", data: "x" }),
+    );
+    // 後から publish した許可チャンネルの受信を待つ(同一接続内は到着順が保たれるため、
+    // 先の許可外チャンネルが届いていればこの時点で messages に入っている)
+    await waitForMessage(messages, "test::ProbeGeneral");
+    expect(messages.some((m) => m.includes("test::ProbeGeneral"))).toBe(true);
+    expect(messages.some((m) => m.includes("test::ProbeRandom"))).toBe(false);
+    ws.close();
+  });
+
+  test("全透過Botは全チャンネルを受信する", async () => {
+    try {
+      await setAllChannel(true);
+      // TESTBOT2 は botChannelPermissions に行を持たない
+      const { ws, messages } = await connectBot("TESTTOKEN2");
+      server.publish(
+        "channel::TESTCHANNEL2",
+        JSON.stringify({ signal: "test::ProbeRandom", data: "x" }),
+      );
+      await waitForMessage(messages, "test::ProbeRandom");
+      expect(messages.some((m) => m.includes("test::ProbeRandom"))).toBe(true);
+      ws.close();
+    } finally {
+      await setAllChannel(false);
+    }
+  });
+
+  test("全透過Botは接続後に作成されたチャンネルも受信する", async () => {
+    try {
+      await setAllChannel(true);
+      const { ws, messages } = await connectBot("TESTTOKEN2");
+
+      // TESTUSER は manageChannel を持つ
+      const res = await FETCH({
+        path: "/channel/create",
+        method: "PUT",
+        body: { channelName: "bot-ext-new-channel" },
+      });
+      const newChannelId = (await res.json()).data.channelId as string;
+      expect(newChannelId).toBeString();
+
+      server.publish(
+        `channel::${newChannelId}`,
+        JSON.stringify({ signal: "test::ProbeNew", data: "x" }),
+      );
+      await waitForMessage(messages, "test::ProbeNew");
+      expect(messages.some((m) => m.includes("test::ProbeNew"))).toBe(true);
+      ws.close();
+    } finally {
+      await setAllChannel(false);
+    }
+  });
 });

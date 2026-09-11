@@ -1,7 +1,11 @@
 import Elysia, { t } from "elysia";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
-import { WSSubscribe, WSUnsubscribe } from "../../ws";
+import {
+  WSSubscribe,
+  WSSubscribeAllChannelBots,
+  WSUnsubscribe,
+} from "../../ws";
 import { ServiceChannel } from "./channel.service";
 
 export const channel = new Elysia({ prefix: "/channel" })
@@ -336,6 +340,9 @@ export const channel = new Elysia({ prefix: "/channel" })
         description,
         _userId,
       );
+
+      // 全透過Botを新規チャンネルの購読に追従させる
+      await WSSubscribeAllChannelBots(newChannel.id);
 
       return {
         message: "Channel created",
