@@ -248,7 +248,7 @@ export namespace ServiceServer {
         permissions[key] !== currentBotPermissions[key],
     );
     const needsReapproval =
-      name !== undefined && (name !== currentBotName || permissionChanged);
+      (name !== undefined && name !== currentBotName) || permissionChanged;
 
     const [bot] = await db
       .update(botManages)

@@ -510,6 +510,23 @@ describe("PATCH /server/bot", () => {
     const t = await res.text();
     expect(t).toBe("Bot not found");
   });
+
+  it("正常 :: 権限のみ変更でもapproveStatusがPENDINGに戻る", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", canFetchUserinfo: true },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.canFetchUserinfo).toBeTrue();
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
 });
 
 // PATCHは共有状態(TESTBOT1のbotName/approveStatus)を書き換えるため、後続のテストファイルへ漏らさないよう戻す
