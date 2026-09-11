@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 // 循環import(ws.ts→index.ts→ws.ts)のため、まず../srcを完全評価してからwsHandlerを取る
-import { db } from "../src";
-import { botManages, users } from "../src/db/schema";
+import { db, GIRACLE_SERVER_CONFIG } from "../src";
+import { botChannelPermissions, botManages, users } from "../src/db/schema";
 import { wsHandler } from "../src/ws";
 import { FETCH, INIT } from "./util";
 
@@ -179,6 +179,46 @@ describe("WS (Bot)", () => {
     expect(messages.some((m) => m.includes("test::ProbeGeneral"))).toBe(true);
     expect(messages.some((m) => m.includes("test::ProbeRandom"))).toBe(false);
     ws.close();
+  });
+
+  test("接続中にチャンネル許可を変更すると購読が張り替わる", async () => {
+    // 自動承諾ONなら再申請(PENDING)にならず切断されないため、購読の張り替えだけを検証できる
+    const beforeAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    // TESTBOT1 は TESTCHANNEL1 のみ許可
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL2"] },
+      });
+      expect(res.ok).toBe(true);
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      server.publish(
+        "channel::TESTCHANNEL1",
+        JSON.stringify({ signal: "test::ProbeOld", data: "x" }),
+      );
+      server.publish(
+        "channel::TESTCHANNEL2",
+        JSON.stringify({ signal: "test::ProbeNew", data: "x" }),
+      );
+      await waitForMessage(messages, "test::ProbeNew");
+      expect(messages.some((m) => m.includes("test::ProbeNew"))).toBe(true);
+      // 解除しないと許可を失ったチャンネルの配信を受け続けてしまう
+      expect(messages.some((m) => m.includes("test::ProbeOld"))).toBe(false);
+      ws.close();
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = beforeAutoApprove;
+      // 後続のテストのため許可を戻す(TESTBOT1はTESTCHANNEL1のみ許可)
+      await db
+        .delete(botChannelPermissions)
+        .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+      await db
+        .insert(botChannelPermissions)
+        .values({ channelId: "TESTCHANNEL1", botId: "TESTBOT1" });
+    }
   });
 
   test("全透過Botは全チャンネルを受信する", async () => {

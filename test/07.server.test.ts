@@ -566,6 +566,17 @@ describe("PATCH /server/bot/approval", () => {
 
 // ファイル末尾に置く(TESTBOT1のbotNameを書き換えるため、GET /server/bot/all の期待値と干渉する)
 describe("PATCH /server/bot", () => {
+  /** 指定Botに許可されているチャンネルId(順序非依存で比較するためソートする) */
+  const channelIdsOfBot = async (botId: string) => {
+    const bot = await db.query.botManages.findFirst({
+      where: eq(botManages.id, botId),
+      with: { channelPermissions: { columns: { channelId: true } } },
+    });
+    return (bot?.channelPermissions ?? [])
+      .map((permission) => permission.channelId)
+      .sort();
+  };
+
   it("正常 :: 権限変更でapproveStatusがPENDINGに戻る", async () => {
     const res = await FETCH({
       path: "/server/bot",
@@ -749,17 +760,129 @@ describe("PATCH /server/bot", () => {
     expect(j.data.canFetchUserinfo).toBeTrue();
     expect(j.data.approveStatus).toBe("PENDING");
   });
+
+  it("正常 :: チャンネル許可を差し替えられる", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(res.ok).toBe(true);
+    // 追加ではなく差し替え(TESTCHANNEL1が残らない)
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+  });
+
+  it("正常 :: 許可を指定しない更新では許可リストが変わらない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", description: "keep permissions" },
+    });
+    expect(res.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+  });
+
+  it("正常 :: 全透過にすると許可リストが空になり、非透過に戻しても復活しない", async () => {
+    const toAll = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", useAllChannel: true },
+    });
+    expect(toAll.ok).toBe(true);
+    expect((await toAll.json()).data.useAllChannel).toBeTrue();
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+
+    // 古い許可が残っていると非透過に戻した瞬間に復活してしまう
+    const toPrivate = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", useAllChannel: false },
+    });
+    expect(toPrivate.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+  });
+
+  it("存在しないチャンネルは許可できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["NOT_EXIST_CHANNEL"] },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("You cannot use a channel you cannot see");
+  });
+
+  it("見られないチャンネルは許可できない", async () => {
+    // TESTUSERはGOD権限を持つため全チャンネルが見える。TESTBOT3の所有者(TESTUSER2)で試す
+    // (TESTCHANNEL3/4 はTESTUSER2から見えないプライベートチャンネル)
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", permissionChannelIds: ["TESTCHANNEL4"] },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("You cannot use a channel you cannot see");
+  });
+
+  it("正常 :: 差分が無くてもエラーにならない", async () => {
+    // 更新対象が空だとdrizzleが "No values to set" で500になるため、許可指定のみの
+    // 差分無し更新と、指定なし更新の両方で通ることを固定する
+    const sameChannel = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(sameChannel.ok).toBe(true);
+
+    const nothing = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1" },
+    });
+    expect(nothing.ok).toBe(true);
+  });
+
+  it("正常 :: チャンネル許可の変更でもapproveStatusがPENDINGに戻る", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL1"] },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
 });
 
 // PATCHは共有状態(TESTBOT1のbotName/approveStatus)を書き換えるため、後続のテストファイルへ漏らさないよう戻す
 afterAll(async () => {
   await db
     .update(botManages)
-    .set({ botName: "BOT_TEST_1", approveStatus: "APPROVED" })
+    .set({
+      botName: "BOT_TEST_1",
+      approveStatus: "APPROVED",
+      useAllChannel: false,
+    })
     .where(eq(botManages.id, "TESTBOT1"));
   // 改名でusers.nameも書き換わるため揃えて戻す
   await db
     .update(users)
     .set({ name: "testbotuser" })
     .where(eq(users.id, "TESTUSER_BOT_1"));
+  // チャンネル許可も初期状態(INIT()と同じ TESTCHANNEL1 のみ)へ戻す
+  // (10/11の「TESTBOT1はTESTCHANNEL1のみ許可」という前提を壊さないため)
+  await db
+    .delete(botChannelPermissions)
+    .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+  await db
+    .insert(botChannelPermissions)
+    .values({ channelId: "TESTCHANNEL1", botId: "TESTBOT1" });
 });
