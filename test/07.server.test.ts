@@ -120,10 +120,12 @@ describe("POST /server/change-config", () => {
       method: "POST",
       body: {
         RegisterAvailable: true,
-        RegisterInviteOnly: true,
+        RegisterInviteOnly: false,
         RegisterAnnounceChannelId: "TESTCHANNEL2",
         MessageMaxLength: 123,
         MessageMaxFileSize: 2048,
+        BotEnabled: true,
+        BotAutoApprove: false,
         DefaultJoinChannel: ["TESTCHANNEL1", "TESTCHANNEL2"],
       },
     });
@@ -131,15 +133,21 @@ describe("POST /server/change-config", () => {
     expect(res.ok).toBe(true);
     expect(j.data.name).toBe("test-name"); //変更無い
     expect(j.data.RegisterAvailable).toBeTrue();
-    GIRACLE_SERVER_CONFIG.RegisterAvailable = true;
-    expect(j.data.RegisterInviteOnly).toBeTrue();
-    GIRACLE_SERVER_CONFIG.RegisterInviteOnly = true;
+    expect(GIRACLE_SERVER_CONFIG.RegisterAvailable).toBeTrue();
+    expect(j.data.RegisterInviteOnly).toBeFalse();
+    expect(GIRACLE_SERVER_CONFIG.RegisterInviteOnly).toBeFalse();
     expect(j.data.RegisterAnnounceChannelId).toBe("TESTCHANNEL2");
-    GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId = "TESTCHANNEL2";
+    expect(GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId).toBe(
+      "TESTCHANNEL2",
+    );
+    expect(j.data.BotEnabled).toBeTrue();
+    expect(GIRACLE_SERVER_CONFIG.BotEnabled).toBeTrue();
+    expect(j.data.BotAutoApprove).toBeFalse();
+    expect(GIRACLE_SERVER_CONFIG.BotAutoApprove).toBeFalse();
     expect(j.data.MessageMaxLength).toBe(123);
-    GIRACLE_SERVER_CONFIG.MessageMaxLength = 123;
+    expect(GIRACLE_SERVER_CONFIG.MessageMaxLength).toBe(123);
     expect(j.data.MessageMaxFileSize).toBe(2048);
-    GIRACLE_SERVER_CONFIG.MessageMaxFileSize = 2048;
+    expect(GIRACLE_SERVER_CONFIG.MessageMaxFileSize).toBe(2048);
 
     const sc = db.select().from(serverConfigs).limit(1).get();
     expect(sc).toBeDefined();
