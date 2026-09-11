@@ -697,10 +697,14 @@ export namespace ServiceServer {
         approveStatus: approvalStatus,
       })
       .where(eq(botManages.id, botId))
-      .returning({ id: botManages.id });
+      .returning({ id: botManages.id, remoteUserId: botManages.remoteUserId });
 
     if (botManageUpdated === undefined) {
       throw status(404, "Bot not found");
+    }
+
+    if (approvalStatus === "BLOCKED" || approvalStatus === "DENIED") {
+      WSDisconnectUser(botManageUpdated.remoteUserId, "Your bot has been disabled");
     }
 
     return botManageUpdated.id;
