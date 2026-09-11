@@ -199,7 +199,7 @@ export namespace ExtServiceMessage {
             tag: `reply-${messageSaved.id}`,
             data: { type: "reply", messageId: messageSaved.id, channelId },
           },
-        });
+        }).catch((e) => console.error("push reply error", e));
       }
     }
 
