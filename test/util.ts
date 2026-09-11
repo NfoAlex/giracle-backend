@@ -68,8 +68,6 @@ export async function INIT() {
   await db.delete(invitations);
   await db.delete(users);
   await db.delete(serverConfigs);
-  await db.delete(botManages);
-  await db.delete(botChannelPermissions);
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await fs.rm("./STORAGE/thumbnail", { recursive: true, force: true });
