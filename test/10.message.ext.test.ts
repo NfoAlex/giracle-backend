@@ -1,8 +1,26 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { db } from "../src";
-import { botManages, inboxes, requestLog, users } from "../src/db/schema";
+import {
+  botManages,
+  inboxes,
+  notificationConfigs,
+  notificationDevices,
+  requestLog,
+  users,
+} from "../src/db/schema";
 import { FETCH, INIT } from "./util";
+
+// web-push の sendNotification をモック化: 実際のFCMは叩かない
+const sendNotificationMock = mock(
+  async (_subscription: unknown, _payload: string) => undefined,
+);
+mock.module("web-push", () => ({
+  default: {
+    setVapidDetails: () => {},
+    sendNotification: sendNotificationMock,
+  },
+}));
 
 // open-graph-scraperをモック化（外部リクエスト不要）
 // let lastOgsOptions:
@@ -490,5 +508,66 @@ describe("無効化されたBotの拒否", () => {
       log = await findLog();
     }
     expect(log?.userId).toBe("TESTUSER_BOT_1");
+  });
+});
+
+describe("メンション通知", () => {
+  it("正常 :: メンションでWeb Pushが送られる", async () => {
+    // 他テストがTESTUSERの通知設定・端末を変更しているため明示的に用意する
+    await db
+      .insert(notificationConfigs)
+      .values({ userId: "TESTUSER", enabled: true, mode: "mention" })
+      .onConflictDoUpdate({
+        target: notificationConfigs.userId,
+        set: { enabled: true, mode: "mention" },
+      });
+    await db
+      .insert(notificationDevices)
+      .values({
+        token: "ext-mention-token",
+        platform: "web",
+        keys: JSON.stringify({ p256dh: "x", auth: "y" }),
+        userId: "TESTUSER",
+      })
+      .onConflictDoUpdate({
+        target: notificationDevices.token,
+        set: { userId: "TESTUSER" },
+      });
+    sendNotificationMock.mockClear();
+
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "@<TESTUSER> ping" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+
+    //pushはawaitされずに走るため届くまで待つ(他端末宛のpushも混ざるのでtagで絞る)
+    const findMentionCall = () =>
+      sendNotificationMock.mock.calls.find((call) =>
+        call[1].includes(`"tag":"mention-${j.id}"`),
+      );
+    let mentionCall = findMentionCall();
+    for (let i = 0; mentionCall === undefined && i < 40; i++) {
+      await Bun.sleep(25);
+      mentionCall = findMentionCall();
+    }
+    expect(mentionCall).toBeDefined();
+    const payload = JSON.parse(mentionCall?.[1] ?? "");
+    expect(payload.data.type).toBe("mention");
+    expect(payload.data.messageId).toBe(j.id);
+    expect(payload.data.channelId).toBe("TESTCHANNEL1");
+    expect(payload.title).toBe("BOT_TEST_1 さんからのメンション");
+
+    //通知設定は既定(行なし=enabled/mention)に戻す
+    await db
+      .delete(notificationConfigs)
+      .where(eq(notificationConfigs.userId, "TESTUSER"));
+    await db
+      .delete(notificationDevices)
+      .where(eq(notificationDevices.token, "ext-mention-token"));
   });
 });

@@ -132,6 +132,9 @@ export namespace ExtServiceMessage {
             })
           : [];
       const memberIds = new Set(existingMentionedUsers.map((u) => u.userId));
+      const mentionTargetUserIds = [...mentionedUserIds].filter((id) =>
+        memberIds.has(id),
+      );
       const savingInboxData = [
         ...(replyTargetUserId
           ? [
@@ -142,16 +145,39 @@ export namespace ExtServiceMessage {
               },
             ]
           : []),
-        ...[...mentionedUserIds]
-          .filter((id) => memberIds.has(id))
-          .map((userId) => ({
-            userId,
-            messageId: messageSaved.id,
-            type: "mention",
-          })),
+        ...mentionTargetUserIds.map((userId) => ({
+          userId,
+          messageId: messageSaved.id,
+          type: "mention",
+        })),
       ];
       if (savingInboxData.length > 0) {
         await db.insert(inboxes).values(savingInboxData);
+      }
+
+      //メンションされたユーザーへ WS + プッシュ通知
+      for (const mentionedUserId of mentionTargetUserIds) {
+        server?.publish(
+          `user::${mentionedUserId}`,
+          JSON.stringify({
+            signal: "inbox::Added",
+            data: { message: messageSaved, type: "mention" },
+          }),
+        );
+
+        if (mentionedUserId !== bot.remoteUserId) {
+          Util.sendPushNotification({
+            userId: mentionedUserId,
+            channelId,
+            eventType: "mention",
+            payload: {
+              title: `${bot.botName} さんからのメンション`,
+              body,
+              tag: `mention-${messageSaved.id}`,
+              data: { type: "mention", messageId: messageSaved.id, channelId },
+            },
+          }).catch((e) => console.error("push mention error", e));
+        }
       }
 
       //返信先へ WS + プッシュ通知
