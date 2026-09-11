@@ -129,6 +129,39 @@ describe("WS (Bot)", () => {
     });
   }
 
+  test("再申請で未承認に戻ったBotは切断される", async () => {
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    try {
+      // 権限を変えると再申請(PENDING)になり、承認済みでなくなる
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", canManageServerConfig: true },
+      });
+      expect(res.ok).toBe(true);
+      expect(
+        db
+          .select({ approveStatus: botManages.approveStatus })
+          .from(botManages)
+          .where(eq(botManages.id, "TESTBOT1"))
+          .get()?.approveStatus,
+      ).toBe("PENDING");
+      // 接続を維持すると channel::* の配信を受け続けるため切断される必要がある
+      await waitForMessage(messages, "not approved");
+      for (let i = 0; i < 40 && ws.readyState !== WebSocket.CLOSED; i++) {
+        await Bun.sleep(25);
+      }
+      expect(ws.readyState).toBe(WebSocket.CLOSED);
+    } finally {
+      // 後続のテストのため承認済みへ戻す
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+
   test("非透過Botは許可されたチャンネルのみ受信する", async () => {
     // TESTBOT1 は TESTCHANNEL1 のみ許可
     const { ws, messages } = await connectBot("TESTTOKEN1");

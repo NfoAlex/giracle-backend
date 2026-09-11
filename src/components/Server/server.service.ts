@@ -280,6 +280,11 @@ export namespace ServiceServer {
       throw status(500, "Bot data should be available");
     }
 
+    //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
+    if (bot.approveStatus !== "APPROVED") {
+      WSDisconnectUser(bot.remoteUserId, "Your bot is not approved yet");
+    }
+
     const { tokenCode, ...botTrimmed } = bot;
     return botTrimmed;
   };
@@ -703,8 +708,12 @@ export namespace ServiceServer {
       throw status(404, "Bot not found");
     }
 
-    if (approvalStatus === "BLOCKED" || approvalStatus === "DENIED") {
-      WSDisconnectUser(botManageUpdated.remoteUserId, "Your bot has been disabled");
+    //承認済みでないなら接続中WSを切断(接続を維持するとchannel::*の配信を受け続ける)
+    if (approvalStatus !== "APPROVED") {
+      WSDisconnectUser(
+        botManageUpdated.remoteUserId,
+        "Your bot is not approved yet",
+      );
     }
 
     return botManageUpdated.id;

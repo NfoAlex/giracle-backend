@@ -398,16 +398,25 @@ describe("GET /server/bot/me/:botId", () => {
 
 describe("PATCH /server/bot/approval", () => {
   it("正常", async () => {
+    // 既定値(APPROVED)以外を送り、暗黙補完されずに指定値が反映されることを見る
     const res = await FETCH({
       path: "/server/bot/approval",
       method: "PATCH",
       body: {
         botId: "TESTBOT1",
-        approvalStatus: "APPROVED",
+        approvalStatus: "DENIED",
       },
     });
     const j = await res.json();
+    expect(res.ok).toBe(true);
     expect(j.data).toBe("TESTBOT1");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
   });
 
   it("存在しないBotデータ", async () => {
