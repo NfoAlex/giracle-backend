@@ -16,7 +16,7 @@ import {
   serverConfigs,
   users,
 } from "../../db/schema";
-import CheckChannelVisibility from "../../Utils/CheckChannelVisibility";
+import { Util } from "../../Util";
 import { WSDisconnectUser } from "../../ws";
 
 export namespace ServiceServer {
@@ -137,7 +137,7 @@ export namespace ServiceServer {
       }
       //TODO: どうにかしたい
       for (const channelId of permissionChannelIds) {
-        if (!(await CheckChannelVisibility(channelId, _userId)))
+        if (!(await Util.checkChannelVisibility(channelId, _userId)))
           throw status(400, "You cannot use a channel you cannot see");
       }
     }
