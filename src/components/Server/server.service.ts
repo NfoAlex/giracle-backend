@@ -10,6 +10,7 @@ import {
   botChannelPermissions,
   botManages,
   channelJoinOnDefaults,
+  channels,
   customEmojis,
   invitations,
   requestLog,
@@ -138,8 +139,20 @@ export namespace ServiceServer {
         throw status(400, "Too many channels to listen");
       }
       //TODO: どうにかしたい
+      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+      //実在しないチャンネルIdも素通りしてしまう。ここで弾かないと許可テーブルの
+      //channelIdがFK違反になり500になる
       for (const channelId of uniqueChannelIds) {
-        if (!(await Util.checkChannelVisibility(channelId, _userId)))
+        const channelExists =
+          db
+            .select({ id: channels.id })
+            .from(channels)
+            .where(eq(channels.id, channelId))
+            .get() !== undefined;
+        if (
+          !channelExists ||
+          !(await Util.checkChannelVisibility(channelId, _userId))
+        )
           throw status(400, "You cannot use a channel you cannot see");
       }
     }
