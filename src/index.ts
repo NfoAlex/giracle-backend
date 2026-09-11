@@ -68,20 +68,15 @@ try {
 
 /////////////////////////////////////////////////////////////////
 
+const corsOrigins = (Bun.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 export const app = new Elysia({
   //16MB
   serve: { maxRequestBodySize: 16 * 1024 * 1024 },
 })
-  .use(
-    cors({
-      origin: Bun.env.CORS_ORIGIN
-        ? Bun.env.CORS_ORIGIN.split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : false,
-      credentials: true,
-    }),
-  )
   .use(
     Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
   )
@@ -96,6 +91,19 @@ export const app = new Elysia({
     return status(500, "somethin went wrong :(");
   })
   .use(Middleware.RequestLogger)
+  .use(externalApi)
+  .use(
+    cors({
+      //Bot用API(/ext)はサーバー間通信専用のためCORSヘッダを付けない。
+      //corsプラグインのonRequestはアプリ全体に効く(use順では絞れない)ため、origin関数で判定する
+      origin: [
+        (request) =>
+          !new URL(request.url).pathname.startsWith("/ext") &&
+          corsOrigins.includes(request.headers.get("Origin") ?? ""),
+      ],
+      credentials: true,
+    }),
+  )
   .use(wsHandler)
   .use(user)
   .use(channel)
@@ -103,7 +111,6 @@ export const app = new Elysia({
   .use(message)
   .use(server)
   .use(notification)
-  .use(externalApi)
   .listen(3000);
 
 console.log("Server running at http://localhost:3000");
