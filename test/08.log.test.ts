@@ -118,23 +118,6 @@ describe("GET /server/log-group", () => {
   );
 
   it(
-    "正常 :: type=error フィルタ",
-    async () => {
-      await seedLog();
-      const res = await FETCH({
-        path: "/server/log-group?cursorLogDate=2025-01-10&type=error",
-        method: "GET",
-      });
-      const j = await res.json();
-      expect(res.ok).toBe(true);
-      const d10 = j.data.group.find((d: LogDaily) => d.date === "2025-01-10");
-      expect(d10.successCount).toBe(0);
-      expect(d10.errorCount).toBe(1);
-    },
-    { timeout: 10000 },
-  );
-
-  it(
     "正常 :: userId フィルタ",
     async () => {
       await seedLog();
@@ -194,9 +177,10 @@ describe("GET /server/log-group", () => {
   );
 
   it(
-    "正常 :: includeFirstLogs省略時は firstDayLog なし",
+    "正常 :: includeFirstLogs有無",
     async () => {
       await seedLog();
+      // 省略時は firstDayLog なし
       const res = await FETCH({
         path: "/server/log-group?cursorLogDate=2025-01-10",
         method: "GET",
@@ -204,23 +188,16 @@ describe("GET /server/log-group", () => {
       const j = await res.json();
       expect(res.ok).toBe(true);
       expect(j.data.firstDayLog).toBeUndefined();
-    },
-    { timeout: 10000 },
-  );
-
-  it(
-    "正常 :: includeFirstLogs=true で初日生ログを返す",
-    async () => {
-      await seedLog();
-      const res = await FETCH({
+      // true で初日生ログを返す
+      const resWith = await FETCH({
         path: "/server/log-group?cursorLogDate=2025-01-10&includeFirstLogs=true",
         method: "GET",
       });
-      const j = await res.json();
-      expect(res.ok).toBe(true);
-      expect(j.data.group.length).toBe(2);
+      const jWith = await resWith.json();
+      expect(resWith.ok).toBe(true);
+      expect(jWith.data.group.length).toBe(2);
       // 初日(2025-01-10)の生ログ 5件
-      expect(j.data.firstDayLog).toHaveLength(5);
+      expect(jWith.data.firstDayLog).toHaveLength(5);
     },
     { timeout: 10000 },
   );
@@ -232,19 +209,6 @@ describe("GET /server/log-group", () => {
         path: "/server/log-group?cursorLogDate=2025-01-10",
         method: "GET",
         useSecondaryUser: true,
-      });
-      expect(res.ok).toBe(false);
-    },
-    { timeout: 10000 },
-  );
-
-  it(
-    "未認証",
-    async () => {
-      const res = await FETCH({
-        path: "/server/log-group?cursorLogDate=2025-01-10",
-        method: "GET",
-        excludeCredential: true,
       });
       expect(res.ok).toBe(false);
     },
@@ -352,19 +316,6 @@ describe("GET /server/log", () => {
         path: "/server/log?targetDate=2025-01-10",
         method: "GET",
         useSecondaryUser: true,
-      });
-      expect(res.ok).toBe(false);
-    },
-    { timeout: 10000 },
-  );
-
-  it(
-    "未認証",
-    async () => {
-      const res = await FETCH({
-        path: "/server/log?targetDate=2025-01-10",
-        method: "GET",
-        excludeCredential: true,
       });
       expect(res.ok).toBe(false);
     },

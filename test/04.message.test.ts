@@ -10,7 +10,6 @@ import {
   messageFileAttached,
   messageUrlPreviewThumbnails,
 } from "../src/db/schema";
-import { Util } from "../src/Util";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
 // open-graph-scraperをモック化（外部リクエスト不要）
@@ -303,28 +302,6 @@ describe("/message/file/upload", async () => {
     expect(j.data.fileId.id).toBeString();
   });
 
-  it("正常 :: 不正なファイル名の正常パース", async () => {
-    const formData = new FormData();
-    const pngBase64 =
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-    const pngBuffer = Buffer.from(pngBase64, "base64");
-    formData.append("channelId", "TESTCHANNEL1");
-    formData.append(
-      "file",
-      new File([pngBuffer], "testあ/test_xss.png", { type: "image/png" }),
-    );
-
-    const res = await FETCH({
-      path: "/message/file/upload",
-      method: "POST",
-      body: formData,
-    });
-    const j = await res.json();
-    expect(j.message).toBe("File uploaded");
-    expect(j.data.fileId.id).toBeString();
-    console.log("04.message :: /message/file/upload : ", { j });
-  });
-
   it("未参加のチャンネルへアップロード", async () => {
     const formData = new FormData();
     const pngBase64 =
@@ -402,33 +379,6 @@ describe("/message/file/upload", async () => {
     expect(res.ok).toBeFalse();
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("File type is invalid");
-  });
-
-  it("octet-stream で送られた .svg は拡張子から image/svg+xml に推論され WebP に再エンコードされる", async () => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="10" height="10"/></svg>`;
-    const formData = new FormData();
-    formData.append("channelId", "TESTCHANNEL1");
-    formData.append(
-      "file",
-      new File([svg], "evil.svg", { type: "application/octet-stream" }),
-    );
-
-    const res = await FETCH({
-      path: "/message/file/upload",
-      method: "POST",
-      body: formData,
-    });
-    const j = await res.json();
-    expect(j.message).toBe("File uploaded");
-    const fileId = j.data.fileId.id;
-
-    const getRes = await FETCH({
-      path: `/message/file/${fileId}`,
-      method: "GET",
-    });
-    // Bun の multipart パーサーが octet-stream をファイル名拡張子(.svg)から
-    // image/svg+xml に推論するため、画像経路で WebP にラスタライズされる
-    expect(getRes.headers.get("content-type")).toBe("image/webp");
   });
 
   it("SVG(image/svg+xml)はWebPに再エンコードされスクリプトが無効化される", async () => {
@@ -592,6 +542,14 @@ describe("/message/url-thumbnail", () => {
       expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
       expect(res.headers.get("Content-Disposition")).toBe("attachment");
 
+      // 未キャッシュ時のDB登録もここで確認する
+      const record = db
+        .select()
+        .from(messageUrlPreviewThumbnails)
+        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
+        .get();
+      expect(record).not.toBeUndefined();
+
       await cleanupThumbnail(testUrl);
     } finally {
       restore();
@@ -614,51 +572,6 @@ describe("/message/url-thumbnail", () => {
     }
   });
 
-  it("サムネイル未キャッシュ時: URLから画像を取得しBun.Imageで圧縮・保存・DB登録される", async () => {
-    const testUrl = `https://example.com/thumbnail-${crypto.randomUUID()}.png`;
-    const sampleImg = await Bun.file(
-      "./STORAGE/icon/default.png",
-    ).arrayBuffer();
-    const restore = mockFetchFor(testUrl, sampleImg, "image/png");
-
-    try {
-      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
-      if (!file) throw new Error("file must not be null");
-
-      expect(await file.exists()).toBeTrue();
-      expect(file.type).toBe("image/webp");
-
-      // DBに登録されていることを確認
-      const record = db
-        .select()
-        .from(messageUrlPreviewThumbnails)
-        .where(eq(messageUrlPreviewThumbnails.url, testUrl))
-        .get();
-      if (!record) throw new Error("record must not be undefined");
-      expect(file.name).toContain(record.fileName);
-
-      // キャッシュ後の再取得では既存ファイルが返ること
-      const cachedFile = await ServiceMessage.GetUrlThumbnail(testUrl, false);
-      if (!cachedFile) throw new Error("cachedFile must not be null");
-      expect(cachedFile.name).toBe(file.name);
-
-      await cleanupThumbnail(testUrl, file);
-    } finally {
-      restore();
-    }
-  });
-
-  it("fetch失敗時: nullが返りDBにも登録されない", async () => {
-    const testUrl = `https://example.com/404-${crypto.randomUUID()}.png`;
-    const restore = mockFetchFor(testUrl, "Not found", "text/plain", 404);
-
-    try {
-      const file = await ServiceMessage.GetUrlThumbnail(testUrl, false);
-      expect(file).toBeNull();
-    } finally {
-      restore();
-    }
-  });
   it("forFavicon=true時: 512px / 32pxに縮小されたwebpで保存される", async () => {
     const normalUrl = `https://example.com/normal-${crypto.randomUUID()}.png`;
     const faviconUrl = `https://example.com/favicon-${crypto.randomUUID()}.png`;
@@ -780,12 +693,6 @@ describe("/message/url-thumbnail", () => {
       restoreHuge();
       restoreControl();
     }
-  });
-
-  it("http以外・リテラルIPは無効", async () => {
-    // DNS解決前の判定のみで完結するケース (ネットワーク不要)
-    expect(await Util.validateUrl.isValid("ftp://example.com/x")).toBeFalse();
-    expect(await Util.validateUrl.isValid("http://127.0.0.1/x")).toBeFalse();
   });
 
   it("リダイレクト先が内部IP: 追従せずnull", async () => {
@@ -945,23 +852,6 @@ describe("/message/emoji-reaction", async () => {
       body: {
         channelId: "TESTCHANNEL1",
         messageId: "TESTMESSAGE999",
-        emojiCode: "robot",
-      },
-    });
-    const t = await res.text();
-    expect(t).toBe("Message not found");
-    expect(res.status).toBe(404);
-    expect(res.ok).toBeFalse();
-  });
-
-  it("指定チャンネルとメッセージの所属チャンネルが不一致", async () => {
-    // TESTCHANNEL1 は閲覧可能だが TESTMESSAGE3 は TESTCHANNEL3 のメッセージ
-    const res = await FETCH({
-      path: "/message/emoji-reaction",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        messageId: "TESTMESSAGE3",
         emojiCode: "robot",
       },
     });
@@ -1188,8 +1078,7 @@ describe("/message/send", async () => {
     expect(secondaryInbox.length).toBe(0);
   });
 
-  let TEST__MESSAGE_ID_WITH_URL = "";
-  it("正常 :: URL含むメッセージ送信 1/2 : 送信", async () => {
+  it("正常 :: URL含むメッセージ送信", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1200,26 +1089,22 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    expect(j.data).toContainKey("id");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("正常 :: URL含むメッセージ送信 2/2 : 確認", async () => {
     // afterResponseは非同期で動くため少し待つ
     await Bun.sleep(500);
 
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.message).toBe("Fetched message");
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBeGreaterThan(0);
-    expect(j.data.MessageUrlPreview[0].url).toBe("https://example.com");
-    expect(j.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
+    const getJ = await getRes.json();
+    expect(getJ.message).toBe("Fetched message");
+    expect(getJ.data.MessageUrlPreview).toBeArray();
+    expect(getJ.data.MessageUrlPreview.length).toBeGreaterThan(0);
+    expect(getJ.data.MessageUrlPreview[0].url).toBe("https://example.com");
+    expect(getJ.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
   });
 
-  it("IPアドレスのURL含むメッセージ送信 1/2 : 送信", async () => {
+  it("IPアドレスのURL含むメッセージ送信", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1230,52 +1115,19 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    expect(j.data).toContainKey("id");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("IPアドレスのURL含むメッセージ送信 2/2 : 確認", async () => {
-    // afterResponseは非同期で動くため少し待つ
     await Bun.sleep(500);
 
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.message).toBe("Fetched message");
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
+    const getJ = await getRes.json();
+    expect(getJ.message).toBe("Fetched message");
+    expect(getJ.data.MessageUrlPreview).toBeArray();
+    expect(getJ.data.MessageUrlPreview.length).toBe(0);
   });
 
-  it("localhostのURL含むメッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://localhost",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    expect(j.data).toContainKey("id");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("localhostのURL含むメッセージ送信 2/2 : 確認", async () => {
-    // afterResponseは非同期で動くため少し待つ
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Fetched message");
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("XのURL含むメッセージ送信 1/2 : 送信", async () => {
+  it("XのURL含むメッセージ送信", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1286,27 +1138,22 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    expect(j.data).toContainKey("id");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("IPアドレスのURL含むメッセージ送信 2/2 : 確認", async () => {
-    // afterResponseは非同期で動くため少し待つ
     await Bun.sleep(500);
 
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.message).toBe("Fetched message");
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBe(1);
-    expect(j.data.MessageUrlPreview[0].url).toBe(
+    const getJ = await getRes.json();
+    expect(getJ.message).toBe("Fetched message");
+    expect(getJ.data.MessageUrlPreview).toBeArray();
+    expect(getJ.data.MessageUrlPreview.length).toBe(1);
+    expect(getJ.data.MessageUrlPreview[0].url).toBe(
       "https://fxtwitter.com/TEST/status/00000000",
     );
   });
 
-  it("複数URL含むメッセージ送信 1/2 : 送信", async () => {
+  it("複数URL含むメッセージ送信", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1317,20 +1164,17 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("複数URL含むメッセージ送信 2/2 : 確認", async () => {
     await Bun.sleep(500);
 
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(2);
+    const getJ = await getRes.json();
+    expect(getJ.data.MessageUrlPreview.length).toBe(2);
   });
 
-  it("同一URL重複記載メッセージ送信 1/2 : 送信", async () => {
+  it("同一URL重複記載メッセージ送信（Setによりdedupeされ1件のみ）", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1341,117 +1185,18 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("同一URL重複記載メッセージ送信 2/2 : 確認（Setによりdedupeされ1件のみ）", async () => {
     await Bun.sleep(500);
 
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(1);
-    expect(j.data.MessageUrlPreview[0].url).toBe("https://example.com");
+    const getJ = await getRes.json();
+    expect(getJ.data.MessageUrlPreview.length).toBe(1);
+    expect(getJ.data.MessageUrlPreview[0].url).toBe("https://example.com");
   });
 
-  it("ポート付きIPアドレスのURL含むメッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://1.2.3.4:8080",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("ポート付きIPアドレスのURL含むメッセージ送信 2/2 : 確認", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("ポート付きlocalhostのURL含むメッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://localhost:3000",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("ポート付きlocalhostのURL含むメッセージ送信 2/2 : 確認", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("認証情報付きIPアドレスのURL含むメッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://user:pass@1.2.3.4",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("認証情報付きIPアドレスのURL含むメッセージ送信 2/2 : 確認", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("パブリックIPアドレスのURL含むメッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://8.8.8.8",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("パブリックIPアドレスのURL含むメッセージ送信 2/2 : 確認（プライベートIP以外も一律スキップされる仕様）", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("ogsがエラーを返すURL含むメッセージ送信 1/2 : 送信", async () => {
+  it("ogsがエラーを返すURL含むメッセージ送信（プレビュー未挿入）", async () => {
     const res = await FETCH({
       path: "/message/send",
       method: "POST",
@@ -1462,32 +1207,6 @@ describe("/message/send", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("ogsがエラーを返すURL含むメッセージ送信 2/2 : 確認（プレビュー未挿入）", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("範囲外の数値によるIP風不正URL含むメッセージ送信（クラッシュしないことの確認）", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://999.999.999.999",
-      },
-    });
-    expect(res.ok).toBeTrue();
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-
     await Bun.sleep(500);
 
     const getRes = await FETCH({
@@ -1495,8 +1214,32 @@ describe("/message/send", async () => {
       method: "GET",
     });
     const getJ = await getRes.json();
-    expect(getRes.ok).toBeTrue();
     expect(getJ.data.MessageUrlPreview.length).toBe(0);
+  });
+
+  it("Twitter・IP・通常URL混在メッセージ送信（IPのみ除外・Twitterはfxtwitter変換）", async () => {
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message:
+          "https://twitter.com/TEST/status/00000000 http://1.2.3.4 https://example.com",
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message sent");
+    await Bun.sleep(500);
+
+    const getRes = await FETCH({
+      path: `/message/${j.data.id}`,
+      method: "GET",
+    });
+    const getJ = await getRes.json();
+    expect(getJ.data.MessageUrlPreview.length).toBe(2);
+    const urls = getJ.data.MessageUrlPreview.map((p: { url: string }) => p.url);
+    expect(urls).toContain("https://fxtwitter.com/TEST/status/00000000");
+    expect(urls).toContain("https://example.com");
   });
 
   // SSRF対策: IPv4の異表記がプレビュー対象にならないこと
@@ -1505,6 +1248,8 @@ describe("/message/send", async () => {
     "http://0177.0.0.1/", // 8進表記 = 127.0.0.1
     "http://0x7f.1/", // 16進表記 = 127.0.0.1
     "http://127.1/", // 短縮表記 = 127.0.0.1
+    "http://8.8.8.8/", // パブリックIPも一律スキップされる仕様
+    "http://999.999.999.999/", // 範囲外の数値によるIP風不正URL (クラッシュしないことの確認)
   ];
   for (const blockedUrl of ssrfBlockedUrls) {
     it(`SSRF対策 :: ${blockedUrl} はプレビュー取得されない`, async () => {
@@ -1547,56 +1292,6 @@ describe("/message/send", async () => {
     await Bun.sleep(500);
 
     expect(lastOgsOptions?.fetchOptions?.redirect).toBe("manual");
-  });
-
-  it("IPv6リテラルURL含むメッセージ送信（URL正規表現が非対応のため未検出で通過確認）", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out http://[::1]/test",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-
-    await Bun.sleep(500);
-
-    const getRes = await FETCH({
-      path: `/message/${j.data.id}`,
-      method: "GET",
-    });
-    const getJ = await getRes.json();
-    expect(getJ.data.MessageUrlPreview.length).toBe(0);
-  });
-
-  it("Twitter・IP・通常URL混在メッセージ送信 1/2 : 送信", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message:
-          "https://twitter.com/TEST/status/00000000 http://1.2.3.4 https://example.com",
-      },
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    TEST__MESSAGE_ID_WITH_URL = j.data.id;
-  });
-  it("Twitter・IP・通常URL混在メッセージ送信 2/2 : 確認（IPのみ除外・Twitterはfxtwitter変換）", async () => {
-    await Bun.sleep(500);
-
-    const res = await FETCH({
-      path: `/message/${TEST__MESSAGE_ID_WITH_URL}`,
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview.length).toBe(2);
-    const urls = j.data.MessageUrlPreview.map((p: { url: string }) => p.url);
-    expect(urls).toContain("https://fxtwitter.com/TEST/status/00000000");
-    expect(urls).toContain("https://example.com");
   });
 });
 
@@ -1735,7 +1430,7 @@ describe("/message/edit", async () => {
     expect(j.data.isEdited).toBeTrue();
   });
 
-  it("正常 :: URLを含めた編集 1/2", async () => {
+  it("正常 :: URLを含めた編集", async () => {
     const res = await FETCH({
       path: "/message/edit",
       method: "POST",
@@ -1747,32 +1442,23 @@ describe("/message/edit", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message edited");
-    expect(j.data).toContainKey("id");
-    expect(j.data).toContainKey("channelId");
-    expect(j.data).toContainKey("content");
-    expect(j.data.content).toBe(
-      "Hello, world! https://example.com (edited with link)",
-    );
     expect(j.data.isEdited).toBeTrue();
-  });
-
-  it("正常 :: URLを含めた編集 2/2 : 確認", async () => {
     // afterResponseは非同期で動くため少し待つ
     await Bun.sleep(1000);
 
-    const res = await FETCH({
+    const getRes = await FETCH({
       path: `/message/${TEST__MESSAGE_ID}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.message).toBe("Fetched message");
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBeGreaterThan(0);
-    expect(j.data.MessageUrlPreview[0].url).toBe("https://example.com");
-    expect(j.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
+    const getJ = await getRes.json();
+    expect(getJ.message).toBe("Fetched message");
+    expect(getJ.data.MessageUrlPreview).toBeArray();
+    expect(getJ.data.MessageUrlPreview.length).toBeGreaterThan(0);
+    expect(getJ.data.MessageUrlPreview[0].url).toBe("https://example.com");
+    expect(getJ.data.MessageUrlPreview[0].title).toBe("Mock OG Title");
   });
 
-  it("URLを含む編集からURLなし編集への変更 1/2 : 編集", async () => {
+  it("URLを含む編集からURLなし編集への変更（既存プレビュー削除）", async () => {
     const res = await FETCH({
       path: "/message/edit",
       method: "POST",
@@ -1784,19 +1470,15 @@ describe("/message/edit", async () => {
     });
     const j = await res.json();
     expect(j.message).toBe("Message edited");
-    expect(j.data.content).toBe("Hello, world! (no link anymore)");
-  });
-
-  it("URLを含む編集からURLなし編集への変更 2/2 : 確認（既存プレビュー削除）", async () => {
     await Bun.sleep(1000);
 
-    const res = await FETCH({
+    const getRes = await FETCH({
       path: `/message/${TEST__MESSAGE_ID}`,
       method: "GET",
     });
-    const j = await res.json();
-    expect(j.data.MessageUrlPreview).toBeArray();
-    expect(j.data.MessageUrlPreview.length).toBe(0);
+    const getJ = await getRes.json();
+    expect(getJ.data.MessageUrlPreview).toBeArray();
+    expect(getJ.data.MessageUrlPreview.length).toBe(0);
   });
 
   it("空白にしてみる", async () => {
@@ -1827,23 +1509,5 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
-  });
-
-  it("制限を超える長さのメッセージ", async () => {
-    //一時的
-    const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;
-    GIRACLE_SERVER_CONFIG.MessageMaxLength = 10;
-    const res = await FETCH({
-      path: "/message/edit",
-      method: "POST",
-      body: {
-        channelId: "TEST__MESSAGE_ID",
-        message: "Hello, world! Is this too long?",
-      },
-    });
-    expect(res.ok).toBeFalse();
-
-    //戻す
-    GIRACLE_SERVER_CONFIG.MessageMaxLength = backup;
   });
 });

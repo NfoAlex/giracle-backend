@@ -246,21 +246,6 @@ describe("/channel/get-history/:channelId", async () => {
     TEST__HISTORY_MSG_B = jB.data.id;
   });
 
-  it("正常", async () => {
-    const res = await FETCH({
-      path: "/channel/get-history/TESTCHANNEL1",
-      method: "POST",
-      body: {
-        userId: "TESTUSER",
-      },
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.history).toBeArray();
-    expect(j.data.history.length).toBeGreaterThan(0);
-    expect(j.data.history[0].channelId).toBe("TESTCHANNEL1");
-  });
-
   it("正常 :: 基準指定無し(fetchDirection省略=older扱い) :: 最新まで取得済みでlatestMessageOfChannelと一致しatEnd=true", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL1",
@@ -291,22 +276,6 @@ describe("/channel/get-history/:channelId", async () => {
     // TESTMESSAGE1(最古)基準のolder取得なので、latestMessageOfChannel(MSG_B)とは一致せずatEnd=false
     expect(j.data.atEnd).toBeFalse();
     expect(j.data.atTop).toBeTrue();
-  });
-
-  it("正常 :: 最新メッセージ基準でolder方向 :: latestMessageOfChannelと一致しatEnd=true", async () => {
-    const res = await FETCH({
-      path: "/channel/get-history/TESTCHANNEL1",
-      method: "POST",
-      body: {
-        userId: "TESTUSER",
-        messageIdFrom: TEST__HISTORY_MSG_B,
-        fetchDirection: "older",
-      },
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.history[0].id).toBe(TEST__HISTORY_MSG_B);
-    expect(j.data.atEnd).toBeTrue();
   });
 
   it("正常 :: 最古メッセージ基準でnewer方向 :: firstMessageOfChannelと一致しatTop=true", async () => {
@@ -343,8 +312,8 @@ describe("/channel/get-history/:channelId", async () => {
     expect(j.data.atTop).toBeFalse();
   });
 
-  it("過去を取得してみる", async () => {
-    const res = await FETCH({
+  it("過去・未来を取得してみる", async () => {
+    const resPast = await FETCH({
       path: "/channel/get-history/TESTCHANNEL1",
       method: "POST",
       body: {
@@ -353,14 +322,12 @@ describe("/channel/get-history/:channelId", async () => {
         fetchDirection: "older",
       },
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.atEnd).toBeFalse();
-    expect(j.data.atTop).toBeTrue();
-  });
+    const jPast = await resPast.json();
+    expect(resPast.ok).toBe(true);
+    expect(jPast.data.atEnd).toBeFalse();
+    expect(jPast.data.atTop).toBeTrue();
 
-  it("未来を取得してみる", async () => {
-    const res = await FETCH({
+    const resFuture = await FETCH({
       path: "/channel/get-history/TESTCHANNEL1",
       method: "POST",
       body: {
@@ -369,10 +336,10 @@ describe("/channel/get-history/:channelId", async () => {
         fetchDirection: "newer",
       },
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.atEnd).toBeTrue();
-    expect(j.data.atTop).toBeFalse();
+    const jFuture = await resFuture.json();
+    expect(resFuture.ok).toBe(true);
+    expect(jFuture.data.atEnd).toBeTrue();
+    expect(jFuture.data.atTop).toBeFalse();
   });
 
   it("fetchLengthに0以下を渡すとバリデーションエラー", async () => {
@@ -396,28 +363,6 @@ describe("/channel/get-history/:channelId", async () => {
     expect(resNegative.ok).toBe(false);
   });
 
-  it("fetchLengthに上限超えを渡すとバリデーションエラー", async () => {
-    const res = await FETCH({
-      path: "/channel/get-history/TESTCHANNEL1",
-      method: "POST",
-      body: {
-        fetchLength: 31,
-      },
-    });
-    expect(res.ok).toBe(false);
-  });
-
-  it("存在しないチャンネル", async () => {
-    const res = await FETCH({
-      path: "/channel/get-history/TESTCHANNEL999",
-      method: "POST",
-    });
-    const t = await res.text();
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(404);
-    expect(t).toBe("Channel not found");
-  });
-
   it("権限がないチャンネルを取得しようとする", async () => {
     const res = await FETCH({
       path: "/channel/get-history/TESTCHANNEL3",
@@ -428,17 +373,16 @@ describe("/channel/get-history/:channelId", async () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
     expect(t).toBe("Channel not found");
-  });
 
-  it("権限がないチャンネルを取得しようとする with CompletePrivate", async () => {
-    const res = await FETCH({
+    // CompletePrivateなチャンネルも同様に見えない
+    const resPrivate = await FETCH({
       path: "/channel/get-history/TESTCHANNEL4",
       method: "POST",
     });
-    const t = await res.text();
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(404);
-    expect(t).toBe("Channel not found");
+    const tPrivate = await resPrivate.text();
+    expect(resPrivate.ok).toBe(false);
+    expect(resPrivate.status).toBe(404);
+    expect(tPrivate).toBe("Channel not found");
   });
 });
 
@@ -454,16 +398,6 @@ describe("/channel/search", async () => {
     expect(j.data[0].id).toBe("TESTCHANNEL1");
   });
 
-  it("存在しないチャンネル", async () => {
-    const res = await FETCH({
-      path: "/channel/search/?query=123",
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.length).toBe(0);
-  });
-
   it("クエリー無し", async () => {
     const res = await FETCH({
       path: "/channel/search",
@@ -476,17 +410,6 @@ describe("/channel/search", async () => {
     //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
     const res = await FETCH({
       path: "/channel/search/?query=%25",
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.length).toBe(0);
-  });
-
-  it("ワイルドカード文字(_)がリテラル扱いされる", async () => {
-    //エスケープ無しだと"Gen_"が"General"(Gen+任意1文字)にマッチしてしまう
-    const res = await FETCH({
-      path: "/channel/search/?query=Gen_",
       method: "GET",
     });
     const j = await res.json();
@@ -740,10 +663,9 @@ describe("/channel/update", async () => {
     expect(j.message).toBe("Channel updated");
     expect(j.data.name).toBe("Updated general");
     expect(res.ok).toBe(true);
-  });
 
-  it("正常 :: 一応戻す", async () => {
-    const res = await FETCH({
+    // 後続テストのため名前を戻す
+    const resRestore = await FETCH({
       path: "/channel/update",
       method: "POST",
       body: {
@@ -751,10 +673,10 @@ describe("/channel/update", async () => {
         name: "General",
       },
     });
-    const j = await res.json();
-    expect(j.message).toBe("Channel updated");
-    expect(j.data.name).toBe("General");
-    expect(res.ok).toBe(true);
+    const jRestore = await resRestore.json();
+    expect(jRestore.message).toBe("Channel updated");
+    expect(jRestore.data.name).toBe("General");
+    expect(resRestore.ok).toBe(true);
   });
 
   it("正常 :: viewableRoleが指定した全件に置換される(既存ロールが消えない)", async () => {

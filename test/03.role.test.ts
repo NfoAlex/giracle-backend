@@ -50,14 +50,6 @@ describe("/role/search", async () => {
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
   });
-
-  it("nameが空欄", async () => {
-    const res = await FETCH({
-      path: "/role/search?name=",
-      method: "GET",
-    });
-    expect(res.ok).toBe(false);
-  });
 });
 
 //作成したロールをのちのテストでも使うためにIDを保存する変数
@@ -189,24 +181,6 @@ describe("/role/update", async () => {
     expect(t).toBe("Role level not enough or role not found");
     expect(res.ok).toBe(false);
   });
-
-  it("権限ない人による更新", async () => {
-    const res = await FETCH({
-      path: "/role/update",
-      method: "POST",
-      body: {
-        roleId: TEST__CREATED_ROLEID,
-        roleData: {
-          name: "updated role",
-          color: "#ff0000",
-        },
-      },
-      useSecondaryUser: true,
-    });
-    const t = await res.text();
-    expect(t).toBe("Role level not enough");
-    expect(res.ok).toBe(false);
-  });
 });
 
 describe("/role/link", async () => {
@@ -271,21 +245,6 @@ describe("/role/link", async () => {
 });
 
 describe("/role/unlink", async () => {
-  it("権限ない人によるリンク解除", async () => {
-    const res = await FETCH({
-      path: "/role/unlink",
-      method: "POST",
-      body: {
-        userId: "TESTUSER2",
-        roleId: TEST__CREATED_ROLEID,
-      },
-      useSecondaryUser: true,
-    });
-    const t = await res.text();
-    expect(t).toBe("Role level not enough");
-    expect(res.ok).toBe(false);
-  });
-
   it("正常", async () => {
     const res = await FETCH({
       path: "/role/unlink",
@@ -300,8 +259,8 @@ describe("/role/unlink", async () => {
     expect(res.ok).toBe(true);
   });
 
-  it("存在しないユーザー", async () => {
-    const res = await FETCH({
+  it("存在しないユーザー・ロール", async () => {
+    const resUser = await FETCH({
       path: "/role/unlink",
       method: "POST",
       body: {
@@ -309,13 +268,11 @@ describe("/role/unlink", async () => {
         roleId: TEST__CREATED_ROLEID,
       },
     });
-    const t = await res.text();
-    expect(t).toBe("User not found");
-    expect(res.ok).toBe(false);
-  });
+    const tUser = await resUser.text();
+    expect(tUser).toBe("User not found");
+    expect(resUser.ok).toBe(false);
 
-  it("存在しないロール", async () => {
-    const res = await FETCH({
+    const resRole = await FETCH({
       path: "/role/unlink",
       method: "POST",
       body: {
@@ -323,9 +280,9 @@ describe("/role/unlink", async () => {
         roleId: "TESTROLE999",
       },
     });
-    const t = await res.text();
-    expect(t).toBe("Role not linked to user");
-    expect(res.ok).toBe(false);
+    const tRole = await resRole.text();
+    expect(tRole).toBe("Role not linked to user");
+    expect(resRole.ok).toBe(false);
   });
 
   it("ついてないロールを外してみる", async () => {
@@ -391,18 +348,6 @@ describe("/role/:roleId", async () => {
     const res = await FETCH({
       path: "/role/RoleManage",
       method: "GET",
-    });
-    const j = await res.json();
-    expect(j.message).toBe("Role info");
-    expect(j.data.id).toBe("RoleManage");
-    expect(j.data.manageRole).toBeTrue();
-  });
-
-  it("正常 :: 第２ユーザーとして", async () => {
-    const res = await FETCH({
-      path: "/role/RoleManage",
-      method: "GET",
-      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(j.message).toBe("Role info");

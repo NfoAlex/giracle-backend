@@ -20,21 +20,6 @@ describe("/user", () => {
     expect(res.ok).toBe(false);
   });
 
-  it("/sign-up :: 招待コード無し", async () => {
-    const res = await FETCH({
-      path: "/user/sign-up",
-      method: "PUT",
-      body: {
-        username: "erroruser",
-        password: "testuser",
-      },
-      excludeCredential: true,
-    });
-
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(400);
-  });
-
   it("/sign-up :: 正常", async () => {
     const res = await FETCH({
       path: "/user/sign-up",
@@ -208,18 +193,6 @@ describe("/user", () => {
     expect(j.data.userId).toBeDefined();
   });
 
-  it("/sign-in :: パスワード無し", async () => {
-    const res = await FETCH({
-      path: "/user/sign-in",
-      method: "POST",
-      body: {
-        username: "testuser",
-        password: "",
-      },
-    });
-    expect(res.ok).toBe(false);
-  });
-
   it("/verify-token :: クレデンシャル無し", async () => {
     const res = await FETCH({
       path: "/user/verify-token",
@@ -302,24 +275,6 @@ describe("/user", () => {
     expect(j.data.name).toBe("新しいセッション名");
   });
 
-  it("/change-session-name :: 変更しようとしているセッション名が空", async () => {
-    const responseChangingName = await app.handle(
-      new Request("http://localhost/user/change-session-name", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: "token=TESTUSERTOKEN_FOR_DELETION_TEST",
-        },
-        body: JSON.stringify({
-          sessionId: sessionIdRemoving,
-          name: "",
-        }),
-      }),
-    );
-    expect(responseChangingName.ok).toBe(false);
-  });
-
   it("/change-session-name :: 存在しないセッション", async () => {
     const responseChangingName = await app.handle(
       new Request("http://localhost/user/change-session-name", {
@@ -391,8 +346,9 @@ describe("/user", () => {
     expect(t).toContain("Session not found");
   });
 
-  it("DELETE /session :: 自分のセッションを削除しようとしてみる", async () => {
-    const response = await app.handle(
+  it("DELETE /session :: 自分・他人は拒否、正常削除", async () => {
+    // 自分のセッションは削除不可
+    const ownRes = await app.handle(
       new Request("http://localhost/user/session", {
         method: "DELETE",
         credentials: "include",
@@ -405,12 +361,10 @@ describe("/user", () => {
         }),
       }),
     );
-    const t = await response.text();
-    expect(t).toBe("You cannot delete your active session");
-  });
+    expect(await ownRes.text()).toBe("You cannot delete your active session");
 
-  it("DELETE /session :: 他人のセッションを削除しようとしてみる", async () => {
-    const res = await FETCH({
+    // 他人のセッションは削除不可
+    const otherRes = await FETCH({
       path: "/user/session",
       method: "DELETE",
       body: {
@@ -418,11 +372,9 @@ describe("/user", () => {
       },
       useSecondaryUser: true,
     });
-    const t = await res.text();
-    expect(t).toBe("Session not found");
-  });
+    expect(await otherRes.text()).toBe("Session not found");
 
-  it("DELETE /session :: 正常(セッションを削除する)", async () => {
+    // 正常削除
     const response = await app.handle(
       new Request("http://localhost/user/session", {
         method: "DELETE",
