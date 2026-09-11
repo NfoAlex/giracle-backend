@@ -622,11 +622,11 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         botId: t.String(),
-        approvalStatus: t.UnionEnum([
-          "APPROVED",
-          "BLOCKED",
-          "PENDING",
-          "DENIED",
+        approvalStatus: t.Union([
+          t.Literal("APPROVED"),
+          t.Literal("BLOCKED"),
+          t.Literal("PENDING"),
+          t.Literal("DENIED"),
         ]),
       }),
       detail: {
