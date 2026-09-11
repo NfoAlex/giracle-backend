@@ -453,6 +453,12 @@ describe("PATCH /server/bot/approval", () => {
         .where(eq(botManages.id, "TESTBOT1"))
         .get()?.approveStatus,
     ).toBe("DENIED");
+
+    // 後続へ漏らさない(このdescribeはTESTBOT1の状態を書き換えるため)
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
   });
 
   it("存在しないBotデータ", async () => {
@@ -562,16 +568,40 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      // 権限を実際に変えてもステータスは据え置き
-      body: { botId: "TESTBOT1", canReadMessage: false, canFetchRoleinfo: true },
+      // 権限を実際に変えても(再審査扱いになる差分でも)ステータスは据え置き
+      body: { botId: "TESTBOT1", canReadMessage: false },
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.approveStatus).toBe("BLOCKED");
-    expect(j.data.canFetchRoleinfo).toBeTrue();
+    // 編集自体は弾かれない
+    expect(j.data.canReadMessage).toBeFalse();
     GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
 
-    // 後続のテストへ漏らさないよう戻す(serviceを経由しないので再申請は走らない)
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("自動承諾なら拒否済み(DENIED)のBotも編集で復帰する", async () => {
+    // 自動承諾は管理者が承認レビュー自体を不要とする設定なので、DENIEDでも承認に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", canReadMessage: false },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED", canReadMessage: true })
