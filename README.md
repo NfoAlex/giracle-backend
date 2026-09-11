@@ -192,7 +192,7 @@ giracle-backend/
 | GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`cursorBotId` で継続取得。`approveStatus` を含む） |
 | GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` は返さない） |
 | PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400 |
-| PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限。`BotAutoApprove` が false なら再申請で `PENDING` に戻る） |
+| PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る） |
 | DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |
 | GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`approveStatus` と要求権限を含む） |
 | PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`APPROVED` 以外にすると WS 切断） |
@@ -239,7 +239,7 @@ Bot が自身でメッセージ操作を行うための外部 API。通常のユ
 | DELETE | `/ext/message/delete` | `canSendMessage` | メッセージ削除（WS通知: `message::MessageDeleted`。自分の送信メッセージのみ） |
 
 - 権限フラグ（`can*`）は 6 種: `canFetchUserinfo` / `canFetchRoleinfo` / `canManageUser` / `canManageServerConfig` / `canReadMessage` / `canSendMessage`。ルートオプション `checkPermission` で判定する。
-- チャンネルへのアクセス可否は `botChannelPermissions`（Bot × Channel）で判定する。許可のないチャンネルへの送信・編集・削除は 403、取得は存在を伏せるため 404 `Message not found`。`useAllChannel: true` の Bot は許可テーブルを引かず全チャンネルを対象にするが、存在しないチャンネルへの送信は 404 `Channel not found`。
+- チャンネルへのアクセス可否は `botChannelPermissions`（Bot × Channel）で判定する。許可のないチャンネルへの送信・編集・削除は 403、取得は存在を伏せるため 404 `Message not found`。`useAllChannel: true` の Bot は許可テーブルを引かず全チャンネルを対象にするが、存在しないチャンネルへの送信は 404 `Channel not found`。許可の変更は `PATCH /server/bot`（`permissionChannelIds` / `useAllChannel`）で行う。
 - Bot の作成・承認は `/server/bot*`（前述の Server モジュール）で行う。**`ServerConfig.BotEnabled` が false の間は Bot を作成できない（既定 false）。**
 
 ---

@@ -74,6 +74,9 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 - WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/ws.ts](src/ws.ts) の open）。
 - Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
 - `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
+- **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは指定された内容で**差し替え**（全削除 → 再挿入）し、`useAllChannel: true` への切り替え時は行を消す。全透過中は許可リストが使われないため消さないと、後で非透過に戻したときに古い許可が復活してしまう。
+  - `checkChannelVisibility` は閲覧制限ロールの無いチャンネルを無条件で許可するので、実在しないチャンネル ID を弾くには別途 `Channel` の存在確認が要る（`PUT` / `PATCH` の両方のループで行っている）。
+- **チャンネル許可が変わったときは、接続中の WS の購読を張り替える**（`WSSubscribe` / `WSUnsubscribe`）。解除しないと許可を失ったチャンネルの `channel::*` 配信を受け続ける。全透過の Bot は接続時に全チャンネルを購読しているため、解除側は全チャンネルを対象にする。
 - ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
   - `BotEnabled`: false の間は `PUT /server/bot` が 400 `Using or creating bot is not allowed` になる。**既定 false なので、有効化しない限り Bot は作成できない。**
   - `BotAutoApprove`: 承認レビュー自体を省く設定。true なら新規作成は `PENDING` ではなく `APPROVED` で作られる（`PutBot`）。
@@ -90,7 +93,8 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 | `PENDING` | `APPROVED` | 差分があれば `PENDING`、無ければ `PENDING` のまま |
 | `APPROVED` | `APPROVED` | 差分があれば `PENDING`、無ければ `APPROVED` のまま |
 
-- 「差分」= Bot 名の変更、または `can*` 権限フラグの実際の変更。`description` のみの変更は再申請にしない。
+- 「差分」= Bot 名の変更、`can*` 権限フラグの実際の変更、またはチャンネル許可（`useAllChannel` / `permissionChannelIds`）の実際の変更。`description` のみの変更は再申請にしない。
+  - チャンネル許可は全透過中なら実効性が無いため、全透過が指定されているときの `permissionChannelIds` の差分は数えない。
 - 差分が無い場合は `approveStatus` を UPDATE の対象に含めない（据え置き）。
 - `BLOCKED` の判定は他の分岐より先に行うため、`BotAutoApprove` の値に関わらず解除されない。
 
