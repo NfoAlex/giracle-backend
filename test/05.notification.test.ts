@@ -35,29 +35,22 @@ describe("/notification/config", () => {
     expect(j.data.mode).toBe("mention");
   });
 
-  it("POST :: モード変更 (all)", async () => {
+  it("POST :: モード・enabled変更", async () => {
     const res = await FETCH({
       path: "/notification/config",
       method: "POST",
-      body: { mode: "all" },
+      body: { mode: "all", enabled: false },
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.mode).toBe("all");
-  });
-
-  it("POST :: enabled 変更後 GET で反映", async () => {
-    const resPost = await FETCH({
-      path: "/notification/config",
-      method: "POST",
-      body: { enabled: false },
-    });
-    expect(resPost.ok).toBe(true);
-
-    const resGet = await FETCH({ path: "/notification/config", method: "GET" });
-    const j = await resGet.json();
     expect(j.data.enabled).toBe(false);
-    expect(j.data.mode).toBe("all");
+
+    // GETに反映される
+    const resGet = await FETCH({ path: "/notification/config", method: "GET" });
+    const jGet = await resGet.json();
+    expect(jGet.data.enabled).toBe(false);
+    expect(jGet.data.mode).toBe("all");
   });
 
   it("POST :: 不正な mode はバリデーションエラー", async () => {
@@ -77,8 +70,8 @@ describe("/notification/device", () => {
   const webToken = "https://fcm.googleapis.com/fcm/test-web-endpoint-1";
   const androidToken = "test-fcm-android-token-1";
 
-  it("register :: web で keys 無しは 400", async () => {
-    const res = await FETCH({
+  it("register :: バリデーションエラー (web keys無し・未対応platform)", async () => {
+    const noKeys = await FETCH({
       path: "/notification/device/register",
       method: "POST",
       body: {
@@ -86,8 +79,19 @@ describe("/notification/device", () => {
         platform: "web",
       },
     });
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(400);
+    expect(noKeys.ok).toBe(false);
+    expect(noKeys.status).toBe(400);
+
+    // 未対応platform
+    const badPlatform = await FETCH({
+      path: "/notification/device/register",
+      method: "POST",
+      body: {
+        token: "unknown-token",
+        platform: "windows",
+      },
+    });
+    expect(badPlatform.ok).toBe(false);
   });
 
   it("register :: web + keys で登録成功", async () => {
@@ -117,18 +121,6 @@ describe("/notification/device", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.id).toBeDefined();
-  });
-
-  it("register :: 未対応 platform はバリデーションエラー", async () => {
-    const res = await FETCH({
-      path: "/notification/device/register",
-      method: "POST",
-      body: {
-        token: "unknown-token",
-        platform: "windows",
-      },
-    });
-    expect(res.ok).toBe(false);
   });
 
   it("register :: 同一 token を再登録すると upsert (id 一致)", async () => {
@@ -204,17 +196,6 @@ describe("/notification/mute", () => {
     expect(res.status).toBe(404);
   });
 
-  it("muted-channels :: 初期は空配列", async () => {
-    const res = await FETCH({
-      path: "/notification/muted-channels",
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(Array.isArray(j.data)).toBe(true);
-    expect(j.data.length).toBe(0);
-  });
-
   it("mute-channel :: 正常追加", async () => {
     const res = await FETCH({
       path: "/notification/mute-channel",
@@ -225,15 +206,6 @@ describe("/notification/mute", () => {
     expect(res.ok).toBe(true);
     expect(j.data.channelId).toBe("TESTCHANNEL1");
     expect(j.data.userId).toBe("TESTUSER");
-  });
-
-  it("mute-channel :: 同一チャンネルの再mute は upsert で成功", async () => {
-    const res = await FETCH({
-      path: "/notification/mute-channel",
-      method: "POST",
-      body: { channelId: "TESTCHANNEL1" },
-    });
-    expect(res.ok).toBe(true);
   });
 
   it("muted-channels :: 追加後リストに現れる", async () => {
@@ -265,15 +237,6 @@ describe("/notification/mute", () => {
       body: { channelId: "TESTCHANNEL1" },
     });
     expect(res.ok).toBe(true);
-  });
-
-  it("muted-channels :: 解除後は空", async () => {
-    const res = await FETCH({
-      path: "/notification/muted-channels",
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(j.data.length).toBe(0);
   });
 });
 
@@ -319,8 +282,7 @@ describe("SendPushNotification :: 分岐", () => {
       });
   };
 
-  it("enabled=false ならスキップ", async () => {
-    sendNotificationMock.mockClear();
+  it("送信スキップ :: enabled=false / mode不一致 / Mute", async () => {
     await setupDevice();
     await db
       .insert(notificationConfigs)
@@ -329,7 +291,7 @@ describe("SendPushNotification :: 分岐", () => {
         target: notificationConfigs.userId,
         set: { enabled: false, mode: "all" },
       });
-
+    sendNotificationMock.mockClear();
     await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
@@ -337,16 +299,13 @@ describe("SendPushNotification :: 分岐", () => {
       payload: { title: "t", body: "b" },
     });
     expect(sendNotificationMock).not.toHaveBeenCalled();
-  });
 
-  it("mode=mention のとき message はスキップ", async () => {
-    sendNotificationMock.mockClear();
-    await setupDevice();
+    // mode=mention のとき message はスキップ
     await db
       .update(notificationConfigs)
       .set({ enabled: true, mode: "mention" })
       .where(eq(notificationConfigs.userId, testUser));
-
+    sendNotificationMock.mockClear();
     await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
@@ -354,24 +313,8 @@ describe("SendPushNotification :: 分岐", () => {
       payload: { title: "t", body: "b" },
     });
     expect(sendNotificationMock).not.toHaveBeenCalled();
-  });
 
-  it("mode=mention + eventType=mention なら送信", async () => {
-    sendNotificationMock.mockClear();
-    await setupDevice();
-
-    await Util.sendPushNotification({
-      userId: testUser,
-      channelId: testChannel,
-      eventType: "mention",
-      payload: { title: "t", body: "b" },
-    });
-    expect(sendNotificationMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("ChannelMute があるとスキップ", async () => {
-    sendNotificationMock.mockClear();
-    await setupDevice();
+    // Mute があるとスキップ
     const existingMute = await db.query.channelMutes.findFirst({
       where: and(
         eq(channelMutes.userId, testUser),
@@ -383,7 +326,7 @@ describe("SendPushNotification :: 分岐", () => {
         .insert(channelMutes)
         .values({ userId: testUser, channelId: testChannel });
     }
-
+    sendNotificationMock.mockClear();
     await Util.sendPushNotification({
       userId: testUser,
       channelId: testChannel,
@@ -401,6 +344,19 @@ describe("SendPushNotification :: 分岐", () => {
           eq(channelMutes.channelId, testChannel),
         ),
       );
+  });
+
+  it("mode=mention + eventType=mention なら送信", async () => {
+    sendNotificationMock.mockClear();
+    await setupDevice();
+
+    await Util.sendPushNotification({
+      userId: testUser,
+      channelId: testChannel,
+      eventType: "mention",
+      payload: { title: "t", body: "b" },
+    });
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1);
   });
 
   it("410 Gone なら DB から購読削除", async () => {

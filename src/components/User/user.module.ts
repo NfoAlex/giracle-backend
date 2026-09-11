@@ -521,19 +521,19 @@ export const user = new Elysia({ prefix: "/user" })
       return {
         message: "Password resetted",
         data: {
-          newPassword
-        }
+          newPassword,
+        },
       };
     },
     {
       body: t.Object({
-        targetUserId: t.String()
+        targetUserId: t.String(),
       }),
       detail: {
-        description: "ユーザーのパスワードリセット"
+        description: "ユーザーのパスワードリセット",
       },
       checkRoleTerm: "manageServer",
-    }
+    },
   )
   .delete(
     "/",

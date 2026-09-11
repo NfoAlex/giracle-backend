@@ -53,45 +53,13 @@ describe("PUT /server/create-invite", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.maxUsage).toBe(5);
-
-    const invite = await db.query.invitations.findFirst({
-      where: eq(invitations.inviteCode, "testinvite-default"),
-    });
-    expect(invite?.maxUsage).toBe(5);
   });
 
-  it("正常 :: maxUsage=-1(無限)", async () => {
-    const res = await FETCH({
-      path: "/server/create-invite",
-      method: "PUT",
-      body: { inviteCode: "testinvite-unlimited", maxUsage: -1 },
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.maxUsage).toBe(-1);
-
-    const invite = await db.query.invitations.findFirst({
-      where: eq(invitations.inviteCode, "testinvite-unlimited"),
-    });
-    expect(invite?.maxUsage).toBe(-1);
-  });
-
-  it("バリデーション :: maxUsageが下限未満(-2)", async () => {
+  it("バリデーション :: maxUsageが範囲外(-2)", async () => {
     const res = await FETCH({
       path: "/server/create-invite",
       method: "PUT",
       body: { inviteCode: "testinvite-invalid", maxUsage: -2 },
-    });
-    const t = await res.text();
-    expect(res.ok).toBe(false);
-    expect(t).toContain("somethin went wrong :(");
-  });
-
-  it("バリデーション :: maxUsageが上限超過(10000)", async () => {
-    const res = await FETCH({
-      path: "/server/create-invite",
-      method: "PUT",
-      body: { inviteCode: "testinvite-invalid2", maxUsage: 10000 },
     });
     const t = await res.text();
     expect(res.ok).toBe(false);

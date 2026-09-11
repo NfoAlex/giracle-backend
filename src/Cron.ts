@@ -1,4 +1,4 @@
-import { inArray, lt } from "drizzle-orm";
+import { and, eq, lt, or } from "drizzle-orm";
 import { db } from "./db";
 import { messageUrlPreviewThumbnails } from "./db/schema";
 
@@ -37,12 +37,19 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
           .catch(() => {});
       }
 
-      await db.delete(messageUrlPreviewThumbnails).where(
-        inArray(
-          messageUrlPreviewThumbnails.id,
-          expiredRows.map((row) => row.id),
-        ),
-      );
+      // 選択後に再生成されてfileNameが変わっていた行は削除しない (孤児ファイル防止)
+      await db
+        .delete(messageUrlPreviewThumbnails)
+        .where(
+          or(
+            ...expiredRows.map((row) =>
+              and(
+                eq(messageUrlPreviewThumbnails.id, row.id),
+                eq(messageUrlPreviewThumbnails.fileName, row.fileName),
+              ),
+            ),
+          ),
+        );
     }
     return true;
   } finally {

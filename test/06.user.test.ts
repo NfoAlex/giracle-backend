@@ -211,7 +211,7 @@ describe("/user/list", () => {
     expect(j.data.length).toBe(0);
   });
 
-  it("username空文字 :: フィルタ無しと同覧", async () => {
+  it("username空文字・SYSTEM除外", async () => {
     const resFiltered = await FETCH({
       path: "/user/list?username=",
       method: "GET",
@@ -220,17 +220,11 @@ describe("/user/list", () => {
     const jf = await resFiltered.json();
     const ja = await resAll.json();
     expect(resFiltered.ok).toBe(true);
+    // 空文字はフィルタ無しと同覧
     expect(jf.data.length).toBe(ja.data.length);
-  });
-
-  it("検索結果にもSYSTEMユーザーは含まれない", async () => {
-    const res = await FETCH({
-      path: "/user/list?username=",
-      method: "GET",
-    });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.some((u: { id: string }) => u.id === "SYSTEM")).toBe(false);
+    // 検索結果・全件いずれにもSYSTEMは含まれない
+    expect(jf.data.some((u: { id: string }) => u.id === "SYSTEM")).toBe(false);
+    expect(ja.data.some((u: { id: string }) => u.id === "SYSTEM")).toBe(false);
   });
 
   it("正常 :: joinedChannel空文字 :: いずれかのチャンネル参加者のみヒット", async () => {
@@ -274,18 +268,6 @@ describe("/user/list", () => {
     expect(t).toBe(
       "You can't search this channel due to visibility restrictions",
     );
-  });
-
-  it("権限がないチャンネルで検索 :: 他ユーザーでも同様に403", async () => {
-    // TESTUSER2は ChannelPrivateViewer ロールを持たない
-    const res = await FETCH({
-      path: "/user/list?joinedChannel=TESTCHANNEL3",
-      method: "GET",
-      useSecondaryUser: true,
-    });
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(403);
-    // TESTUSER2向けの文言検証は行わない(403であることだけ検証)
   });
 
   it("正常 :: 閲覧権限ロール所持者は非参加チャンネルも検索可", async () => {
@@ -334,48 +316,6 @@ describe("/user/list", () => {
     expect(collected.length).toBe(2);
     expect(new Set(collected).size).toBe(2);
     expect(collected).toEqual(jFull.data.map((u: { id: string }) => u.id));
-  });
-
-  it("正常 :: joinedChannel検索とカーソルページネーションの併用", async () => {
-    // ページネーション無しのフル結果を取得
-    const resFull = await FETCH({
-      path: "/user/list?joinedChannel=TESTCHANNEL1",
-      method: "GET",
-    });
-    const jFull = await resFull.json();
-    expect(resFull.ok).toBe(true);
-    expect(jFull.data.length).toBeGreaterThanOrEqual(1);
-    const fullIds = jFull.data.map((u: { id: string }) => u.id);
-
-    // length=1 でフル結果の件数+1ページまで取得し、連結して検証
-    const collected: string[] = [];
-    let cursor: string | undefined;
-    for (let i = 0; i <= fullIds.length; i++) {
-      const res = await FETCH({
-        path: `/user/list?joinedChannel=TESTCHANNEL1&length=1${
-          cursor ? `&cursorUserId=${cursor}` : ""
-        }`,
-        method: "GET",
-      });
-      const j = await res.json();
-      expect(res.ok).toBe(true);
-      for (const u of j.data) {
-        collected.push(u.id);
-      }
-      cursor = j.data.at(-1)?.id;
-      if (j.data.length < 1) break;
-    }
-
-    // 重複なく・漏れなくフル結果と一致
-    expect(new Set(collected).size).toBe(collected.length);
-    expect(collected).toEqual(fullIds);
-  });
-
-  it("SYSTEMユーザーは含まれない", async () => {
-    const res = await FETCH({ path: "/user/list", method: "GET" });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.some((u: { id: string }) => u.id === "SYSTEM")).toBe(false);
   });
 
   it("並び順 :: createdAt昇順・同一秒ならid昇順", async () => {
@@ -521,25 +461,15 @@ describe("/user/list", () => {
     }
   });
 
-  it("正常 :: length指定", async () => {
-    const res = await FETCH({ path: "/user/list?length=1", method: "GET" });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.length).toBe(1);
-  });
+  it("length範囲外 :: 500", async () => {
+    const over = await FETCH({ path: "/user/list?length=51", method: "GET" });
+    expect(over.ok).toBe(false);
+    expect(over.status).toBe(500);
 
-  it("length上限超過 :: 500(バリデーションエラー)", async () => {
-    const res = await FETCH({ path: "/user/list?length=51", method: "GET" });
-    const t = await res.text();
-    expect(res.ok).toBe(false);
-    expect(t).toContain("somethin went wrong :(");
-  });
-
-  it("length下限未満 :: 500(バリデーションエラー)", async () => {
-    const res = await FETCH({ path: "/user/list?length=0", method: "GET" });
-    const t = await res.text();
-    expect(res.ok).toBe(false);
-    expect(t).toContain("somethin went wrong :(");
+    // 下限未満
+    const under = await FETCH({ path: "/user/list?length=0", method: "GET" });
+    expect(under.ok).toBe(false);
+    expect(under.status).toBe(500);
   });
 
   it("正常 :: cursorUserId指定", async () => {

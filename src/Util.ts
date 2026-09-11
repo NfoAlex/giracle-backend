@@ -9,6 +9,7 @@ import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
+import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
 import { ValidateUrl } from "./Utils/ValidateUrl";
@@ -27,4 +28,5 @@ export namespace Util {
   export const getUsersRoleLevel = GetUsersRoleLevel;
   export const getSafeFileExtension = GetSafeFileExtension;
   export const getUrlPreviewThumbnailFileName = GetUrlPreviewThumbnailFileName;
+  export const readResponseBodyWithByteLimit = ReadResponseBodyWithByteLimit;
 }

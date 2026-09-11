@@ -364,6 +364,10 @@ export namespace ServiceMessage {
     targetUrl: string,
     forFavicon: boolean,
   ) => {
+    // ダウンロード/デコードの上限 (DoS対策)
+    const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024; // 5MB
+    const MAX_THUMBNAIL_PIXELS = 4096 * 4096; // 約16.7MP
+
     const thumbnail = db
       .select({ fileName: messageUrlPreviewThumbnails.fileName })
       .from(messageUrlPreviewThumbnails)
@@ -413,24 +417,43 @@ export namespace ServiceMessage {
       return null;
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    // 画像以外は取得しない
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      return null;
+    }
+
+    // Content-Length が上限超過なら事前に取得しない
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (contentLength > MAX_THUMBNAIL_BYTES) {
+      return null;
+    }
+
+    // 未申告・偽装 Content-Length 対策として読み込み中も上限を判定する
+    const bytes = await Util.readResponseBodyWithByteLimit(
+      response,
+      MAX_THUMBNAIL_BYTES,
+    );
+    if (bytes === null) {
+      return null;
+    }
 
     // ファイル名と保存パスを決める
-    const isSvg = response.headers.get("content-type")?.includes("image/svg");
+    const isSvg = contentType.includes("image/svg");
     const fileName = `${crypto.randomUUID()}.${isSvg ? "svg" : "webp"}`;
     const filePath = `./STORAGE/thumbnail/${fileName}`;
 
     try {
       // SVG は Bun.Image 非対応のためバイト列をそのまま保存
       if (isSvg) {
-        await Bun.write(filePath, new Uint8Array(arrayBuffer));
+        await Bun.write(filePath, bytes);
       } else {
-        const image = new Bun.Image(arrayBuffer);
+        const image = new Bun.Image(bytes, { maxPixels: MAX_THUMBNAIL_PIXELS });
+        // 長辺を枠内に収める (縦長パノラマの肥大化防止。幅のみ指定だと高さが無制限に残る)
+        const box = forFavicon ? 32 : 512;
         await image
-          .resize(forFavicon ? 32 : 512, undefined, {
-            withoutEnlargement: true,
-          })
-          .webp({ quality: 95 })
+          .resize(box, box, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 90 })
           .write(filePath);
       }
     } catch (e) {
