@@ -205,6 +205,33 @@ describe("GET /server/bot/me", () => {
     expect(j.data.length).toBe(1);
     expect(j.data[0].botName).toBe("BOT_TEST_3");
   });
+
+  it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
+    const allRes = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+    });
+    const all = await allRes.json();
+    // 無カーソル時は新しい順なので先頭がBOT_TEST_2
+    const res = await FETCH({
+      path: `/server/bot/me?cursorBotId=${all.data[0].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    // BOT_TEST_2より古いBOT_TEST_1のみが返る
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_1");
+  });
+
+  it("異常 :: cursorBotIdが存在しない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?cursorBotId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor bot does not exists");
+  });
 });
 
 let TEST__deletingBotId = "";
@@ -411,6 +438,33 @@ describe("GET /server/bot", () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBeFalse();
+  });
+
+  it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
+    const allRes = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+    });
+    const all = await allRes.json();
+    // 生成ミリ秒が同値でも並びが揺れないよう、絶対順序ではなく無カーソル応答との対応で検証する
+    const res = await FETCH({
+      path: `/server/bot/all?cursorBotId=${all.data[2].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.map((b: { id: string }) => b.id)).toEqual(
+      all.data.slice(3).map((b: { id: string }) => b.id),
+    );
+  });
+
+  it("異常 :: cursorBotIdが存在しない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?cursorBotId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor bot does not exists");
   });
 });
 
