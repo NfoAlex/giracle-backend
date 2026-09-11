@@ -317,7 +317,9 @@ export namespace ServiceServer {
         const updated = trx
           .update(botManages)
           .set({
-            botName: name,
+            //更新項目が無い更新ではnameがundefinedのままになり、drizzleは空のsetで
+            //例外を投げて500になる。botNameは必ず書く値なので現状値で埋める
+            botName: name ?? currentBotName,
             botDescription: description,
             approveStatus: newApproveStatus,
             ...permissions,
