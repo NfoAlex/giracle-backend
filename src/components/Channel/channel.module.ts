@@ -1,5 +1,5 @@
 import Elysia, { t } from "elysia";
-import { WSSubscribeAllChannelBots } from "../../ws";
+import { WSSubscribeAllChannelBots } from "../../external/ws.ext";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceChannel } from "./channel.service";

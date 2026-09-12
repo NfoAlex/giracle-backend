@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
-// 循環import(ws.ts→index.ts→ws.ts)のため、まず../srcを完全評価してからwsHandlerを取る
+// 循環import(ws.ext.ts→index.ts→external.module.ts→ws.ext.ts)のため、まず../srcを完全評価してから取る
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import {
   botChannelPermissions,
@@ -9,7 +9,7 @@ import {
   roleLinks,
   users,
 } from "../src/db/schema";
-import { wsHandler } from "../src/ws";
+import { externalApi } from "../src/external/external.module";
 import { FETCH, INIT } from "./util";
 
 describe("WS (Bot)", () => {
@@ -54,7 +54,7 @@ describe("WS (Bot)", () => {
       ws.data as WsRouteHandlers;
     server = Bun.serve({
       port: 0,
-      fetch: wsHandler.fetch,
+      fetch: externalApi.fetch,
       websocket: {
         open: (ws: Bun.ServerWebSocket<unknown>) => dispatch(ws).open?.(ws),
         message: (ws: Bun.ServerWebSocket<unknown>, message: string | Buffer) =>
@@ -66,7 +66,7 @@ describe("WS (Bot)", () => {
         ) => dispatch(ws).close?.(ws, code, reason),
       },
     } as unknown as Parameters<typeof Bun.serve>[0]);
-    wsHandler.server = server;
+    externalApi.server = server;
   });
 
   afterAll(() => server.stop(true));
@@ -78,7 +78,7 @@ describe("WS (Bot)", () => {
         const messages: string[] = [];
         let closed = false;
         const ws = new WebSocket(
-          `ws://localhost:${server.port}/ws`,
+          `ws://localhost:${server.port}/ext/ws`,
           // biome-ignore lint/suspicious/noExplicitAny: headersはBun固有オプションで型定義が無い
           { headers: { Authorization: token } } as any,
         );
