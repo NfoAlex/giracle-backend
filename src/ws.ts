@@ -16,9 +16,9 @@ export const wsHandler = new Elysia().ws("/ws", {
     signal: t.String({ minLength: 1 }),
     data: t.String({ minLength: 1 }),
   }),
-  headers: t.Object({
+  headers: t.Optional(t.Object({
     authorization: t.Union([t.String(), t.Undefined()]),
-  }),
+  })),
 
   message(ws, { signal }) {
     //pingを受け取ったらpongを返す
