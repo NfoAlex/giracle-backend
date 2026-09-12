@@ -292,6 +292,7 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 | `server::ConfigUpdate` | サーバー設定更新 |
 | `server::CustomEmojiUploaded` | カスタム絵文字追加 |
 | `server::CustomEmojiDeleted` | カスタム絵文字削除 |
+| `ERROR` | エラー（Bot未承認・トークン無効・BAN等。送信後に切断される） |
 
 ---
 
@@ -394,4 +395,4 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
 - **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。
-- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続は `ERROR` シグナルを送って切断される。`DENIED` / `BLOCKED` にすると接続中の WS も切断される。
+- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。
