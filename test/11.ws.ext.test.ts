@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 // 循環import(ws.ts→index.ts→ws.ts)のため、まず../srcを完全評価してからwsHandlerを取る
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
-import { botChannelPermissions, botManages, users } from "../src/db/schema";
+import {
+  botChannelPermissions,
+  botManages,
+  roleInfos,
+  roleLinks,
+  users,
+} from "../src/db/schema";
 import { wsHandler } from "../src/ws";
 import { FETCH, INIT } from "./util";
 
@@ -16,6 +22,20 @@ describe("WS (Bot)", () => {
       .update(botManages)
       .set({ tokenCode: "TESTTOKEN3" })
       .where(eq(botManages.id, "TESTBOT3"));
+    // 承認API用に管理者権限を付与(07と同内容。単体実行時も叩けるよう重複時は無視する)
+    await db
+      .insert(roleInfos)
+      .values({
+        id: "GOD",
+        name: "Role for testing server configs",
+        createdUserId: "SYSTEM",
+        manageServer: true,
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(roleLinks)
+      .values({ roleId: "GOD", userId: "TESTUSER" })
+      .onConflictDoNothing();
     // Elysiaはupgradeをapp.server.upgrade()で行うため、listen()相当の設定が要る:
     // serve側ディスパッチャ(ws.data経由でルートハンドラへ振り分け) + app.server設定
     type WsRouteHandlers = {
@@ -158,6 +178,30 @@ describe("WS (Bot)", () => {
       await db
         .update(botManages)
         .set({ approveStatus: "APPROVED", canManageServerConfig: false })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+  test("承認取消で接続中のBotは切断される", async () => {
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    try {
+      const res = await FETCH({
+        path: "/server/bot/approval",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", approvalStatus: "DENIED" },
+      });
+      expect(res.ok).toBe(true);
+      // 非APPROVED化は接続中WSを切断する
+      await waitForMessage(messages, "not approved");
+      for (let i = 0; i < 40 && ws.readyState !== WebSocket.CLOSED; i++) {
+        await Bun.sleep(25);
+      }
+      expect(ws.readyState).toBe(WebSocket.CLOSED);
+    } finally {
+      // 後続のテストのため承認済みへ戻す
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
         .where(eq(botManages.id, "TESTBOT1"));
     }
   });
