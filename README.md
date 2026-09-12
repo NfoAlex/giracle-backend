@@ -49,9 +49,9 @@ bun dev
 giracle-backend/
 ├── src/
 │   ├── index.ts              # エントリーポイント・サーバー起動
-│   ├── ws.ts                 # WebSocket ハンドラ
+│   ├── ws.ts                 # WebSocket ハンドラ (通常ユーザー /ws)
 │   ├── Middlewares.ts        # ミドルウェア定義
-│   ├── Utils/                # 共通ユーティリティ
+│   ├── Utils/                # 共通ユーティリティ (WSインスタンス管理 WSUserInstance 等)
 │   ├── db/                   # DB接続・スキーマ・シード (Drizzle)
 │   │   ├── index.ts          # bun:sqlite + drizzle() インスタンス
 │   │   ├── schema.ts         # テーブル定義 + relations + 型export
@@ -78,6 +78,7 @@ giracle-backend/
 │           └── user.service.ts
 ├── external/                 # Bot 用外部 API (/ext)
 │   ├── external.module.ts    # /ext 配下のルート登録
+│   ├── ws.ext.ts             # WebSocket ハンドラ (Bot /ext/ws)
 │   ├── Middleware.ext.ts     # CheckApiCode / CheckPermission
 │   ├── Util.ext.ts           # ExtUtil (チャンネル許可判定)
 │   └── components/
@@ -237,6 +238,7 @@ Bot が自身でメッセージ操作を行うための外部 API。通常のユ
 | POST | `/ext/message/send` | `canSendMessage` | メッセージ送信（WS通知: `message::SendMessage`、URLプレビュー生成） |
 | POST | `/ext/message/edit` | `canSendMessage` | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
 | DELETE | `/ext/message/delete` | `canSendMessage` | メッセージ削除（WS通知: `message::MessageDeleted`。自分の送信メッセージのみ） |
+| WS | `/ext/ws` | - | Bot 用 WebSocket 接続（`Authorization: <tokenCode>`。下記 WebSocket 節を参照） |
 
 - 権限フラグ（`can*`）は 6 種: `canFetchUserinfo` / `canFetchRoleinfo` / `canManageUser` / `canManageServerConfig` / `canReadMessage` / `canSendMessage`。ルートオプション `checkPermission` で判定する。
 - チャンネルへのアクセス可否は `botChannelPermissions`（Bot × Channel）で判定する。許可のないチャンネルへの送信・編集・削除は 403、取得は存在を伏せるため 404 `Message not found`。`useAllChannel: true` の Bot は許可テーブルを引かず全チャンネルを対象にするが、存在しないチャンネルへの送信は 404 `Channel not found`。許可の変更は `PATCH /server/bot`（`permissionChannelIds` / `useAllChannel`）で行う。
@@ -244,15 +246,20 @@ Bot が自身でメッセージ操作を行うための外部 API。通常のユ
 
 ---
 
-## WebSocket (`/ws`)
+## WebSocket
 
-接続時に Cookie または `?token` クエリパラメータでトークン認証。**Bot として接続する場合は `Authorization` ヘッダに `tokenCode` を付ける**（Cookie は不要）。Bot は `approveStatus === "APPROVED"` でないと接続できず、BAN / 論理削除済みも拒否される。
+通常ユーザー用は `/ws`、Bot用は `/ext/ws` に分かれている。
+
+- **通常ユーザー (`/ws`)** — 接続時に Cookie または `?token` クエリパラメータでトークン認証。
+- **Bot (`/ext/ws`)** — `Authorization` ヘッダに `tokenCode` を付ける（Cookie は不要）。`approveStatus === "APPROVED"` でないと接続できず、BAN / 論理削除済みも拒否される。
+
+Elysia の静的ルーターは同一パスの WS ルートを上書きするため、両者を 1 つのパスに共存させることはできない。実装は通常ユーザーが [src/ws.ts](src/ws.ts)、Bot が [src/external/ws.ext.ts](src/external/ws.ext.ts)。
 
 ### 接続時の購読チャンネル
 
 | WS チャンネル | 対象 |
 | --------------- | ------ |
-| `GLOBAL` | 全ユーザー共通イベント |
+| `GLOBAL` | 全ユーザー共通イベント（通常ユーザーのみ。Bot は購読しない） |
 | `user::{userId}` | 該当ユーザー向けイベント |
 | `channel::{channelId}` | 参加済みチャンネルのイベント |
 
@@ -395,4 +402,4 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
 - **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。
-- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。
+- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続（`/ext/ws`）は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。

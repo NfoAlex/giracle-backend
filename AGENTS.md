@@ -70,8 +70,8 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
   - 非透過は `botChannelPermissions.channelId` の FK により、許可行があればチャンネルの存在が保証されるので存在確認クエリを足さない（存在しないチャンネルは 403 のまま）。
 - 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me` と `/server/bot/me/:botId`。
 - 一覧系は審査に必要な情報を返す。`GetBotMe` は `approveStatus`、管理者用 `GetBot`（`/server/bot/all`）は `approveStatus` + `useAllChannel` + `can*`（要求権限を伏せたまま承認させないため）。
-- **Bot を承認済みでない状態にする・無効化する操作は、接続中の WS も切断する**（`WSDisconnectUser`）。該当は `PatchBotApproval`（BLOCKED/DENIED/PENDING へ変更時）、`PatchBot`（再申請で PENDING に戻った時）、`DeleteBot`（`users.isDeleted` で無効化）。切断しないと接続済み Bot が `channel::*` の配信を受け続ける。
-- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/ws.ts](src/ws.ts) の open）。
+- **Bot を承認済みでない状態にする・無効化する操作は、接続中の WS も切断する**（`Util.wsUserInstance.disconnect`）。該当は `PatchBotApproval`（BLOCKED/DENIED/PENDING へ変更時）、`PatchBot`（再申請で PENDING に戻った時）、`DeleteBot`（`users.isDeleted` で無効化）。切断しないと接続済み Bot が `channel::*` の配信を受け続ける。
+- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open）。
 - Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
 - `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
 - **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは指定された内容で**差し替え**（全削除 → 再挿入）し、`useAllChannel: true` への切り替え時は行を消す。全透過中は許可リストが使われないため消さないと、後で非透過に戻したときに古い許可が復活してしまう。
@@ -80,7 +80,7 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 - ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
   - `BotEnabled`: false の間は `PUT /server/bot` が 400 `Using or creating bot is not allowed` になる。**既定 false なので、有効化しない限り Bot は作成できない。**
   - `BotAutoApprove`: 承認レビュー自体を省く設定。true なら新規作成は `PENDING` ではなく `APPROVED` で作られる（`PutBot`）。
-- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/ws.ts](src/ws.ts) の open/close で分岐）。`user::${remoteUserId}` と許可チャンネル（全透過は既存の全チャンネル）を購読する。
+- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open/close）。`user::${remoteUserId}` と許可チャンネル（全透過は既存の全チャンネル）を購読する。**Bot の WS エンドポイントは `/ext/ws`**（通常ユーザーは `/ws`、[src/ws.ts](src/ws.ts)）。Elysia の静的ルーターは同一パスの WS ルートを上書きするため、1 つのパスに両方を登録することはできない。
 
 #### `BotAutoApprove` と更新時の `approveStatus`
 
@@ -110,7 +110,9 @@ server?.publish(
 ```
 
 - signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
-- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
+- ユーザーの購読チャンネルを増減させるときは [src/Utils/WSUserInstance.ts](src/Utils/WSUserInstance.ts)（`Util.wsUserInstance.subscribe(userId, wsChannel)` / `.unsubscribe(...)`）を使う。`Util.wsUserInstance.instances`（Map<userId, ws[]>）が通常ユーザーと Bot の両方の接続を一括管理し、複数端末の同時接続を許容する。BAN・Bot 無効化時の切断は `Util.wsUserInstance.disconnect(userId, reason)`。
+  - この共通処理を通常ユーザー用 [src/ws.ts](src/ws.ts) と Bot 用 [src/external/ws.ext.ts](src/external/ws.ext.ts) が共有する。**WS 接続は `/ws`（通常ユーザー・Cookie 認証）と `/ext/ws`（Bot・Authorization ヘッダ）でエンドポイントが分かれている**（Elysia の静的ルーターが同一パスの WS ルートを上書きするため同居できない）。
+  - 新規チャンネル作成時は `WSSubscribeAllChannelBots(channelId)`（[src/external/ws.ext.ts](src/external/ws.ext.ts)）で全透過 Bot を追従させる。
 - URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
 
 ### 通知（Inbox / Web Push）
@@ -155,4 +157,4 @@ server?.publish(
 4. README のエンドポイント表・WS シグナル表・環境変数表を更新
 5. `test/` の対応するテストファイルにケースを追記し、`NODE_ENV=test bun test` を通す
 6. `bunx biome check --write .` を通す
-7. Bot の承認・権限フローを変えたら、`APPROVED` でなくなった時の WS 切断（`WSDisconnectUser`）と、改名時の `users.name` 同期を確認する
+7. Bot の承認・権限フローを変えたら、`APPROVED` でなくなった時の WS 切断（`Util.wsUserInstance.disconnect`）と、改名時の `users.name` 同期を確認する
