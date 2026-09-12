@@ -18,7 +18,6 @@ import {
   users,
 } from "../../db/schema";
 import { Util } from "../../Util";
-import { WSDisconnectUser, WSSubscribe, WSUnsubscribe } from "../../ws";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -237,7 +236,7 @@ export namespace ServiceServer {
     });
 
     //削除済みBotのWS接続を切断(接続し続けるとpublishを受け取れ続ける)
-    WSDisconnectUser(bot.remoteUserId, "bot was deleted");
+    Util.wsUserInstance.disconnect(bot.remoteUserId, "bot was deleted");
 
     return true;
   };
@@ -448,7 +447,10 @@ export namespace ServiceServer {
 
     //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
     if (bot.approveStatus !== "APPROVED") {
-      WSDisconnectUser(bot.remoteUserId, "Your bot is not approved yet");
+      Util.wsUserInstance.disconnect(
+        bot.remoteUserId,
+        "Your bot is not approved yet",
+      );
     } else if (channelPermissionChanged) {
       //チャンネル許可が変わったなら、接続中のWSの購読を新しい許可に合わせる
       //(解除しないと許可を失ったチャンネルの配信を受け続けてしまう)
@@ -469,10 +471,16 @@ export namespace ServiceServer {
         : (uniqueChannelIds ?? currentChannelIds);
 
       for (const channelId of subscribedChannelIds) {
-        WSUnsubscribe(bot.remoteUserId, `channel::${channelId}`);
+        Util.wsUserInstance.unsubscribe(
+          bot.remoteUserId,
+          `channel::${channelId}`,
+        );
       }
       for (const channelId of notifyChannelIds) {
-        WSSubscribe(bot.remoteUserId, `channel::${channelId}`);
+        Util.wsUserInstance.subscribe(
+          bot.remoteUserId,
+          `channel::${channelId}`,
+        );
       }
     }
 
@@ -917,7 +925,7 @@ export namespace ServiceServer {
 
     //承認済みでないなら接続中WSを切断(接続を維持するとchannel::*の配信を受け続ける)
     if (approvalStatus !== "APPROVED") {
-      WSDisconnectUser(
+      Util.wsUserInstance.disconnect(
         botManageUpdated.remoteUserId,
         "Your bot is not approved yet",
       );

@@ -10,7 +10,7 @@ import {
   tokens,
   users,
 } from "../src/db/schema";
-import { userWSInstance, WSDisconnectUser } from "../src/ws";
+import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
 
 // sharpのresizeを通せる最小PNG(1x1px)
@@ -892,7 +892,7 @@ describe("/user/ban & /user/unban", () => {
     expect(t).toBe("You can't unban yourself");
   });
 
-  it("正常 :: BAN時に既存のWS接続が切断されること（WSDisconnectUser）", () => {
+  it("正常 :: BAN時に既存のWS接続が切断されること（Util.wsUserInstance.disconnect）", () => {
     //BAN後もWS接続が生き残ると新着メッセージを受け取り続けてしまう
     const closed: string[] = [];
     const fakeWs = (id: string) =>
@@ -904,18 +904,22 @@ describe("/user/ban & /user/unban", () => {
         // biome-ignore lint/suspicious/noExplicitAny: 生のWSインスタンスを模したダミーのため
       }) as any;
 
-    userWSInstance.set("WS_DISCONNECT_TEST_USER", [
+    Util.wsUserInstance.instances.set("WS_DISCONNECT_TEST_USER", [
       fakeWs("ws1"),
       fakeWs("ws2"),
     ]);
 
-    WSDisconnectUser("WS_DISCONNECT_TEST_USER");
+    Util.wsUserInstance.disconnect("WS_DISCONNECT_TEST_USER");
 
     expect(closed).toEqual(["ws1", "ws2"]);
-    expect(userWSInstance.has("WS_DISCONNECT_TEST_USER")).toBe(false);
+    expect(Util.wsUserInstance.instances.has("WS_DISCONNECT_TEST_USER")).toBe(
+      false,
+    );
 
     //未接続ユーザーでもエラーにならない
-    expect(() => WSDisconnectUser("NOT_CONNECTED_USER")).not.toThrow();
+    expect(() =>
+      Util.wsUserInstance.disconnect("NOT_CONNECTED_USER"),
+    ).not.toThrow();
   });
 });
 

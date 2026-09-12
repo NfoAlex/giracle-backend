@@ -1,11 +1,7 @@
 import Elysia, { t } from "elysia";
+import { WSSubscribeAllChannelBots } from "../../ws";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
-import {
-  WSSubscribe,
-  WSSubscribeAllChannelBots,
-  WSUnsubscribe,
-} from "../../ws";
 import { ServiceChannel } from "./channel.service";
 
 export const channel = new Elysia({ prefix: "/channel" })
@@ -17,8 +13,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       await ServiceChannel.Join(channelId, _userId);
 
       //WS登録させる
-      //userWSInstance.get(_userId)?.subscribe(`channel::${channelId}`);
-      WSSubscribe(_userId, `channel::${channelId}`);
+      Util.wsUserInstance.subscribe(_userId, `channel::${channelId}`);
       //システムメッセージを送信
       Util.sendSystemMessage(channelId, _userId, "CHANNEL_JOIN", server);
 
@@ -67,8 +62,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       await ServiceChannel.Leave(channelId, _userId);
 
       //WS登録を解除させる
-      //userWSInstance.get(_userId)?.unsubscribe(`channel::${channelId}`);
-      WSUnsubscribe(_userId, `channel::${channelId}`);
+      Util.wsUserInstance.unsubscribe(_userId, `channel::${channelId}`);
       //システムメッセージを送信
       Util.sendSystemMessage(channelId, _userId, "CHANNEL_LEFT", server);
 
@@ -209,7 +203,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       await ServiceChannel.Invite(channelId, userId, _userId);
 
       //WSチャンネルを登録させる
-      WSSubscribe(userId, `channel::${channelId}`);
+      Util.wsUserInstance.subscribe(userId, `channel::${channelId}`);
 
       //システムメッセージを送信
       Util.sendSystemMessage(channelId, userId, "CHANNEL_INVITED", server);
@@ -252,7 +246,7 @@ export const channel = new Elysia({ prefix: "/channel" })
       await ServiceChannel.Kick(channelId, userId, _userId);
 
       //WSチャンネルを登録解除
-      WSUnsubscribe(userId, `channel::${channelId}`);
+      Util.wsUserInstance.unsubscribe(userId, `channel::${channelId}`);
 
       //システムメッセージを送信
       Util.sendSystemMessage(channelId, userId, "CHANNEL_KICKED", server);

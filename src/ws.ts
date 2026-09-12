@@ -3,14 +3,8 @@ import Elysia, { t } from "elysia";
 import type { ServerWebSocket } from "elysia/ws/bun";
 import { db } from ".";
 import { botManages, channels, tokens } from "./db/schema";
+import { Util } from "./Util";
 
-//ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
-// biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
-export const userWSInstance = new Map<string, ServerWebSocket<any>[]>();
-
-/**
- * WebSocket用 ハンドラ
- */
 export const wsHandler = new Elysia().ws("/ws", {
   body: t.Object({
     signal: t.String({ minLength: 1 }),
@@ -86,7 +80,7 @@ export const wsHandler = new Elysia().ws("/ws", {
       }
 
       //BotとしてユーザーWSインスタンス保存
-      WSaddUserInstance(botData.remoteUserId, ws);
+      Util.wsUserInstance.add(botData.remoteUserId, ws);
       //ユーザー接続通知
       ws.publish(
         "GLOBAL",
@@ -175,8 +169,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
 
     //このユーザーWSインスタンス保存
-    //userWSInstance.set(user.id, ws);
-    WSaddUserInstance(user.id, ws);
+    Util.wsUserInstance.add(user.id, ws);
     //ユーザー接続通知
     ws.publish(
       "GLOBAL",
@@ -204,9 +197,9 @@ export const wsHandler = new Elysia().ws("/ws", {
       }
 
       //このbotWSインスタンス削除
-      WSremoveUserInstance(botData.remoteUserId, ws);
+      Util.wsUserInstance.remove(botData.remoteUserId, ws);
 
-      if (!userWSInstance.has(botData.remoteUserId)) {
+      if (!Util.wsUserInstance.instances.has(botData.remoteUserId)) {
         ws.publish(
           "GLOBAL",
           JSON.stringify({
@@ -233,9 +226,9 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
 
     //このユーザーWSインスタンス削除
-    WSremoveUserInstance(userToken.userId, ws);
+    Util.wsUserInstance.remove(userToken.userId, ws);
 
-    if (!userWSInstance.has(userToken.userId)) {
+    if (!Util.wsUserInstance.instances.has(userToken.userId)) {
       //ユーザー切断通知
       ws.publish(
         "GLOBAL",
@@ -247,91 +240,6 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
   },
 });
-
-/**
- * WSインスタンスマップにユーザーのインスタンスを新しく追加
- * @param userId
- * @param ws
- * @returns
- */
-// biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSaddUserInstance(userId: string, ws: ServerWebSocket<any>) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合普通にset
-  if (!currentInstance) {
-    userWSInstance.set(userId, [ws]);
-    return;
-  }
-  userWSInstance.set(userId, [...currentInstance, ws]);
-}
-
-/**
- * WSインスタンスマップからユーザーのインスタンスを削除
- * @param userId
- * @param ws
- * @returns
- */
-// biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-
-  //インスタンス自体の同一性で削除対象を特定する(クエリトークン接続時はcookieが無くクラッシュするため)
-  const indexToRemove = currentInstance.indexOf(ws);
-  if (indexToRemove !== -1) {
-    currentInstance.splice(indexToRemove, 1);
-  }
-
-  //もしインスタンスが0になったら削除
-  if (userWSInstance.get(userId)?.length === 0) {
-    userWSInstance.delete(userId);
-  }
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN時等に使用)
- * @param userId
- * @returns
- */
-export function WSDisconnectUser(userId: string, reason = "you are banned") {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    //生のWSインスタンスのため文字列で送信する
-    ws.send(
-      JSON.stringify({
-        signal: "ERROR",
-        data: reason,
-      }),
-    );
-    ws.close();
-  }
-  userWSInstance.delete(userId);
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルから登録させる
- * @param userId
- * @param wsChannel
- * @returns
- */
-export function WSSubscribe(userId: string, wsChannel: `${string}::${string}`) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    ws.subscribe(wsChannel);
-  }
-}
-
 /**
  * useAllChannel の Bot に新規チャンネルの購読を追加する（接続後に作られたチャンネルへ追従させるため）
  */
@@ -342,28 +250,8 @@ export async function WSSubscribeAllChannelBots(channelId: string) {
     .where(eq(botManages.useAllChannel, true));
 
   for (const { remoteUserId } of bots) {
-    for (const ws of userWSInstance.get(remoteUserId) ?? []) {
+    for (const ws of Util.wsUserInstance.instances.get(remoteUserId) ?? []) {
       ws.subscribe(`channel::${channelId}`);
     }
-  }
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルから登録解除させる
- * @param userId
- * @param wsChannel
- * @returns
- */
-export function WSUnsubscribe(
-  userId: string,
-  wsChannel: `${string}::${string}`,
-) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    ws.unsubscribe(wsChannel);
   }
 }
