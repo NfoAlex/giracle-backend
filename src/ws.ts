@@ -1,15 +1,12 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
-import type { ServerWebSocket } from "elysia/ws/bun";
 import { db } from ".";
 import { tokens } from "./db/schema";
-
-//ユーザーごとのWSインスタンス管理 ( Map <UserId, WSインスタンス>)
-// biome-ignore lint/suspicious/noExplicitAny: 全WSインスタンスを受け付けるためany
-export const userWSInstance = new Map<string, ServerWebSocket<any>[]>();
+import { Util } from "./Util";
 
 /**
- * WebSocket用 ハンドラ
+ * 通常ユーザー用 WebSocket ハンドラ ( /ws )
+ * Bot用は認証方法が異なるため src/external/ws.ext.ts ( /ext/ws ) に分離している。
  */
 export const wsHandler = new Elysia().ws("/ws", {
   body: t.Object({
@@ -105,8 +102,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
 
     //このユーザーWSインスタンス保存
-    //userWSInstance.set(user.id, ws);
-    WSaddUserInstance(user.id, ws);
+    Util.wsUserInstance.add(user.id, ws);
     //ユーザー接続通知
     ws.publish(
       "GLOBAL",
@@ -115,13 +111,9 @@ export const wsHandler = new Elysia().ws("/ws", {
         data: user.id,
       }),
     );
-
-    //console.log("index :: 新しいWS接続");
   },
 
   async close(ws) {
-    //console.log("ws :: WS切断");
-
     //トークンを取得して有効か調べる
     const token = ws.data.cookie?.token?.value;
     if (!token) {
@@ -136,10 +128,10 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
 
     //このユーザーWSインスタンス削除
-    WSremoveUserInstance(userToken.userId, ws);
+    Util.wsUserInstance.remove(userToken.userId, ws);
 
-    if (!userWSInstance.has(userToken.userId)) {
-      //ユーザー接続通知
+    if (!Util.wsUserInstance.instances.has(userToken.userId)) {
+      //ユーザー切断通知
       ws.publish(
         "GLOBAL",
         JSON.stringify({
@@ -150,107 +142,3 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
   },
 });
-
-/**
- * WSインスタンスマップにユーザーのインスタンスを新しく追加
- * @param userId
- * @param ws
- * @returns
- */
-// biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSaddUserInstance(userId: string, ws: ServerWebSocket<any>) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合普通にset
-  if (!currentInstance) {
-    userWSInstance.set(userId, [ws]);
-    return;
-  }
-  userWSInstance.set(userId, [...currentInstance, ws]);
-}
-
-/**
- * WSインスタンスマップからユーザーのインスタンスを削除
- * @param userId
- * @param ws
- * @returns
- */
-// biome-ignore lint/suspicious/noExplicitAny: どのwsインスタンスでも受け付けるためにany
-function WSremoveUserInstance(userId: string, ws: ServerWebSocket<any>) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-
-  //インスタンス自体の同一性で削除対象を特定する(クエリトークン接続時はcookieが無くクラッシュするため)
-  const indexToRemove = currentInstance.indexOf(ws);
-  if (indexToRemove !== -1) {
-    currentInstance.splice(indexToRemove, 1);
-  }
-
-  //もしインスタンスが0になったら削除
-  if (userWSInstance.get(userId)?.length === 0) {
-    userWSInstance.delete(userId);
-  }
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN時等に使用)
- * @param userId
- * @returns
- */
-export function WSDisconnectUser(userId: string) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    //生のWSインスタンスのため文字列で送信する
-    ws.send(
-      JSON.stringify({
-        signal: "ERROR",
-        data: "you are banned",
-      }),
-    );
-    ws.close();
-  }
-  userWSInstance.delete(userId);
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルから登録させる
- * @param userId
- * @param wsChannel
- * @returns
- */
-export function WSSubscribe(userId: string, wsChannel: `${string}::${string}`) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    ws.subscribe(wsChannel);
-  }
-}
-
-/**
- * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルから登録解除させる
- * @param userId
- * @param wsChannel
- * @returns
- */
-export function WSUnsubscribe(
-  userId: string,
-  wsChannel: `${string}::${string}`,
-) {
-  const currentInstance = userWSInstance.get(userId);
-  //存在しない場合スルー
-  if (!currentInstance) {
-    return;
-  }
-  for (const ws of currentInstance) {
-    ws.unsubscribe(wsChannel);
-  }
-}

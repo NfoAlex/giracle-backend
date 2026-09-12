@@ -6,13 +6,20 @@ import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
+  type BotChannelPermission,
+  type BotManage,
+  botChannelPermissions,
+  botManages,
   channelJoinOnDefaults,
+  channels,
   customEmojis,
   invitations,
   requestLog,
   serverConfigs,
+  type User,
   users,
 } from "../../db/schema";
+import { Util } from "../../Util";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -53,6 +60,478 @@ export namespace ServiceServer {
     }
 
     throw status(404, "Banner not found");
+  };
+
+  export const GetBotMe = async (userId: string, cursorBotId?: string) => {
+    let queryFromCursor: SQL | undefined;
+    if (cursorBotId) {
+      const cursorBot = db
+        .select({ createdAt: botManages.createdAt })
+        .from(botManages)
+        .where(eq(botManages.id, cursorBotId))
+        .get();
+      if (cursorBot === undefined)
+        throw status(400, "Cursor bot does not exists");
+      queryFromCursor = or(
+        lt(botManages.createdAt, cursorBot.createdAt),
+        and(
+          eq(botManages.createdAt, cursorBot.createdAt),
+          lt(botManages.id, cursorBotId),
+        ),
+      );
+    }
+
+    const mybot = await db
+      .select({
+        id: botManages.id,
+        botName: botManages.botName,
+        //申請者は自分のBotの審査状況を確認できる必要がある
+        approveStatus: botManages.approveStatus,
+        createdAt: botManages.createdAt,
+        createdBy: botManages.createdBy,
+      })
+      .from(botManages)
+      .where(and(queryFromCursor, eq(botManages.createdBy, userId)))
+      .limit(50)
+      .orderBy(desc(botManages.createdAt), desc(botManages.id));
+
+    return mybot;
+  };
+
+  export const GetBotById = async (botId: string, _userId: string) => {
+    const myBot = await db.query.botManages.findFirst({
+      where: and(eq(botManages.id, botId)),
+      columns: { tokenCode: false },
+      with: {
+        channelPermissions: true,
+        user: true,
+      },
+    });
+    if (myBot === undefined) throw status(404, "Bot not found");
+    if (myBot.createdBy !== _userId)
+      throw status(403, "You are not owner of this bot");
+
+    return myBot;
+  };
+
+  export const PutBot = async (
+    name: string,
+    description: string | undefined = undefined,
+    _userId: string,
+    permissionChannelIds: string[] = [],
+    useAllChannel: boolean = false,
+    permissionConfig: {
+      canFetchUserinfo?: boolean;
+      canFetchRoleinfo?: boolean;
+      canManageUser?: boolean;
+      canManageServerConfig?: boolean;
+      canReadMessage?: boolean;
+      canSendMessage?: boolean;
+    },
+  ) => {
+    if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+      throw status(400, "Using or creating bot is not allowed");
+    }
+    //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
+    const uniqueChannelIds = [...new Set(permissionChannelIds)];
+    //チャンネル全透過じゃないならチャンネル検査
+    if (!useAllChannel) {
+      if (uniqueChannelIds.length > 100) {
+        throw status(400, "Too many channels to listen");
+      }
+      //TODO: どうにかしたい
+      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+      //実在しないチャンネルIdも素通りしてしまう。ここで弾かないと許可テーブルの
+      //channelIdがFK違反になり500になる
+      for (const channelId of uniqueChannelIds) {
+        const channelExists =
+          db
+            .select({ id: channels.id })
+            .from(channels)
+            .where(eq(channels.id, channelId))
+            .get() !== undefined;
+        if (
+          !channelExists ||
+          !(await Util.checkChannelVisibility(channelId, _userId))
+        )
+          throw status(400, "You cannot use a channel you cannot see");
+      }
+    }
+
+    let botCreatedResult:
+      | (BotManage & {
+          channelPermissions: BotChannelPermission[] | undefined;
+          user: User;
+        })
+      | undefined;
+    try {
+      botCreatedResult = db.transaction((trx) => {
+        const userForBot = trx
+          .insert(users)
+          .values({
+            name,
+            selfIntroduction: "I am a bot",
+            isBot: true,
+          })
+          .returning()
+          .get();
+        //returning().get() は対象0件で undefined になるため型を絞る
+        if (userForBot === undefined) throw status(500, "Bot creation failed");
+
+        const bot = trx
+          .insert(botManages)
+          .values({
+            botName: name,
+            botDescription: description,
+            createdBy: _userId,
+            remoteUserId: userForBot.id,
+            approveStatus: GIRACLE_SERVER_CONFIG.BotAutoApprove
+              ? "APPROVED"
+              : "PENDING",
+            useAllChannel: useAllChannel,
+            ...permissionConfig,
+          })
+          .returning()
+          .get();
+        if (bot === undefined) throw status(500, "Bot creation failed");
+
+        //チャンネル登録
+        let channelsPermitted: BotChannelPermission[] | undefined;
+        if (!useAllChannel && uniqueChannelIds.length !== 0) {
+          channelsPermitted = trx
+            .insert(botChannelPermissions)
+            .values(
+              uniqueChannelIds.map((channelId) => {
+                return {
+                  botId: bot.id,
+                  channelId: channelId,
+                };
+              }),
+            )
+            .returning()
+            .all();
+        }
+
+        const returningBotResult = {
+          user: userForBot,
+          channelPermissions: channelsPermitted,
+          ...bot,
+        };
+
+        return returningBotResult;
+      });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.includes("UNIQUE constraint failed")
+      ) {
+        //users.nameとbotNameはどちらもUNIQUEなので重複は同じ400に寄せる
+        throw status(400, "Bot name already exists");
+      }
+      throw e;
+    }
+
+    return botCreatedResult;
+  };
+
+  export const DeleteBot = async (botId: string, _userId: string) => {
+    const [bot] = await db
+      .select({ remoteUserId: botManages.remoteUserId })
+      .from(botManages)
+      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)));
+    if (bot === undefined) throw status(404, "Bot not found");
+
+    db.transaction((trx) => {
+      trx.delete(botManages).where(eq(botManages.id, botId)).run();
+      trx
+        .update(users)
+        .set({ isDeleted: true })
+        .where(eq(users.id, bot.remoteUserId))
+        .run();
+    });
+
+    //削除済みBotのWS接続を切断(接続し続けるとpublishを受け取れ続ける)
+    Util.wsUserInstance.disconnect(bot.remoteUserId, "bot was deleted");
+
+    return true;
+  };
+
+  export const PatchBot = async (
+    botId: string,
+    _userId: string,
+    updateValue: {
+      name?: string;
+      description?: string;
+      permissionChannelIds?: string[];
+      useAllChannel?: boolean;
+      canFetchUserinfo?: boolean;
+      canFetchRoleinfo?: boolean;
+      canManageUser?: boolean;
+      canManageServerConfig?: boolean;
+      canReadMessage?: boolean;
+      canSendMessage?: boolean;
+    },
+  ) => {
+    const currentBot = db
+      .select({
+        botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        canFetchRoleinfo: botManages.canFetchRoleinfo,
+        canManageUser: botManages.canManageUser,
+        canManageServerConfig: botManages.canManageServerConfig,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+      })
+      .from(botManages)
+      .where(and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)))
+      .get();
+    if (currentBot === undefined) {
+      throw status(404, "Bot not found");
+    }
+
+    const {
+      botName: currentBotName,
+      approveStatus: currentApproveStatus,
+      useAllChannel: currentUseAllChannel,
+      ...currentBotPermissions
+    } = currentBot;
+    const {
+      name,
+      description,
+      permissionChannelIds,
+      useAllChannel,
+      ...permissions
+    } = updateValue;
+
+    //現在許可されているチャンネルId(変更差分の判定とWS購読の更新に使う)
+    const currentChannelIds = db
+      .select({ channelId: botChannelPermissions.channelId })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, botId))
+      .all()
+      .map((permission) => permission.channelId);
+    //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
+    const uniqueChannelIds =
+      permissionChannelIds === undefined
+        ? undefined
+        : [...new Set(permissionChannelIds)];
+    //変更後の全透過設定(未指定なら現状維持)
+    const effectiveUseAllChannel = useAllChannel ?? currentUseAllChannel;
+
+    //チャンネル許可を指定された場合は作成時と同じ検査をする
+    //(全透過なら許可リストは使われないため不要)
+    if (uniqueChannelIds !== undefined && !effectiveUseAllChannel) {
+      if (uniqueChannelIds.length > 100) {
+        throw status(400, "Too many channels to listen");
+      }
+      //TODO: どうにかしたい
+      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+      //実在しないチャンネルIdも素通りしてしまう。ここで弾かないと許可テーブルの
+      //channelIdがFK違反になり500になる
+      for (const channelId of uniqueChannelIds) {
+        const channelExists =
+          db
+            .select({ id: channels.id })
+            .from(channels)
+            .where(eq(channels.id, channelId))
+            .get() !== undefined;
+        if (
+          !channelExists ||
+          !(await Util.checkChannelVisibility(channelId, _userId))
+        )
+          throw status(400, "You cannot use a channel you cannot see");
+      }
+    }
+
+    //全透過設定の変更
+    const useAllChannelChanged =
+      useAllChannel !== undefined && useAllChannel !== currentUseAllChannel;
+    //許可チャンネルリストの変更(全透過中はリストに実効性が無いため数えない)
+    const channelListChanged =
+      uniqueChannelIds !== undefined &&
+      !effectiveUseAllChannel &&
+      (uniqueChannelIds.length !== currentChannelIds.length ||
+        uniqueChannelIds.some(
+          (channelId) => !currentChannelIds.includes(channelId),
+        ));
+    const channelPermissionChanged = useAllChannelChanged || channelListChanged;
+
+    //再承認が必要かどうかフラグ
+    let needsReapproval = false;
+    //許可設定かBot名を変えているなら再申請扱いにして審査状況を初期化
+    if (!GIRACLE_SERVER_CONFIG.BotAutoApprove) {
+      const permissionChanged = (
+        Object.keys(
+          currentBotPermissions,
+        ) as (keyof typeof currentBotPermissions)[]
+      ).some(
+        (key) =>
+          permissions[key] !== undefined && // updateValueで未指定の権限は差分に数えない
+          permissions[key] !== currentBotPermissions[key],
+      );
+      needsReapproval =
+        (name !== undefined && name !== currentBotName) ||
+        permissionChanged ||
+        channelPermissionChanged;
+    }
+
+    //最終的な承認状態
+    //BLOCKED(管理者による制裁)は所有者の編集で解除させない
+    const newApproveStatus =
+      currentApproveStatus === "BLOCKED"
+        ? "BLOCKED"
+        : GIRACLE_SERVER_CONFIG.BotAutoApprove
+          ? "APPROVED"
+          : needsReapproval
+            ? "PENDING"
+            : undefined;
+
+    //botManagesの更新とusers.nameの更新を1トランザクションにまとめる
+    let bot:
+      | (BotManage & {
+          channelPermissions: BotChannelPermission[] | undefined;
+          user: User;
+        })
+      | undefined;
+    try {
+      bot = db.transaction((trx) => {
+        const updated = trx
+          .update(botManages)
+          .set({
+            //更新項目が無い更新ではnameがundefinedのままになり、drizzleは空のsetで
+            //例外を投げて500になる。botNameは必ず書く値なので現状値で埋める
+            botName: name ?? currentBotName,
+            botDescription: description,
+            useAllChannel: useAllChannel,
+            approveStatus: newApproveStatus,
+            ...permissions,
+          })
+          .where(
+            and(eq(botManages.id, botId), eq(botManages.createdBy, _userId)),
+          )
+          .returning()
+          .get();
+        if (updated === undefined) {
+          throw status(500, "Bot data should be available");
+        }
+
+        //チャンネル許可の差し替え
+        //全透過に切り替えた場合は許可リストが実効性を失うため消す(残すと後で
+        //非透過に戻した時に古い許可が復活してしまう)
+        let channelsPermitted: BotChannelPermission[] | undefined;
+        if (effectiveUseAllChannel || uniqueChannelIds !== undefined) {
+          trx
+            .delete(botChannelPermissions)
+            .where(eq(botChannelPermissions.botId, botId))
+            .run();
+          if (
+            !effectiveUseAllChannel &&
+            uniqueChannelIds !== undefined &&
+            uniqueChannelIds.length !== 0
+          ) {
+            channelsPermitted = trx
+              .insert(botChannelPermissions)
+              .values(
+                uniqueChannelIds.map((channelId) => ({
+                  botId: botId,
+                  channelId: channelId,
+                })),
+              )
+              .returning()
+              .all();
+          }
+        } else {
+          //許可リストを変更していないなら現状の許可をそのまま返す
+          channelsPermitted = trx
+            .select()
+            .from(botChannelPermissions)
+            .where(eq(botChannelPermissions.botId, botId))
+            .all();
+        }
+
+        //改名時は紐付いたユーザー行の名前も揃える(表示名はusers.name側を参照する)
+        let botUser: User | undefined;
+        if (name !== undefined) {
+          botUser = trx
+            .update(users)
+            .set({ name })
+            .where(eq(users.id, updated.remoteUserId))
+            .returning()
+            .get();
+        } else {
+          //未改名なら現状のユーザー行をそのまま返す
+          botUser = trx
+            .select()
+            .from(users)
+            .where(eq(users.id, updated.remoteUserId))
+            .get();
+        }
+
+        //returning().get() / select().get() は対象0件で undefined になるため型を絞る
+        if (botUser === undefined)
+          throw status(500, "Bot data should be available");
+        return {
+          user: botUser,
+          channelPermissions: channelsPermitted,
+          ...updated,
+        };
+      });
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.includes("UNIQUE constraint failed")
+      ) {
+        //botNameとusers.nameはどちらもUNIQUEなので重複は同じ400に寄せる
+        throw status(400, "Bot name already exists");
+      }
+      throw e;
+    }
+
+    //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
+    //更新対象0件での undefined は上で500に寄せているため、ここでは有るはず
+    if (bot === undefined) throw status(500, "Bot data should be available");
+    if (bot.approveStatus !== "APPROVED") {
+      Util.wsUserInstance.disconnect(
+        bot.remoteUserId,
+        "Your bot is not approved yet",
+      );
+    } else if (channelPermissionChanged) {
+      //チャンネル許可が変わったなら、接続中のWSの購読を新しい許可に合わせる
+      //(解除しないと許可を失ったチャンネルの配信を受け続けてしまう)
+      //全透過のBotは接続時に全チャンネルを購読しているため、その一覧も必要になる
+      const allChannelIds =
+        currentUseAllChannel || bot.useAllChannel
+          ? db
+              .select({ id: channels.id })
+              .from(channels)
+              .all()
+              .map((channel) => channel.id)
+          : [];
+      const subscribedChannelIds = currentUseAllChannel
+        ? allChannelIds
+        : currentChannelIds;
+      const notifyChannelIds = bot.useAllChannel
+        ? allChannelIds
+        : (uniqueChannelIds ?? currentChannelIds);
+
+      for (const channelId of subscribedChannelIds) {
+        Util.wsUserInstance.unsubscribe(
+          bot.remoteUserId,
+          `channel::${channelId}`,
+        );
+      }
+      for (const channelId of notifyChannelIds) {
+        Util.wsUserInstance.subscribe(
+          bot.remoteUserId,
+          `channel::${channelId}`,
+        );
+      }
+    }
+
+    const { tokenCode, ...botTrimmed } = bot;
+    return botTrimmed;
   };
 
   export const GetInvite = async () => {
@@ -107,6 +586,8 @@ export namespace ServiceServer {
     RegisterAnnounceChannelId?: string,
     MessageMaxLength?: number,
     MessageMaxFileSize?: number,
+    BotEnabled?: boolean,
+    BotAutoApprove?: boolean,
     DefaultJoinChannel?: string[],
   ) => {
     const [serverinfo] = await db
@@ -117,22 +598,27 @@ export namespace ServiceServer {
         RegisterAnnounceChannelId,
         MessageMaxLength,
         MessageMaxFileSize,
+        BotEnabled,
+        BotAutoApprove,
       })
       .returning();
 
     if (serverinfo === undefined) throw status(500, "Server config not found");
 
-    if (RegisterAvailable)
+    if (RegisterAvailable !== undefined)
       GIRACLE_SERVER_CONFIG.RegisterAvailable = RegisterAvailable;
-    if (RegisterInviteOnly)
+    if (RegisterInviteOnly !== undefined)
       GIRACLE_SERVER_CONFIG.RegisterInviteOnly = RegisterInviteOnly;
     if (RegisterAnnounceChannelId)
       GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId =
         RegisterAnnounceChannelId;
-    if (MessageMaxLength)
+    if (MessageMaxLength !== undefined)
       GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
-    if (MessageMaxFileSize)
+    if (MessageMaxFileSize !== undefined)
       GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
+    if (BotEnabled !== undefined) GIRACLE_SERVER_CONFIG.BotEnabled = BotEnabled;
+    if (BotAutoApprove !== undefined)
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = BotAutoApprove;
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
@@ -421,5 +907,76 @@ export namespace ServiceServer {
       group: logByGroup,
       firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
     };
+  };
+
+  export const GetBot = async (cursorBotId?: string) => {
+    let queryFromCursor: SQL | undefined;
+    if (cursorBotId) {
+      const cursorBot = db
+        .select({ createdAt: botManages.createdAt })
+        .from(botManages)
+        .where(eq(botManages.id, cursorBotId))
+        .get();
+      if (cursorBot === undefined)
+        throw status(400, "Cursor bot does not exists");
+      queryFromCursor = or(
+        lt(botManages.createdAt, cursorBot.createdAt),
+        and(
+          eq(botManages.createdAt, cursorBot.createdAt),
+          lt(botManages.id, cursorBotId),
+        ),
+      );
+    }
+
+    const bot = await db
+      .select({
+        id: botManages.id,
+        botName: botManages.botName,
+        //承認者が申請内容(審査状況・要求権限)を確認できるようにする
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        canFetchRoleinfo: botManages.canFetchRoleinfo,
+        canManageUser: botManages.canManageUser,
+        canManageServerConfig: botManages.canManageServerConfig,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+        createdAt: botManages.createdAt,
+        createdBy: botManages.createdBy,
+      })
+      .from(botManages)
+      .where(queryFromCursor)
+      .limit(50)
+      //新しい順で取得する
+      .orderBy(desc(botManages.createdAt), desc(botManages.id));
+
+    return bot;
+  };
+
+  export const PatchBotApproval = async (
+    botId: string,
+    approvalStatus: BotManage["approveStatus"],
+  ) => {
+    const [botManageUpdated] = await db
+      .update(botManages)
+      .set({
+        approveStatus: approvalStatus,
+      })
+      .where(eq(botManages.id, botId))
+      .returning({ id: botManages.id, remoteUserId: botManages.remoteUserId });
+
+    if (botManageUpdated === undefined) {
+      throw status(404, "Bot not found");
+    }
+
+    //承認済みでないなら接続中WSを切断(接続を維持するとchannel::*の配信を受け続ける)
+    if (approvalStatus !== "APPROVED") {
+      Util.wsUserInstance.disconnect(
+        botManageUpdated.remoteUserId,
+        "Your bot is not approved yet",
+      );
+    }
+
+    return botManageUpdated.id;
   };
 }

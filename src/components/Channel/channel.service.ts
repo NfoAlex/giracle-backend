@@ -25,7 +25,6 @@ import {
   users,
 } from "../../db/schema";
 import { Util } from "../../Util";
-import { WSUnsubscribe } from "../../ws";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
@@ -640,7 +639,10 @@ export namespace ServiceChannel {
       where: eq(channelJoins.channelId, channelId),
     });
     for (const channelJoinData of joinedUsers) {
-      WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
+      Util.wsUserInstance.unsubscribe(
+        channelJoinData.userId,
+        `channel::${channelId}`,
+      );
     }
 
     //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)

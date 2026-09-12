@@ -38,7 +38,182 @@ export const server = new Elysia({ prefix: "/server" })
   )
 
   .use(Middleware.CheckToken)
+
+  .get(
+    "/bot/me",
+    async ({ query: { cursorBotId }, CheckToken: { _userId } }) => {
+      const myBots = await ServiceServer.GetBotMe(_userId, cursorBotId);
+
+      return {
+        message: "Fetched my bots",
+        data: myBots,
+      };
+    },
+    {
+      query: t.Object({
+        cursorBotId: t.Optional(t.String()),
+      }),
+      detail: {
+        description: "自分のBot一覧取得",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+  .get(
+    "/bot/me/:botId",
+    async ({ params: { botId }, CheckToken: { _userId } }) => {
+      const myBot = await ServiceServer.GetBotById(botId, _userId);
+
+      return {
+        message: "Fetched my bot info",
+        data: myBot,
+      };
+    },
+    {
+      params: t.Object({
+        botId: t.String(),
+      }),
+      detail: {
+        description: "指定した自分のBot詳細を取得",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+  .put(
+    "/bot",
+    async ({
+      body: {
+        name,
+        description,
+        permissionChannelIds,
+        useAllChannel,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      },
+      CheckToken: { _userId },
+    }) => {
+      const newBot = await ServiceServer.PutBot(
+        name,
+        description,
+        _userId,
+        permissionChannelIds,
+        useAllChannel,
+        {
+          canFetchUserinfo,
+          canFetchRoleinfo,
+          canManageUser,
+          canManageServerConfig,
+          canReadMessage,
+          canSendMessage,
+        },
+      );
+
+      return {
+        message: "Bot created",
+        data: newBot,
+      };
+    },
+    {
+      body: t.Object({
+        name: t.String({ minLength: 1, maxLength: 64 }),
+        description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
+        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1 })),
+        useAllChannel: t.Optional(t.Boolean()),
+        canFetchUserinfo: t.Optional(t.Boolean()),
+        canFetchRoleinfo: t.Optional(t.Boolean()),
+        canManageUser: t.Optional(t.Boolean()),
+        canManageServerConfig: t.Optional(t.Boolean()),
+        canReadMessage: t.Optional(t.Boolean()),
+        canSendMessage: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        description: "Botを作成(申請)する",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+  .delete(
+    "/bot",
+    async ({ body: { botId }, CheckToken: { _userId } }) => {
+      await ServiceServer.DeleteBot(botId, _userId);
+
+      return {
+        message: "Bot deleted",
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+      }),
+      detail: {
+        description: "自分のBotを削除",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+  .patch(
+    "/bot",
+    async ({
+      body: {
+        botId,
+        name,
+        description,
+        permissionChannelIds,
+        useAllChannel,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      },
+      CheckToken: { _userId },
+    }) => {
+      const bot = await ServiceServer.PatchBot(botId, _userId, {
+        name,
+        description,
+        permissionChannelIds,
+        useAllChannel,
+        canFetchUserinfo,
+        canFetchRoleinfo,
+        canManageUser,
+        canManageServerConfig,
+        canReadMessage,
+        canSendMessage,
+      });
+
+      return {
+        message: "Bot updated",
+        data: bot,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        name: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
+        description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
+        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1 })),
+        useAllChannel: t.Optional(t.Boolean()),
+        canFetchUserinfo: t.Optional(t.Boolean()),
+        canFetchRoleinfo: t.Optional(t.Boolean()),
+        canManageUser: t.Optional(t.Boolean()),
+        canManageServerConfig: t.Optional(t.Boolean()),
+        canReadMessage: t.Optional(t.Boolean()),
+        canSendMessage: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        description: "自分のBot情報を更新",
+        tags: ["Server", "Bot"],
+      },
+    },
+  )
+
   .use(Middleware.CheckRoleTerm)
+
   .get(
     "/get-invite",
     async () => {
@@ -148,6 +323,8 @@ export const server = new Elysia({ prefix: "/server" })
         RegisterAnnounceChannelId,
         MessageMaxLength,
         MessageMaxFileSize,
+        BotEnabled,
+        BotAutoApprove,
         DefaultJoinChannel,
       },
       server,
@@ -158,6 +335,8 @@ export const server = new Elysia({ prefix: "/server" })
         RegisterAnnounceChannelId,
         MessageMaxLength,
         MessageMaxFileSize,
+        BotEnabled,
+        BotAutoApprove,
         DefaultJoinChannel,
       );
 
@@ -182,6 +361,8 @@ export const server = new Elysia({ prefix: "/server" })
         RegisterAnnounceChannelId: t.Optional(t.String()),
         MessageMaxLength: t.Optional(t.Number()),
         MessageMaxFileSize: t.Optional(t.Number()),
+        BotEnabled: t.Optional(t.Boolean()),
+        BotAutoApprove: t.Optional(t.Boolean()),
         DefaultJoinChannel: t.Optional(t.Array(t.String())),
       }),
       detail: {
@@ -412,6 +593,57 @@ export const server = new Elysia({ prefix: "/server" })
             ),
           }),
         }),
+      },
+      checkRoleTerm: "manageServer",
+    },
+  )
+  .get(
+    "/bot/all",
+    async ({ query: { cursorBotId } }) => {
+      const bots = await ServiceServer.GetBot(cursorBotId);
+
+      return {
+        message: "Bot fetched",
+        data: bots,
+      };
+    },
+    {
+      query: t.Object({
+        cursorBotId: t.Optional(t.String()),
+      }),
+      detail: {
+        description: "ボットの一覧を取得",
+        tags: ["Server", "Bot"],
+      },
+      checkRoleTerm: "manageServer",
+    },
+  )
+  .patch(
+    "/bot/approval",
+    async ({ body: { botId, approvalStatus } }) => {
+      const botIdUpdated = await ServiceServer.PatchBotApproval(
+        botId,
+        approvalStatus,
+      );
+
+      return {
+        message: "Bot approval updated",
+        data: botIdUpdated,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        approvalStatus: t.Union([
+          t.Literal("APPROVED"),
+          t.Literal("BLOCKED"),
+          t.Literal("PENDING"),
+          t.Literal("DENIED"),
+        ]),
+      }),
+      detail: {
+        description: "ボットの承認状況を更新する",
+        tags: ["Server", "Bot"],
       },
       checkRoleTerm: "manageServer",
     },

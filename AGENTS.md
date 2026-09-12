@@ -26,6 +26,9 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - [test/util.ts](test/util.ts) の `INIT()` が全テスト共通の前処理（migrate → 全テーブル削除 → seeds 投入 → `TESTUSER` / `TESTUSER2` とトークン作成）。各テストファイルの `beforeAll` で呼ぶ。多重呼び出しはフラグで抑止される。
 - リクエストは `FETCH({ path, method, body })` ヘルパー経由（内部で `app.handle(new Request(...))`）。デフォルトで `TESTUSER` の Cookie が付く。`useSecondaryUser: true` で `TESTUSER2`、`excludeCredential: true` で未認証リクエストになる。
 - `NODE_ENV=test` のとき index.ts の `.onError()` はエラーログを抑制する。
+- リクエストヘッダが必要な場合は `FETCH({ headers })` を使う。`PATCH` も可。
+- Bot 用テストユーザー（`TESTUSER_BOT_1..3`）と `TESTBOT1..3`（BotManage）、`TESTBOT1` と `TESTCHANNEL1` のチャンネル許可が `INIT()` で作られる。Bot 関連テストはこれを使う（`tokenCode` は `TESTTOKEN1` / `TESTTOKEN2`）。`TESTBOT1` / `TESTBOT2` は `APPROVED`、`TESTBOT3` は既定の `PENDING`。
+- **Bot 作成テストは `GIRACLE_SERVER_CONFIG.BotEnabled = true` を直接立てる必要がある**（seed 直後は false。`INIT()` の `reloadServerConfig()` で DB の値に戻るため、テスト内で毎回設定する）。
 - 機能を追加したら対応するテストファイルに追記する。
 
 ## アーキテクチャの約束事
@@ -38,6 +41,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - DB のパスは環境変数 `DATABASE_URL`（`file:` プレフィックスは除去される。既定は `./dev.db`）。
 - テーブル定義・relations・型 export は [src/db/schema.ts](src/db/schema.ts) にまとめてある。relational query (`db.query.<table>.findFirst/findMany`) を使うため `drizzle(sqlite, { schema })` で初期化されている。
 - `db.query.*.findFirst` は該当なしで `undefined` を返す（Prisma の `null` とは異なるので `!== undefined` で判定する）。`update`/`delete` は対象0件でも例外を投げない（事前 `findFirst` か `.returning()` の行数で判定する）。
+- `GIRACLE_SERVER_CONFIG` は起動時に select した値を**ミュータブルなオブジェクト**で保持する（旧来の「起動時の `const [config] = ...`」とは別物）。ServerConfig を書き換えたら index.ts の `reloadServerConfig()` を呼んでメモリを更新すること。テストの `INIT()` でも呼ばれる。DB 未初期化（マイグレーション前・テストロード時）でも起動が落ちないよう try/catch で握り潰している。
 
 ### モジュール構成: module（ルーティング）+ service（ロジック）
 
@@ -53,6 +57,46 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - 認証必須ルート: module の先頭で `.use(Middleware.CheckToken)`。ハンドラでは `CheckToken: { _userId }` がコンテキストに注入される。トークンは 5 分キャッシュされる（[src/Middlewares.ts](src/Middlewares.ts)）ため、BAN 反映等に最大 5 分の遅延があり得る。
 - 権限チェック: `.use(Middleware.CheckRoleTerm)` を併用し、ルートオプションに `checkRoleTerm: "manageChannel"` のように指定する（macro 実装）。権限は `manageServer` / `manageChannel` / `manageRole` / `manageUser` / `manageEmoji` の 5 種。`manageServer` は全チェックを通過する。
 - **管理系ルートに `checkRoleTerm` を付け忘れると「ログイン済みなら誰でも実行可」になる。** 追加時は必ず確認。
+- **macro と事前ミドルウェアの併用（二重処理の有無）**: `CheckRoleTerm`（内部で `.use(Middleware.CheckToken)`）や `ExtMiddleware.CheckPermission`（内部で `.use(CheckApiCode)`）のように macro 定義側で事前ミドルウェアを `.use()` していても、各 module 側で `.use(CheckToken).use(CheckRoleTerm)`（または `.use(CheckApiCode).use(CheckPermission)`）と併用して二重処理にはならない。Elysia の同一インスタンス/名前による重複排除に加え、`as: "scoped"` は孫モジュールへ自動伝播しないため。module 側の `.use(CheckToken)` はコンテキスト注入と検証実行に必須で、macro 側の `.use(CheckToken)` は macro 内の型解決に必要。
+
+### Bot（外部 API）
+
+Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.ts](src/external/external.module.ts)）経由で操作する。module/service 構成は通常の `src/components/<Name>/` と同じ。**Bot 自身の操作（メッセージ送受信など）は `/ext` 配下、Bot の管理（作成・承認・一覧）は `src/components/Server/` 配下の `/server/bot*` にある。** **Bot は `remoteUserId`（紐付いた users の行。`users.isBot` が true）経由でユーザーアカウントを持つ。** メッセージ送信・編集などの操作もすべて `remoteUserId` 名義で行う（`messages.userId = remoteUserId` かつ `isBot: true`）。
+
+- 認証: `ExtMiddleware.CheckApiCode`（[Middleware.ext.ts](src/external/Middleware.ext.ts)）。`Authorization` ヘッダで `BotManage.tokenCode` を照合し、`approveStatus === "APPROVED"` でないと 401。コンテキストに `CheckApiCode: { ...BotManage }` が注入される。
+- 権限: `ExtMiddleware.CheckPermission` macro + ルートオプション `checkPermission: "canSendMessage"` 等で `can*` フラグ（6 種）をチェック。認証同様 module 側で `.use(CheckApiCode).use(CheckPermission)` を併用する。
+- チャンネル許可は `botChannelPermissions`（Bot × Channel の複合）。判定は [src/external/Util.ext.ts](src/external/Util.ext.ts) の `ExtUtil.isChannelPermitted` に集約している。許可のないチャンネルへの読み書きは 403。
+  - 全透過（`useAllChannel: true`）は許可テーブルを引かず無条件で許可するが、**存在しないチャンネルは同関数が 404 `Channel not found` を投げる**（存在確認しないと `messages` への INSERT が FK 違反で 500 になるため）。
+  - 非透過は `botChannelPermissions.channelId` の FK により、許可行があればチャンネルの存在が保証されるので存在確認クエリを足さない（存在しないチャンネルは 403 のまま）。
+- 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me` と `/server/bot/me/:botId`。
+- 一覧系は審査に必要な情報を返す。`GetBotMe` は `approveStatus`、管理者用 `GetBot`（`/server/bot/all`）は `approveStatus` + `useAllChannel` + `can*`（要求権限を伏せたまま承認させないため）。
+- **Bot を承認済みでない状態にする・無効化する操作は、接続中の WS も切断する**（`Util.wsUserInstance.disconnect`）。該当は `PatchBotApproval`（BLOCKED/DENIED/PENDING へ変更時）、`PatchBot`（再申請で PENDING に戻った時）、`DeleteBot`（`users.isDeleted` で無効化）。切断しないと接続済み Bot が `channel::*` の配信を受け続ける。
+- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open）。
+- Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
+- `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
+- **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは指定された内容で**差し替え**（全削除 → 再挿入）し、`useAllChannel: true` への切り替え時は行を消す。全透過中は許可リストが使われないため消さないと、後で非透過に戻したときに古い許可が復活してしまう。
+  - `checkChannelVisibility` は閲覧制限ロールの無いチャンネルを無条件で許可するので、実在しないチャンネル ID を弾くには別途 `Channel` の存在確認が要る（`PUT` / `PATCH` の両方のループで行っている）。
+- **チャンネル許可が変わったときは、接続中の WS の購読を張り替える**（`WSSubscribe` / `WSUnsubscribe`）。解除しないと許可を失ったチャンネルの `channel::*` 配信を受け続ける。全透過の Bot は接続時に全チャンネルを購読しているため、解除側は全チャンネルを対象にする。
+- ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
+  - `BotEnabled`: false の間は `PUT /server/bot` が 400 `Using or creating bot is not allowed` になる。**既定 false なので、有効化しない限り Bot は作成できない。**
+  - `BotAutoApprove`: 承認レビュー自体を省く設定。true なら新規作成は `PENDING` ではなく `APPROVED` で作られる（`PutBot`）。
+- WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open/close）。`user::${remoteUserId}` と許可チャンネル（全透過は既存の全チャンネル）を購読する。**Bot の WS エンドポイントは `/ext/ws`**（通常ユーザーは `/ws`、[src/ws.ts](src/ws.ts)）。Elysia の静的ルーターは同一パスの WS ルートを上書きするため、1 つのパスに両方を登録することはできない。
+
+#### `BotAutoApprove` と更新時の `approveStatus`
+
+`PatchBot`（`PATCH /server/bot`）で Bot を更新したときの `approveStatus` は次のとおり。**`BLOCKED` は管理者による制裁なので据え置き、`BotAutoApprove: true` なら `DENIED` も `APPROVED` に戻る。**
+
+| 更新前の状態 | `BotAutoApprove: true` | `BotAutoApprove: false` |
+|---|---|---|
+| `BLOCKED` | `BLOCKED` のまま | `BLOCKED` のまま |
+| `DENIED` | `APPROVED` | 差分があれば `PENDING`、無ければ `DENIED` のまま |
+| `PENDING` | `APPROVED` | 差分があれば `PENDING`、無ければ `PENDING` のまま |
+| `APPROVED` | `APPROVED` | 差分があれば `PENDING`、無ければ `APPROVED` のまま |
+
+- 「差分」= Bot 名の変更、`can*` 権限フラグの実際の変更、またはチャンネル許可（`useAllChannel` / `permissionChannelIds`）の実際の変更。`description` のみの変更は再申請にしない。
+  - チャンネル許可は全透過中なら実効性が無いため、全透過が指定されているときの `permissionChannelIds` の差分は数えない。
+- 差分が無い場合は `approveStatus` を UPDATE の対象に含めない（据え置き）。
+- `BLOCKED` の判定は他の分岐より先に行うため、`BotAutoApprove` の値に関わらず解除されない。
 
 ### WebSocket 通知
 
@@ -66,7 +110,9 @@ server?.publish(
 ```
 
 - signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
-- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
+- ユーザーの購読チャンネルを増減させるときは [src/Utils/WSUserInstance.ts](src/Utils/WSUserInstance.ts)（`Util.wsUserInstance.subscribe(userId, wsChannel)` / `.unsubscribe(...)`）を使う。`Util.wsUserInstance.instances`（Map<userId, ws[]>）が通常ユーザーと Bot の両方の接続を一括管理し、複数端末の同時接続を許容する。BAN・Bot 無効化時の切断は `Util.wsUserInstance.disconnect(userId, reason)`。
+  - この共通処理を通常ユーザー用 [src/ws.ts](src/ws.ts) と Bot 用 [src/external/ws.ext.ts](src/external/ws.ext.ts) が共有する。**WS 接続は `/ws`（通常ユーザー・Cookie 認証）と `/ext/ws`（Bot・Authorization ヘッダ）でエンドポイントが分かれている**（Elysia の静的ルーターが同一パスの WS ルートを上書きするため同居できない）。
+  - 新規チャンネル作成時は `WSSubscribeAllChannelBots(channelId)`（[src/external/ws.ext.ts](src/external/ws.ext.ts)）で全透過 Bot を追従させる。
 - URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
 
 ### 通知（Inbox / Web Push）
@@ -82,6 +128,9 @@ server?.publish(
 - チャンネルへのアクセス制御を伴う処理では `CheckChannelVisibility` / `GetUserViewableChannel` の再利用を優先する。
 
 呼び出し側は個々のファイルを直接 import せず、[src/Util.ts](src/Util.ts) が re-export する `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.sendSystemMessage(...)` のように使う）。プロパティ名は camelCase（例: `CheckChannelVisibility` → `Util.checkChannelVisibility`）。**新しい Utils ファイルを追加したら `src/Util.ts` に import + namespace export を追記すること。**
+
+- Bot 外部 API 専用のヘルパは [src/external/Util.ext.ts](src/external/Util.ext.ts) の `ExtUtil` namespace に置く（`src/Util.ts` の `Util` とは別系統なので追記先を間違えない）。
+- `ExtUtil.isChannelPermitted` は権限なしを `false` で返しエラーは呼び出し側が投げるが、チャンネル不在は文言が全ルート共通なので同関数が 404 を投げる（前述の Bot 節を参照）。
 
 ## DB（Drizzle / bun:sqlite）
 
@@ -102,9 +151,10 @@ server?.publish(
 
 ## 変更時のチェックリスト
 
-1. ルート追加 → `t.Object` バリデーション + `response` スキーマ + `detail` を必ず定義
+1. ルート追加 → `t.Object` バリデーション + `detail` を必ず定義
 2. 認証が必要か → `Middleware.CheckToken`、管理操作か → `checkRoleTerm`
 3. 状態変化をクライアントへ通知するか → `server?.publish` の WS シグナル追加
 4. README のエンドポイント表・WS シグナル表・環境変数表を更新
 5. `test/` の対応するテストファイルにケースを追記し、`NODE_ENV=test bun test` を通す
 6. `bunx biome check --write .` を通す
+7. Bot の承認・権限フローを変えたら、`APPROVED` でなくなった時の WS 切断（`Util.wsUserInstance.disconnect`）と、改名時の `users.name` 同期を確認する
