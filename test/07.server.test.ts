@@ -259,7 +259,11 @@ describe("PUT /server/bot", () => {
     expect(j.data.user.name).toBe("newBot");
     expect(j.data.user.name).toBe("newBot");
     expect(j.data.channelPermissions).toBeDefined();
-    expect(j.data.channelPermissions.some((c: { channelId: string }) => c.channelId === "TESTCHANNEL1")).toBeTrue();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL1",
+      ),
+    ).toBeTrue();
 
     //チャンネル透過もできていることを確認
     const perms = db
@@ -599,6 +603,11 @@ describe("PATCH /server/bot", () => {
     expect(j.data.approveStatus).toBe("PENDING");
     // tokenCodeは返らない
     expect(j.data.tokenCode).toBeUndefined();
+    // 作成時と同じくフル情報が同時取得できる
+    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED");
+    expect(j.data.channelPermissions).toEqual([
+      { botId: "TESTBOT1", channelId: "TESTCHANNEL1", id: expect.any(Number) },
+    ]);
 
     // 表示名を参照するusers.name側も揃っている(乖離すると改名が画面に出ない)
     const botUser = db
@@ -774,6 +783,12 @@ describe("PATCH /server/bot", () => {
     expect(res.ok).toBe(true);
     // 追加ではなく差し替え(TESTCHANNEL1が残らない)
     expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+    // フル情報も同時取得できる
+    const j = await res.json();
+    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.channelPermissions).toEqual([
+      { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
+    ]);
   });
 
   it("正常 :: 許可を指定しない更新では許可リストが変わらない", async () => {
@@ -784,6 +799,12 @@ describe("PATCH /server/bot", () => {
     });
     expect(res.ok).toBe(true);
     expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+    // 許可を指定しない更新でも現状の許可とユーザーがフルで返る
+    const j = await res.json();
+    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.channelPermissions).toEqual([
+      { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
+    ]);
   });
 
   it("正常 :: 全透過にすると許可リストが空になり、非透過に戻しても復活しない", async () => {

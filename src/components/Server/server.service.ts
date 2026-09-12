@@ -389,8 +389,12 @@ export namespace ServiceServer {
             : undefined;
 
     //botManagesの更新とusers.nameの更新を1トランザクションにまとめる
-    //(表示名はusers.name側を参照するため、片方だけ更新されると乖離する)
-    let bot: BotManage;
+    let bot:
+      | (BotManage & {
+          channelPermissions: BotChannelPermission[] | undefined;
+          user: User;
+        })
+      | undefined;
     try {
       bot = db.transaction((trx) => {
         const updated = trx
@@ -416,6 +420,7 @@ export namespace ServiceServer {
         //チャンネル許可の差し替え
         //全透過に切り替えた場合は許可リストが実効性を失うため消す(残すと後で
         //非透過に戻した時に古い許可が復活してしまう)
+        let channelsPermitted: BotChannelPermission[] | undefined;
         if (effectiveUseAllChannel || uniqueChannelIds !== undefined) {
           trx
             .delete(botChannelPermissions)
@@ -426,7 +431,7 @@ export namespace ServiceServer {
             uniqueChannelIds !== undefined &&
             uniqueChannelIds.length !== 0
           ) {
-            trx
+            channelsPermitted = trx
               .insert(botChannelPermissions)
               .values(
                 uniqueChannelIds.map((channelId) => ({
@@ -434,20 +439,44 @@ export namespace ServiceServer {
                   channelId: channelId,
                 })),
               )
-              .run();
+              .returning()
+              .all();
           }
+        } else {
+          //許可リストを変更していないなら現状の許可をそのまま返す
+          channelsPermitted = trx
+            .select()
+            .from(botChannelPermissions)
+            .where(eq(botChannelPermissions.botId, botId))
+            .all();
         }
 
-        //改名時は紐付いたユーザー行の名前も揃える
+        //改名時は紐付いたユーザー行の名前も揃える(表示名はusers.name側を参照する)
+        let botUser: User | undefined;
         if (name !== undefined) {
-          trx
+          botUser = trx
             .update(users)
             .set({ name })
             .where(eq(users.id, updated.remoteUserId))
-            .run();
+            .returning()
+            .get();
+        } else {
+          //未改名なら現状のユーザー行をそのまま返す
+          botUser = trx
+            .select()
+            .from(users)
+            .where(eq(users.id, updated.remoteUserId))
+            .get();
         }
 
-        return updated;
+        //returning().get() / select().get() は対象0件で undefined になるため型を絞る
+        if (botUser === undefined)
+          throw status(500, "Bot data should be available");
+        return {
+          user: botUser,
+          channelPermissions: channelsPermitted,
+          ...updated,
+        };
       });
     } catch (e) {
       if (
@@ -461,6 +490,8 @@ export namespace ServiceServer {
     }
 
     //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
+    //更新対象0件での undefined は上で500に寄せているため、ここでは有るはず
+    if (bot === undefined) throw status(500, "Bot data should be available");
     if (bot.approveStatus !== "APPROVED") {
       Util.wsUserInstance.disconnect(
         bot.remoteUserId,
