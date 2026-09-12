@@ -256,6 +256,10 @@ describe("PUT /server/bot", () => {
     expect(j.data.botDescription).toBe("This is a new bot");
     expect(j.data.useAllChannel).toBeFalse();
     expect(j.data.canFetchUserinfo).toBeTrue();
+    expect(j.data.user.name).toBe("newBot");
+    expect(j.data.user.name).toBe("newBot");
+    expect(j.data.channelPermissions).toBeDefined();
+    expect(j.data.channelPermissions.some((c: { channelId: string }) => c.channelId === "TESTCHANNEL1")).toBeTrue();
 
     //チャンネル透過もできていることを確認
     const perms = db
