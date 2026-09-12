@@ -85,6 +85,11 @@ mock.module("open-graph-scraper", () => ({
 
 beforeAll(async () => {
   await INIT();
+  // 未承認Bot(TESTBOT3)のtokenCodeを固定(HTTP経路の承認ゲート検証用)
+  await db
+    .update(botManages)
+    .set({ tokenCode: "TESTTOKEN3" })
+    .where(eq(botManages.id, "TESTBOT3"));
 });
 
 describe("GET /ext/message/:messageId", () => {
@@ -108,6 +113,17 @@ describe("GET /ext/message/:messageId", () => {
     });
     const t = await res.text();
     expect(t).toBe("Permission not enough");
+  });
+
+  it("未承認のボットは401", async () => {
+    const res = await FETCH({
+      path: "/ext/message/TESTMESSAGE1",
+      method: "GET",
+      headers: { authorization: "TESTTOKEN3" },
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Your bot is not approved");
   });
 });
 
