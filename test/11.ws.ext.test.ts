@@ -205,6 +205,37 @@ describe("WS (Bot)", () => {
         .where(eq(botManages.id, "TESTBOT1"));
     }
   });
+  test("Bot削除で接続中のBotは切断される", async () => {
+    // 既存フィクスチャを壊さないよう使い捨てBotを直挿しする
+    await db.insert(users).values({
+      id: "TESTUSER_BOT_TMP",
+      name: "testbotuser_tmp",
+      selfIntroduction: "",
+    });
+    await db.insert(botManages).values({
+      id: "TESTBOT_TMP",
+      botName: "BOT_TEST_TMP",
+      createdBy: "TESTUSER",
+      remoteUserId: "TESTUSER_BOT_TMP",
+      approveStatus: "APPROVED",
+      tokenCode: "TESTTOKEN_TMP",
+      canReadMessage: true,
+      canSendMessage: true,
+    });
+    const { ws, messages } = await connectBot("TESTTOKEN_TMP");
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "DELETE",
+      body: { botId: "TESTBOT_TMP" },
+    });
+    expect(res.ok).toBe(true);
+    await waitForMessage(messages, "bot was deleted");
+    for (let i = 0; i < 40 && ws.readyState !== WebSocket.CLOSED; i++) {
+      await Bun.sleep(25);
+    }
+    expect(ws.readyState).toBe(WebSocket.CLOSED);
+  });
 
   test("非透過Botは許可されたチャンネルのみ受信する", async () => {
     // TESTBOT1 は TESTCHANNEL1 のみ許可
