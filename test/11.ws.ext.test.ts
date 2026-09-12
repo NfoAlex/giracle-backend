@@ -154,10 +154,10 @@ describe("WS (Bot)", () => {
       }
       expect(ws.readyState).toBe(WebSocket.CLOSED);
     } finally {
-      // 後続のテストのため承認済みへ戻す
+      // 後続のテストのため承認済み・権限フラグを戻す(権限を戻さないと後続テストに漏れる)
       await db
         .update(botManages)
-        .set({ approveStatus: "APPROVED" })
+        .set({ approveStatus: "APPROVED", canManageServerConfig: false })
         .where(eq(botManages.id, "TESTBOT1"));
     }
   });
