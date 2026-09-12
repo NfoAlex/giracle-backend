@@ -6,6 +6,7 @@ import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
+  type BotChannelPermission,
   type BotManage,
   botChannelPermissions,
   botManages,
@@ -15,6 +16,7 @@ import {
   invitations,
   requestLog,
   serverConfigs,
+  type User,
   users,
 } from "../../db/schema";
 import { Util } from "../../Util";
@@ -156,9 +158,14 @@ export namespace ServiceServer {
       }
     }
 
-    let botCreated: BotManage;
+    let botCreatedResult:
+      | (BotManage & {
+          channelPermissions: BotChannelPermission[] | undefined;
+          user: User;
+        })
+      | undefined;
     try {
-      botCreated = db.transaction((trx) => {
+      botCreatedResult = db.transaction((trx) => {
         const userForBot = trx
           .insert(users)
           .values({
@@ -189,8 +196,9 @@ export namespace ServiceServer {
         if (bot === undefined) throw status(500, "Bot creation failed");
 
         //チャンネル登録
+        let channelsPermitted: BotChannelPermission[] | undefined;
         if (!useAllChannel && uniqueChannelIds.length !== 0) {
-          trx
+          channelsPermitted = trx
             .insert(botChannelPermissions)
             .values(
               uniqueChannelIds.map((channelId) => {
@@ -200,10 +208,17 @@ export namespace ServiceServer {
                 };
               }),
             )
-            .run();
+            .returning()
+            .all();
         }
 
-        return bot;
+        const returningBotResult = {
+          user: userForBot,
+          channelPermissions: channelsPermitted,
+          ...bot,
+        };
+
+        return returningBotResult;
       });
     } catch (e) {
       if (
@@ -216,7 +231,7 @@ export namespace ServiceServer {
       throw e;
     }
 
-    return botCreated;
+    return botCreatedResult;
   };
 
   export const DeleteBot = async (botId: string, _userId: string) => {
