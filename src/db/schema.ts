@@ -898,3 +898,4 @@ export type Channel = typeof channels.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type NewMessageUrlPreview = typeof messageUrlPreviews.$inferInsert;
 export type BotManage = typeof botManages.$inferSelect;
+export type BotChannelPermission = typeof botChannelPermissions.$inferInsert;
