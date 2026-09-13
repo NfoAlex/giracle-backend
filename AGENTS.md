@@ -2,6 +2,12 @@
 
 Giracle（セルフホスト型チャットサービス）のバックエンド。プロジェクト概要・エンドポイント一覧・WS シグナル一覧・環境変数は [README.md](README.md) を参照。このファイルは **コードを書く際に必要なコンテキスト**（アーキテクチャの約束事・落とし穴）をまとめる。
 
+## 進め方
+
+- リポジトリを俯瞰するために README を毎回読む必要はない。README.md はエンドポイント・WS シグナル・環境変数の一覧を更新するとき、または概要を確認したいときに参照する。本ファイルの各節もそのトピックを触るときだけ読めばよい。
+- `NODE_ENV=test bun test` は使い捨ての `test.db` に対して走るので、承認なしで実行してよい。変更に起因する失敗は遠慮なく修正して再実行すること。
+- 完了の定義は末尾の「変更時のチェックリスト」をすべて満たすこと。最初の実装で報告して止まらず、テストと Biome が通るところまで進めてから返す。
+
 ## コマンド
 
 ```bash
@@ -111,7 +117,7 @@ server?.publish(
 
 - signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
 - ユーザーの購読チャンネルを増減させるときは [src/Utils/WSUserInstance.ts](src/Utils/WSUserInstance.ts)（`Util.wsUserInstance.subscribe(userId, wsChannel)` / `.unsubscribe(...)`）を使う。`Util.wsUserInstance.instances`（Map<userId, ws[]>）が通常ユーザーと Bot の両方の接続を一括管理し、複数端末の同時接続を許容する。BAN・Bot 無効化時の切断は `Util.wsUserInstance.disconnect(userId, reason)`。
-  - この共通処理を通常ユーザー用 [src/ws.ts](src/ws.ts) と Bot 用 [src/external/ws.ext.ts](src/external/ws.ext.ts) が共有する。**WS 接続は `/ws`（通常ユーザー・Cookie 認証）と `/ext/ws`（Bot・Authorization ヘッダ）でエンドポイントが分かれている**（Elysia の静的ルーターが同一パスの WS ルートを上書きするため同居できない）。
+  - この共通処理を通常ユーザー用 [src/ws.ts](src/ws.ts) と Bot 用 [src/external/ws.ext.ts](src/external/ws.ext.ts) が共有する。エンドポイントは Bot 節のとおり分離している（`/ws` / `/ext/ws`）。
   - 新規チャンネル作成時は `WSSubscribeAllChannelBots(channelId)`（[src/external/ws.ext.ts](src/external/ws.ext.ts)）で全透過 Bot を追従させる。
 - URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
 
