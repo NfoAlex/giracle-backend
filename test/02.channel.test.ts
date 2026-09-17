@@ -2,9 +2,11 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { db } from "../src";
 import {
+  channels,
   channelViewableRoles,
   messageFileAttached,
   messageReadTimes,
+  roleLinks,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -406,6 +408,23 @@ describe("/channel/search", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("クエリー空文字", async () => {
+    //空文字を許すとLIKE '%%'になり可視チャンネル全件が返ってしまう
+    const res = await FETCH({
+      path: "/channel/search/?query=",
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("クエリー長すぎ", async () => {
+    const res = await FETCH({
+      path: `/channel/search/?query=${"a".repeat(101)}`,
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
     //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
     const res = await FETCH({
@@ -426,6 +445,78 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("正常 :: 自分が作成した閲覧制限チャンネルが見える", async () => {
+    //TESTUSER2作成・閲覧ロールはTESTUSERのみのチャンネルを用意する
+    await db.insert(channels).values({
+      id: "TESTCHANNEL_CREATOR",
+      name: "CreatorOnly Room",
+      description: "Created by TESTUSER2",
+      createdUserId: "TESTUSER2",
+    });
+    await db.insert(channelViewableRoles).values({
+      channelId: "TESTCHANNEL_CREATOR",
+      roleId: "ChannelPrivateViewer",
+    });
+    try {
+      //search/get-info/listで可視集合が揃っていることを確認する
+      const res = await FETCH({
+        path: "/channel/search/?query=CreatorOnly",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CREATOR",
+      ]);
+      //同じチャンネルがget-infoでも取得できる(以前は404で不一致だった)
+      const info = await FETCH({
+        path: "/channel/get-info/TESTCHANNEL_CREATOR",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      expect(info.status).toBe(200);
+
+      const list = await FETCH({
+        path: "/channel/list",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const jList = await list.json();
+      expect(jList.data.map((c: { id: string }) => c.id)).toContain(
+        "TESTCHANNEL_CREATOR",
+      );
+    } finally {
+      await db.delete(channels).where(eq(channels.id, "TESTCHANNEL_CREATOR"));
+    }
+  });
+
+  it("正常 :: サーバー管理者は閲覧制限チャンネルも検索できる", async () => {
+    //TESTUSERへ一時的にHOST(manageServer)を付与し、List/Searchの可視集合が管理権限で広がることを確認する
+    await db.insert(roleLinks).values({ userId: "TESTUSER", roleId: "HOST" });
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=Private",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toContain("TESTCHANNEL4");
+
+      const list = await FETCH({ path: "/channel/list", method: "GET" });
+      const jList = await list.json();
+      expect(jList.data.map((c: { id: string }) => c.id)).toContain(
+        "TESTCHANNEL4",
+      );
+    } finally {
+      await db
+        .delete(roleLinks)
+        .where(
+          and(eq(roleLinks.userId, "TESTUSER"), eq(roleLinks.roleId, "HOST")),
+        );
+    }
   });
 });
 

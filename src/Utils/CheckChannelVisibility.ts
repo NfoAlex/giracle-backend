@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "..";
 import {
   channelJoins,
+  channels,
   channelViewableRoles,
   roleInfos,
   roleLinks,
@@ -22,6 +23,14 @@ export default async function CheckChannelVisibility(
     .from(channelViewableRoles)
     .where(eq(channelViewableRoles.channelId, _channelId));
   if (roleViewable.length === 0) return true;
+
+  //チャンネル作成者は無条件で閲覧可能(GetUserViewableChannelの判定と揃える)
+  const channel = await db
+    .select({ createdUserId: channels.createdUserId })
+    .from(channels)
+    .where(eq(channels.id, _channelId))
+    .get();
+  if (channel !== undefined && channel.createdUserId === _userId) return true;
 
   // チャンネルに参加しているか調べる
   const channelJoined = await db.query.channelJoins.findFirst({
