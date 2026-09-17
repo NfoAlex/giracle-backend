@@ -160,8 +160,8 @@ export const server = new Elysia({ prefix: "/server" })
     async ({
       body: {
         botId,
-        name,
-        description,
+        botName,
+        botDescription,
         permissionChannelIds,
         useAllChannel,
         canFetchUserinfo,
@@ -174,8 +174,8 @@ export const server = new Elysia({ prefix: "/server" })
       CheckToken: { _userId },
     }) => {
       const bot = await ServiceServer.PatchBot(botId, _userId, {
-        name,
-        description,
+        botName,
+        botDescription,
         permissionChannelIds,
         useAllChannel,
         canFetchUserinfo,
@@ -194,8 +194,8 @@ export const server = new Elysia({ prefix: "/server" })
     {
       body: t.Object({
         botId: t.String(),
-        name: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
-        description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
+        botName: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
+        botDescription: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
         permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1 })),
         useAllChannel: t.Optional(t.Boolean()),
         canFetchUserinfo: t.Optional(t.Boolean()),

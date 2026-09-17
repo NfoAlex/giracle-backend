@@ -260,8 +260,8 @@ export namespace ServiceServer {
     botId: string,
     _userId: string,
     updateValue: {
-      name?: string;
-      description?: string;
+      botName?: string;
+      botDescription?: string;
       permissionChannelIds?: string[];
       useAllChannel?: boolean;
       canFetchUserinfo?: boolean;
@@ -298,8 +298,8 @@ export namespace ServiceServer {
       ...currentBotPermissions
     } = currentBot;
     const {
-      name,
-      description,
+      botName,
+      botDescription,
       permissionChannelIds,
       useAllChannel,
       ...permissions
@@ -372,7 +372,7 @@ export namespace ServiceServer {
           permissions[key] !== currentBotPermissions[key],
       );
       needsReapproval =
-        (name !== undefined && name !== currentBotName) ||
+        (botName !== undefined && botName !== currentBotName) ||
         permissionChanged ||
         channelPermissionChanged;
     }
@@ -402,8 +402,8 @@ export namespace ServiceServer {
           .set({
             //更新項目が無い更新ではnameがundefinedのままになり、drizzleは空のsetで
             //例外を投げて500になる。botNameは必ず書く値なので現状値で埋める
-            botName: name ?? currentBotName,
-            botDescription: description,
+            botName: botName ?? currentBotName,
+            botDescription: botDescription,
             useAllChannel: useAllChannel,
             approveStatus: newApproveStatus,
             ...permissions,
@@ -453,10 +453,10 @@ export namespace ServiceServer {
 
         //改名時は紐付いたユーザー行の名前も揃える(表示名はusers.name側を参照する)
         let botUser: User | undefined;
-        if (name !== undefined) {
+        if (botName !== undefined) {
           botUser = trx
             .update(users)
-            .set({ name })
+            .set({ name: botName })
             .where(eq(users.id, updated.remoteUserId))
             .returning()
             .get();
