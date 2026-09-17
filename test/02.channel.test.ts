@@ -406,6 +406,23 @@ describe("/channel/search", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("クエリー空文字", async () => {
+    //空文字を許すとLIKE '%%'になり可視チャンネル全件が返ってしまう
+    const res = await FETCH({
+      path: "/channel/search/?query=",
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("クエリー長すぎ", async () => {
+    const res = await FETCH({
+      path: `/channel/search/?query=${"a".repeat(101)}`,
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
     //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
     const res = await FETCH({

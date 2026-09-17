@@ -181,7 +181,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     },
     {
       query: t.Object({
-        query: t.String(),
+        query: t.String({ minLength: 1, maxLength: 100 }),
       }),
       detail: {
         description: "チャンネル情報を検索します",
