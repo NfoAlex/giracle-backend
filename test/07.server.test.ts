@@ -591,7 +591,7 @@ describe("PATCH /server/bot", () => {
       method: "PATCH",
       body: {
         botId: "TESTBOT1",
-        name: "BOT_TEST_1_RENAMED",
+        botName: "BOT_TEST_1_RENAMED",
         canSendMessage: true,
         canManageUser: true,
       },
@@ -628,7 +628,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", name: "BOT_TEST_1_RENAMED2" },
+      body: { botId: "TESTBOT1", botName: "BOT_TEST_1_RENAMED2" },
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -647,7 +647,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", name: "BOT_TEST_1_RENAMED3" },
+      body: { botId: "TESTBOT1", botName: "BOT_TEST_1_RENAMED3" },
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -717,7 +717,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", description: "testing new description" },
+      body: { botId: "TESTBOT1", botDescription: "testing new description" },
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -730,7 +730,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", name: "BOT_TEST_2" },
+      body: { botId: "TESTBOT1", botName: "BOT_TEST_2" },
     });
     expect(res.ok).toBeFalse();
     const t = await res.text();
@@ -741,7 +741,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT3", name: "hijack" },
+      body: { botId: "TESTBOT3", botName: "hijack" },
     });
     expect(res.ok).toBeFalse();
   });
@@ -750,7 +750,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT999", name: "ghost" },
+      body: { botId: "TESTBOT999", botName: "ghost" },
     });
     expect(res.ok).toBeFalse();
     const t = await res.text();
@@ -795,7 +795,7 @@ describe("PATCH /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", description: "keep permissions" },
+      body: { botId: "TESTBOT1", botDescription: "keep permissions" },
     });
     expect(res.ok).toBe(true);
     expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
