@@ -312,15 +312,15 @@ export namespace ServiceChannel {
     const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
-    //チャンネル検索
+    //チャンネル検索(前方一致。GLOBは`*`を索引レンジに変換するためChannel_name_uniqueが効く)
     if (channelIdsViewable.length === 0) return [];
     const channelInfos = await db
       .select()
       .from(channels)
       .where(
         and(
-          //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
-          sql`${channels.name} LIKE ${`%${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
+          //ワイルドカード(*,?,[,])を無効化してGLOB検索(item 15)
+          sql`${channels.name} GLOB ${`${Util.escapeGlobPattern(query)}*`}`,
           inArray(channels.id, channelIdsViewable),
         ),
       );
