@@ -171,8 +171,12 @@ export const channel = new Elysia({ prefix: "/channel" })
   )
   .get(
     "/search",
-    async ({ query: { query }, CheckToken: { _userId } }) => {
-      const channelInfos = await ServiceChannel.Search(query, _userId);
+    async ({ query: { query, cursorChannelId }, CheckToken: { _userId } }) => {
+      const channelInfos = await ServiceChannel.Search(
+        query,
+        _userId,
+        cursorChannelId,
+      );
 
       return {
         message: "Searched channels",
@@ -182,6 +186,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     {
       query: t.Object({
         query: t.String({ minLength: 1, maxLength: 100 }),
+        cursorChannelId: t.Optional(t.String()),
       }),
       detail: {
         description: "チャンネル情報を検索します",

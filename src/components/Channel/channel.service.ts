@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
@@ -307,10 +307,29 @@ export namespace ServiceChannel {
     };
   };
 
-  export const Search = async (query: string, _userId: string) => {
+  export const Search = async (
+    query: string,
+    _userId: string,
+    cursorChannelId?: string,
+  ) => {
     //閲覧できるチャンネルをId配列で取得
     const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
+
+    //カーソル位置より後ろ(名前順で後ろ)を取得する条件
+    //Channelには作成日時が無いため並び順は検索対象と同じnameを使う
+    let queryFromCursor: SQL | undefined;
+    if (cursorChannelId) {
+      const cursorChannel = db
+        .select({ name: channels.name })
+        .from(channels)
+        .where(eq(channels.id, cursorChannelId))
+        .get();
+      if (cursorChannel === undefined)
+        throw status(400, "Cursor channel does not exists");
+      //nameはUNIQUEなのでIdでの同値タイブレークは不要
+      queryFromCursor = gt(channels.name, cursorChannel.name);
+    }
 
     //チャンネル検索(前方一致。GLOBは`*`を索引レンジに変換するためChannel_name_uniqueが効く)
     if (channelIdsViewable.length === 0) return [];
@@ -322,8 +341,11 @@ export namespace ServiceChannel {
           //ワイルドカード(*,?,[,])を無効化してGLOB検索(item 15)
           sql`${channels.name} GLOB ${`${Util.escapeGlobPattern(query)}*`}`,
           inArray(channels.id, channelIdsViewable),
+          queryFromCursor,
         ),
-      );
+      )
+      .orderBy(channels.name)
+      .limit(50);
 
     return channelInfos;
   };
