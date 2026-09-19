@@ -426,7 +426,7 @@ describe("/channel/search", async () => {
   });
 
   it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
-    //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
+    //エスケープ無しだとLIKE時代の`%%%`は全チャンネルにマッチしていた
     const res = await FETCH({
       path: "/channel/search/?query=%25",
       method: "GET",
@@ -434,6 +434,30 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("前方一致で検索する", async () => {
+    //部分一致(以前のLIKE '%query%')だと"eneral"が"General"にヒットしていた
+    const res = await FETCH({
+      path: "/channel/search/?query=eneral",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
+  it("ワイルドカード文字(*,?,[,])がリテラル扱いされる", async () => {
+    //エスケープ無しだと`*`/`?`が全チャンネルにマッチしてしまう
+    for (const query of ["*", "?", "[", "]"]) {
+      const res = await FETCH({
+        path: `/channel/search/?query=${encodeURIComponent(query)}`,
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.length).toBe(0);
+    }
   });
 
   it("プライベートが非表示なのを確認 :: 二番目のユーザー", async () => {
