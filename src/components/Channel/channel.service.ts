@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { and, eq, gt, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
@@ -321,7 +321,7 @@ export namespace ServiceChannel {
 
     //カーソル行も可視集合から引く。可視外のIdを素通しすると「存在するが不可視」と
     //「存在しない」で応答が変わり、チャンネルIdの存在を推測できてしまう
-    let queryFromCursor: SQL | undefined;
+    let cursorChannelName: string | undefined;
     if (cursorChannelId !== undefined) {
       const cursorChannel = db
         .select({ name: channels.name })
@@ -335,23 +335,26 @@ export namespace ServiceChannel {
         .get();
       if (cursorChannel === undefined)
         throw status(400, "Cursor channel does not exists");
-      //nameはUNIQUEなのでIdでの同値タイブレークは不要
-      queryFromCursor = gt(channels.name, cursorChannel.name);
+      cursorChannelName = cursorChannel.name;
     }
 
-    //チャンネル検索(前方一致。GLOBは`*`を索引レンジに変換するためChannel_name_uniqueが効く)
+    //チャンネル検索(大小を区別しない前方一致)
+    //LIKEは既定でASCIIの大小を区別しないため、Channel_name_nocase_idxが索引レンジに変換する
     const channelInfos = await db
       .select()
       .from(channels)
       .where(
         and(
-          //ワイルドカード(*,?,[,])を無効化してGLOB検索(item 15)
-          sql`${channels.name} GLOB ${`${Util.escapeGlobPattern(query)}*`}`,
+          //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
+          sql`${channels.name} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
           inArray(channels.id, channelIdsViewable),
-          queryFromCursor,
+          //NOCASEで畳むと別名が同値になるため、nameで決定的にタイブレークして取りこぼしを防ぐ
+          cursorChannelName !== undefined
+            ? sql`(${channels.name} COLLATE NOCASE, ${channels.name}) > (${cursorChannelName}, ${cursorChannelName})`
+            : undefined,
         ),
       )
-      .orderBy(channels.name)
+      .orderBy(sql`${channels.name} COLLATE NOCASE`, channels.name)
       .limit(50);
 
     return channelInfos;

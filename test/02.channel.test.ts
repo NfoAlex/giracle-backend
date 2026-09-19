@@ -426,7 +426,7 @@ describe("/channel/search", async () => {
   });
 
   it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
-    //エスケープ無しだとLIKE時代の`%%%`は全チャンネルにマッチしていた
+    //エスケープ無しだと`%%%`が全チャンネルにマッチしてしまう
     const res = await FETCH({
       path: "/channel/search/?query=%25",
       method: "GET",
@@ -434,6 +434,41 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("ワイルドカード文字(_)がリテラル扱いされる", async () => {
+    //`_`がワイルドカードのままだと"Under_score"以外にも1文字違いでマッチしてしまう
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_UNDER1",
+        name: "Under_score",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_UNDER2",
+        name: "UnderXscore",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=Under_",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_UNDER1",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, ["TESTCHANNEL_UNDER1", "TESTCHANNEL_UNDER2"]),
+        );
+    }
   });
 
   it("前方一致で検索する", async () => {
@@ -445,6 +480,19 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("大小を区別せず検索する", async () => {
+    //LIKEの既定に合わせてASCIIの大小は区別しない
+    for (const query of ["gen", "GEN", "GeNeRaL"]) {
+      const res = await FETCH({
+        path: `/channel/search/?query=${query}`,
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toContain("TESTCHANNEL1");
+    }
   });
 
   it("正常 :: name順で返る", async () => {
@@ -550,16 +598,57 @@ describe("/channel/search", async () => {
     expect(await res.text()).toBe("Cursor channel does not exists");
   });
 
-  it("ワイルドカード文字(*,?,[,])がリテラル扱いされる", async () => {
-    //エスケープ無しだと`*`/`?`が全チャンネルにマッチしてしまう
-    for (const query of ["*", "?", "[", "]"]) {
+  it("正常 :: 大小が異なる名前でもカーソル継続取得が取りこぼさない", async () => {
+    //NOCASEで畳むと "CursorSame a" と "CursorSame A" が同値になるため、
+    //nameでのタイブレークが無いとページ境界で取りこぼす
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_NCASE_A",
+        name: "CursorSame a",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_NCASE_B",
+        name: "CursorSame A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_NCASE_C",
+        name: "CursorSame b",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const all = await FETCH({
+        path: "/channel/search/?query=CursorSame",
+        method: "GET",
+      });
+      const jAll = await all.json();
+      expect(jAll.data.length).toBe(3);
+
+      //先頭をカーソルにして残りが漏れなく取れること
       const res = await FETCH({
-        path: `/channel/search/?query=${encodeURIComponent(query)}`,
+        path: `/channel/search/?query=CursorSame&cursorChannelId=${jAll.data[0].id}`,
         method: "GET",
       });
       const j = await res.json();
-      expect(res.ok).toBe(true);
-      expect(j.data.length).toBe(0);
+      expect(j.data.length).toBe(2);
+      const returned = j.data.map((c: { id: string }) => c.id);
+      expect(returned).not.toContain(jAll.data[0].id);
+      expect(new Set([...returned, jAll.data[0].id]).size).toBe(3);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_NCASE_A",
+            "TESTCHANNEL_NCASE_B",
+            "TESTCHANNEL_NCASE_C",
+          ]),
+        );
     }
   });
 

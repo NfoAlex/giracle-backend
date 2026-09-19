@@ -99,6 +99,13 @@
       "when": 1789040047032,
       "tag": "0013_shallow_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1789849722587,
+      "tag": "0014_acoustic_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

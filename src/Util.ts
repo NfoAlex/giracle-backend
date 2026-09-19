@@ -4,7 +4,6 @@ import CalculateReactionTotal, {
 import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisibility";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
-import EscapeGlobPattern from "./Utils/EscapeGlobPattern";
 import EscapeLikePattern from "./Utils/EscapeLikePattern";
 import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
@@ -22,7 +21,6 @@ export namespace Util {
   export const calculateRoleLevel = CalculateRoleLevel;
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
-  export const escapeGlobPattern = EscapeGlobPattern;
   export const escapeLikePattern = EscapeLikePattern;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;

@@ -189,7 +189,8 @@ export const channel = new Elysia({ prefix: "/channel" })
         cursorChannelId: t.Optional(t.String()),
       }),
       detail: {
-        description: "チャンネル情報を検索します",
+        description:
+          "チャンネル情報を検索します。queryは大小を区別しない前方一致、cursorChannelIdで継続取得(名前順・最大50件)",
         tags: ["Channel"],
       },
     },
