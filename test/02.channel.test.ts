@@ -538,6 +538,18 @@ describe("/channel/search", async () => {
     expect(await res.text()).toBe("Cursor channel does not exists");
   });
 
+  it("異常 :: 閲覧できないチャンネルはcursorChannelIdに使えない", async () => {
+    //存在するが TESTUSER2 から見えないチャンネルをカーソルに指定する
+    //素通しすると「存在するが不可視(200)」と「存在しない(400)」で応答が変わり存在を推測できる
+    const res = await FETCH({
+      path: "/channel/search/?query=Private&cursorChannelId=TESTCHANNEL3",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor channel does not exists");
+  });
+
   it("ワイルドカード文字(*,?,[,])がリテラル扱いされる", async () => {
     //エスケープ無しだと`*`/`?`が全チャンネルにマッチしてしまう
     for (const query of ["*", "?", "[", "]"]) {

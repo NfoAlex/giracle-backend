@@ -316,14 +316,22 @@ export namespace ServiceChannel {
     const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
-    //カーソル位置より後ろ(名前順で後ろ)を取得する条件
-    //Channelには作成日時が無いため並び順は検索対象と同じnameを使う
+    //見えるチャンネルが無ければ検索結果も空
+    if (channelIdsViewable.length === 0) return [];
+
+    //カーソル行も可視集合から引く。可視外のIdを素通しすると「存在するが不可視」と
+    //「存在しない」で応答が変わり、チャンネルIdの存在を推測できてしまう
     let queryFromCursor: SQL | undefined;
-    if (cursorChannelId) {
+    if (cursorChannelId !== undefined) {
       const cursorChannel = db
         .select({ name: channels.name })
         .from(channels)
-        .where(eq(channels.id, cursorChannelId))
+        .where(
+          and(
+            eq(channels.id, cursorChannelId),
+            inArray(channels.id, channelIdsViewable),
+          ),
+        )
         .get();
       if (cursorChannel === undefined)
         throw status(400, "Cursor channel does not exists");
@@ -332,7 +340,6 @@ export namespace ServiceChannel {
     }
 
     //チャンネル検索(前方一致。GLOBは`*`を索引レンジに変換するためChannel_name_uniqueが効く)
-    if (channelIdsViewable.length === 0) return [];
     const channelInfos = await db
       .select()
       .from(channels)
