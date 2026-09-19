@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../src";
 import {
   channels,
@@ -445,6 +445,97 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("正常 :: name順で返る", async () => {
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_CURSOR_B",
+        name: "CursorChan B",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_A",
+        name: "CursorChan A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=CursorChan",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CURSOR_A",
+        "TESTCHANNEL_CURSOR_B",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_CURSOR_A",
+            "TESTCHANNEL_CURSOR_B",
+          ]),
+        );
+    }
+  });
+
+  it("正常 :: cursorChannelId指定でカーソルより後のみ返る", async () => {
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_CURSOR_A",
+        name: "CursorChan A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_B",
+        name: "CursorChan B",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_C",
+        name: "CursorChan C",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=CursorChan&cursorChannelId=TESTCHANNEL_CURSOR_B",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CURSOR_C",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_CURSOR_A",
+            "TESTCHANNEL_CURSOR_B",
+            "TESTCHANNEL_CURSOR_C",
+          ]),
+        );
+    }
+  });
+
+  it("異常 :: 存在しないcursorChannelIdは400", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=Gen&cursorChannelId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor channel does not exists");
   });
 
   it("ワイルドカード文字(*,?,[,])がリテラル扱いされる", async () => {
