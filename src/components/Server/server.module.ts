@@ -38,6 +38,7 @@ export const server = new Elysia({ prefix: "/server" })
   )
 
   .use(Middleware.CheckToken)
+
   .use(Middleware.CheckRoleTerm)
   .get(
     "/get-invite",
