@@ -121,7 +121,7 @@ export const server = new Elysia({ prefix: "/server" })
       body: t.Object({
         name: t.String({ minLength: 1, maxLength: 64 }),
         description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
-        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1 })),
+        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1, maxItems: 100 })),
         useAllChannel: t.Optional(t.Boolean()),
         canFetchUserinfo: t.Optional(t.Boolean()),
         canFetchRoleinfo: t.Optional(t.Boolean()),
