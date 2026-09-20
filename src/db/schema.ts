@@ -65,19 +65,34 @@ export const roleInfos = sqliteTable("RoleInfo", {
     .default(false),
 });
 
-export const channels = sqliteTable("Channel", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull().unique(),
-  description: text("description").notNull(),
-  isArchived: integer("isArchived", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  createdUserId: text("createdUserId")
-    .notNull()
-    .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
-});
+export const channels = sqliteTable(
+  "Channel",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull().unique(),
+    description: text("description").notNull(),
+    isArchived: integer("isArchived", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdUserId: text("createdUserId")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+  },
+  (table) => [
+    //名前検索は大小を区別しない(LIKEの既定)ため、前方一致を索引レンジに変換するには
+    //NOCASE索引が要る。BINARYのUNIQUE索引ではLIKEが索引を使えない。
+    //nameを第2キーに含めて、同名fold衝突時もキーセットの順序が安定するようにする。
+    index("Channel_name_nocase_idx").on(
+      sql`${table.name} COLLATE NOCASE`,
+      table.name,
+    ),
+  ],
+);
 
 export const messages = sqliteTable(
   "Message",

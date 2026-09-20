@@ -137,7 +137,7 @@ giracle-backend/
 | GET | `/channel/get-info/:channelId` | ✅ | - | チャンネル情報取得 |
 | GET | `/channel/list` | ✅ | - | チャンネル一覧取得 |
 | POST | `/channel/get-history/:channelId` | ✅ | - | メッセージ履歴取得（ページネーション対応） |
-| GET | `/channel/search` | ✅ | - | チャンネル検索 |
+| GET | `/channel/search` | ✅ | - | チャンネル検索（`query` は大小を区別しない前方一致。`cursorChannelId` で継続取得。名前順で最大50件） |
 | POST | `/channel/invite` | ✅ | `manageChannel` | ユーザーをチャンネルへ招待（WS通知: `channel::Join`） |
 | POST | `/channel/kick` | ✅ | `manageChannel` | ユーザーをチャンネルからキック（WS通知: `channel::Left`） |
 | POST | `/channel/update` | ✅ | `manageChannel` | チャンネル情報更新（WS通知: `channel::UpdateChannel`） |
