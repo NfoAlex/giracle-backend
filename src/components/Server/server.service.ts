@@ -391,7 +391,7 @@ export namespace ServiceServer {
     //botManagesの更新とusers.nameの更新を1トランザクションにまとめる
     let bot:
       | (BotManage & {
-          channelPermissions: BotChannelPermission[] | undefined;
+          channelPermissions: BotChannelPermission[];
           user: User;
         })
       | undefined;
@@ -474,7 +474,7 @@ export namespace ServiceServer {
           throw status(500, "Bot data should be available");
         return {
           user: botUser,
-          channelPermissions: channelsPermitted,
+          channelPermissions: channelsPermitted ?? [],
           ...updated,
         };
       });
