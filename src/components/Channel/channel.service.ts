@@ -319,8 +319,6 @@ export namespace ServiceChannel {
     //見えるチャンネルが無ければ検索結果も空
     if (channelIdsViewable.length === 0) return [];
 
-    //カーソル行も可視集合から引く。可視外のIdを素通しすると「存在するが不可視」と
-    //「存在しない」で応答が変わり、チャンネルIdの存在を推測できてしまう
     let cursorChannelName: string | undefined;
     if (cursorChannelId !== undefined) {
       const cursorChannel = db
