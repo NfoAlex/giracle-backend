@@ -455,7 +455,7 @@ describe("DELETE /server/bot", () => {
   });
 });
 
-describe("GET /server/bot", () => {
+describe("GET /server/bot/all", () => {
   it("正常", async () => {
     const res = await FETCH({
       path: "/server/bot/all",
