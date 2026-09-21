@@ -415,7 +415,7 @@ export const user = new Elysia({ prefix: "/user" })
       detail: {
         description: "トークンの検証",
         tags: ["User"],
-      }
+      },
     },
   )
   .get(

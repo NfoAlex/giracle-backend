@@ -612,7 +612,12 @@ export const server = new Elysia({ prefix: "/server" })
     },
     {
       query: t.Object({
-        query: t.Optional(t.String()),
+        query: t.Optional(
+          t.String({
+            minLength: 1,
+            maxLength: 100,
+          }),
+        ),
         cursorBotId: t.Optional(t.String()),
       }),
       detail: {
