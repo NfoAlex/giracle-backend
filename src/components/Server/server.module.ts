@@ -602,8 +602,8 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .get(
     "/bot/all",
-    async ({ query: { cursorBotId } }) => {
-      const bots = await ServiceServer.GetBot(cursorBotId);
+    async ({ query: { query, cursorBotId } }) => {
+      const bots = await ServiceServer.GetBot(query, cursorBotId);
 
       return {
         message: "Bot fetched",
@@ -612,10 +612,11 @@ export const server = new Elysia({ prefix: "/server" })
     },
     {
       query: t.Object({
+        query: t.Optional(t.String()),
         cursorBotId: t.Optional(t.String()),
       }),
       detail: {
-        description: "ボットの一覧を取得",
+        description: "管理者としてボットの一覧を取得",
         tags: ["Server", "Bot"],
       },
       checkRoleTerm: "manageServer",

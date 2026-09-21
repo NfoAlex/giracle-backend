@@ -920,7 +920,12 @@ export namespace ServiceServer {
     };
   };
 
-  export const GetBot = async (cursorBotId?: string) => {
+  export const GetBot = async (query?: string, cursorBotId?: string) => {
+    //query未指定なら名前条件を足さない(空文字なら全件)
+    const queryFromName = query
+      ? sql`${botManages.botName} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`
+      : undefined;
+
     let queryFromCursor: SQL | undefined;
     if (cursorBotId) {
       const cursorBot = db
@@ -956,7 +961,7 @@ export namespace ServiceServer {
         createdBy: botManages.createdBy,
       })
       .from(botManages)
-      .where(queryFromCursor)
+      .where(and(queryFromCursor, queryFromName))
       .limit(50)
       //新しい順で取得する
       .orderBy(desc(botManages.createdAt), desc(botManages.id));
