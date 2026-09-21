@@ -14,7 +14,6 @@ import {
 } from "../../db/schema";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
 import { Util } from "../../Util";
-import { userWSInstance, WSDisconnectUser } from "../../ws";
 
 export namespace ServiceUser {
   export const SignUp = async (
@@ -209,7 +208,7 @@ export namespace ServiceUser {
 
   export const GetOnline = async () => {
     //オンラインユーザーIDを取得
-    const onlineUserIds = Array.from(userWSInstance.keys());
+    const onlineUserIds = Array.from(Util.wsUserInstance.instances.keys());
     //重複を削除
     const uniqueOnlineUserIds = Array.from(new Set(onlineUserIds)).map(String);
 
@@ -685,7 +684,7 @@ export namespace ServiceUser {
     invalidateUserCache(userId);
 
     //既存のWS接続も切断する(BAN後も新着メッセージを受信し続けられるのを防ぐ)
-    WSDisconnectUser(userId);
+    Util.wsUserInstance.disconnect(userId);
 
     return userBanned;
   };
@@ -738,7 +737,7 @@ export namespace ServiceUser {
     }
 
     //既存のWS接続も切断する
-    WSDisconnectUser(userId);
+    Util.wsUserInstance.disconnect(userId);
 
     return;
   };

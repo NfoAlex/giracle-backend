@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import { $ } from "bun";
 import { eq } from "drizzle-orm";
-import { app } from "../src";
+import { app, reloadServerConfig } from "../src";
 import { db } from "../src/db";
 import {
+  botChannelPermissions,
+  botManages,
   channelJoinOnDefaults,
   channelJoins,
   channelMutes,
@@ -58,6 +60,8 @@ export async function INIT() {
   await db.delete(messageUrlPreviewThumbnails);
   await db.delete(messageUrlPreviews);
   await db.delete(messages);
+  await db.delete(botChannelPermissions);
+  await db.delete(botManages);
   await db.delete(roleLinks);
   await db.delete(roleInfos);
   await db.delete(channels);
@@ -67,11 +71,15 @@ export async function INIT() {
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
   await fs.rm("./STORAGE/thumbnail", { recursive: true, force: true });
-  await $`bun ./src/db/seeds.ts`;
+  await $`bun run ./src/db/seeds.ts`;
+  await reloadServerConfig(); //ServerConfigを初期化する
 
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_1", name: "testbotuser", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_2", name: "testbotuser2", selfIntroduction: "" },
+    { id: "TESTUSER_BOT_3", name: "testbotuser3", selfIntroduction: "" },
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
@@ -220,19 +228,68 @@ export async function INIT() {
     .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
     .onConflictDoNothing();
+
+  // --- 07.server: サーバー用データ追加
+  // ボット
+  // id・createdAtを固定しないとrandomUUID+同msで順序が不定になる
+  const botBase = Date.now();
+  await db
+    .insert(botManages)
+    .values([
+      {
+        id: "TESTBOT1",
+        botName: "BOT_TEST_1",
+        createdBy: "TESTUSER",
+        remoteUserId: "TESTUSER_BOT_1",
+        approveStatus: "APPROVED",
+        createdAt: new Date(botBase),
+        tokenCode: "TESTTOKEN1",
+        canReadMessage: true,
+        canSendMessage: true,
+      },
+      {
+        id: "TESTBOT2",
+        botName: "BOT_TEST_2",
+        createdBy: "TESTUSER",
+        remoteUserId: "TESTUSER_BOT_2",
+        approveStatus: "APPROVED",
+        createdAt: new Date(botBase + 1),
+        tokenCode: "TESTTOKEN2",
+      },
+      {
+        id: "TESTBOT3",
+        botName: "BOT_TEST_3",
+        createdBy: "TESTUSER2",
+        remoteUserId: "TESTUSER_BOT_3",
+        createdAt: new Date(botBase + 2),
+      },
+    ])
+    .onConflictDoNothing();
+  await db
+    .insert(botChannelPermissions)
+    .values([
+      {
+        id: 1,
+        channelId: "TESTCHANNEL1",
+        botId: "TESTBOT1",
+      },
+    ])
+    .onConflictDoNothing();
 }
 
 export async function FETCH({
   path,
   method,
   body,
+  headers,
   useSecondaryUser = false,
   excludeCredential = false,
 }: {
   path: `/${string}`;
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   // biome-ignore lint/suspicious/noExplicitAny: for test
   body?: any;
+  headers?: Record<string, string>;
   useSecondaryUser?: boolean;
   excludeCredential?: boolean;
 }): Promise<Response> {
@@ -245,6 +302,7 @@ export async function FETCH({
       credentials: "include",
       headers: {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(headers ?? {}),
         Cookie: excludeCredential ? "" : `token=${tokenUsing}`,
       },
       body: isFormData ? body : JSON.stringify(body),

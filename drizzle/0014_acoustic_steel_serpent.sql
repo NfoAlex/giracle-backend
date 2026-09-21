@@ -1,0 +1,1 @@
+CREATE INDEX `Channel_name_nocase_idx` ON `Channel` ("name" COLLATE NOCASE,`name`);

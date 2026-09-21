@@ -6,6 +6,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 // ============================================================
@@ -27,8 +28,12 @@ export const users = sqliteTable(
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
+    isBot: integer("isBot", { mode: "boolean" }).notNull().default(false),
   },
-  (table) => [index("User_id_createdAt_idx").on(table.createdAt, table.id)],
+  (table) => [
+    index("User_id_createdAt_idx").on(table.createdAt, table.id),
+    index("User_isBot_idx").on(table.isBot),
+  ],
 );
 
 export const roleInfos = sqliteTable("RoleInfo", {
@@ -60,19 +65,34 @@ export const roleInfos = sqliteTable("RoleInfo", {
     .default(false),
 });
 
-export const channels = sqliteTable("Channel", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull().unique(),
-  description: text("description").notNull(),
-  isArchived: integer("isArchived", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  createdUserId: text("createdUserId")
-    .notNull()
-    .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
-});
+export const channels = sqliteTable(
+  "Channel",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull().unique(),
+    description: text("description").notNull(),
+    isArchived: integer("isArchived", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdUserId: text("createdUserId")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+  },
+  (table) => [
+    //名前検索は大小を区別しない(LIKEの既定)ため、前方一致を索引レンジに変換するには
+    //NOCASE索引が要る。BINARYのUNIQUE索引ではLIKEが索引を使えない。
+    //nameを第2キーに含めて、同名fold衝突時もキーセットの順序が安定するようにする。
+    index("Channel_name_nocase_idx").on(
+      sql`${table.name} COLLATE NOCASE`,
+      table.name,
+    ),
+  ],
+);
 
 export const messages = sqliteTable(
   "Message",
@@ -85,6 +105,7 @@ export const messages = sqliteTable(
       .notNull()
       .default(false),
     isEdited: integer("isEdited", { mode: "boolean" }).notNull().default(false),
+    isBot: integer("isBot", { mode: "boolean" }).notNull().default(false),
     replyingMessageId: text("replyingMessageId"),
     userId: text("userId")
       .notNull()
@@ -489,6 +510,12 @@ export const serverConfigs = sqliteTable("ServerConfig", {
     .default(""),
   MessageMaxLength: integer("MessageMaxLength").notNull().default(3000),
   MessageMaxFileSize: integer("MessageMaxFileSize").notNull().default(512000),
+  BotEnabled: integer("BotEnabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  BotAutoApprove: integer("BotAutoApprove", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 export const requestLog = sqliteTable(
@@ -523,6 +550,80 @@ export const requestLog = sqliteTable(
   ],
 );
 
+export const botManages = sqliteTable(
+  "BotManage",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    createdBy: text("createdBy")
+      .notNull()
+      .references(() => users.id),
+    botName: text("botName", { length: 64 }).notNull().unique(),
+    botDescription: text("botDescription", { length: 255 }),
+    remoteUserId: text("remoteUserId")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    approveStatus: text("status", {
+      enum: ["PENDING", "APPROVED", "DENIED", "BLOCKED"],
+    })
+      .notNull()
+      .default("PENDING"),
+    tokenCode: text("tokenCode")
+      .notNull()
+      .unique()
+      .$defaultFn(() => crypto.randomUUID()),
+    useAllChannel: integer("useAllChannel", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canFetchUserinfo: integer("canFetchUserinfo", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canFetchRoleinfo: integer("canFetchRoleinfo", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canManageUser: integer("canManageUser", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canManageServerConfig: integer("canManageServerConfig", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canReadMessage: integer("canReadMessage", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    canSendMessage: integer("canSendMessage", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => [
+    check("BotManage_botName_chk", sql`length(${table.botName}) <= 64`),
+  ],
+);
+
+export const botChannelPermissions = sqliteTable(
+  "BotChannelPermission",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    botId: text("botId")
+      .notNull()
+      .references(() => botManages.id, { onDelete: "cascade" }),
+    channelId: text("channelId")
+      .notNull()
+      .references(() => channels.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("BotChannelPermission_botId_channelId_unique").on(
+      table.botId,
+      table.channelId,
+    ),
+    index("BotChannelPermission_channelId_idx").on(table.channelId),
+  ],
+);
+
 // ============================================================
 // リレーション定義
 // プロパティ名は schema.prisma のリレーションフィールド名と完全一致させる
@@ -552,6 +653,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   RoleInfo: many(roleInfos),
   RoleLink: many(roleLinks),
   Token: many(tokens),
+  botManage: one(botManages, {
+    fields: [users.id],
+    references: [botManages.remoteUserId],
+  }),
 }));
 
 export const roleInfosRelations = relations(roleInfos, ({ one, many }) => ({
@@ -579,6 +684,7 @@ export const channelsRelations = relations(channels, ({ one, many }) => ({
   MessageFileAttached: many(messageFileAttached),
   MessageReaction: many(messageReactions),
   MessageReadTime: many(messageReadTimes),
+  BotChannelPermission: many(botChannelPermissions),
 }));
 
 export const messagesRelations = relations(messages, ({ one, many }) => ({
@@ -772,6 +878,32 @@ export const invitationsRelations = relations(invitations, ({ one }) => ({
   }),
 }));
 
+export const botManageRelations = relations(botManages, ({ one, many }) => ({
+  user: one(users, {
+    fields: [botManages.remoteUserId],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [botManages.createdBy],
+    references: [users.id],
+  }),
+  channelPermissions: many(botChannelPermissions),
+}));
+
+export const botChannelPermissionRelations = relations(
+  botChannelPermissions,
+  ({ one }) => ({
+    bot: one(botManages, {
+      fields: [botChannelPermissions.botId],
+      references: [botManages.id],
+    }),
+    channel: one(channels, {
+      fields: [botChannelPermissions.channelId],
+      references: [channels.id],
+    }),
+  }),
+);
+
 // ============================================================
 // 型 export (prisma/generated/client の代替)
 // ============================================================
@@ -780,3 +912,5 @@ export type User = typeof users.$inferSelect;
 export type Channel = typeof channels.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type NewMessageUrlPreview = typeof messageUrlPreviews.$inferInsert;
+export type BotManage = typeof botManages.$inferSelect;
+export type BotChannelPermission = typeof botChannelPermissions.$inferInsert;

@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../src";
 import {
+  channels,
   channelViewableRoles,
   messageFileAttached,
   messageReadTimes,
+  roleLinks,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -406,8 +408,25 @@ describe("/channel/search", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("クエリー空文字", async () => {
+    //空文字を許すとLIKE '%%'になり可視チャンネル全件が返ってしまう
+    const res = await FETCH({
+      path: "/channel/search/?query=",
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("クエリー長すぎ", async () => {
+    const res = await FETCH({
+      path: `/channel/search/?query=${"a".repeat(101)}`,
+      method: "GET",
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("ワイルドカード文字(%)がリテラル扱いされる", async () => {
-    //エスケープ無しだと%%%が全チャンネルにマッチしてしまう
+    //エスケープ無しだと`%%%`が全チャンネルにマッチしてしまう
     const res = await FETCH({
       path: "/channel/search/?query=%25",
       method: "GET",
@@ -415,6 +434,222 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("ワイルドカード文字(_)がリテラル扱いされる", async () => {
+    //`_`がワイルドカードのままだと"Under_score"以外にも1文字違いでマッチしてしまう
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_UNDER1",
+        name: "Under_score",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_UNDER2",
+        name: "UnderXscore",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=Under_",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_UNDER1",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, ["TESTCHANNEL_UNDER1", "TESTCHANNEL_UNDER2"]),
+        );
+    }
+  });
+
+  it("前方一致で検索する", async () => {
+    //部分一致(以前のLIKE '%query%')だと"eneral"が"General"にヒットしていた
+    const res = await FETCH({
+      path: "/channel/search/?query=eneral",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(0);
+  });
+
+  it("大小を区別せず検索する", async () => {
+    //LIKEの既定に合わせてASCIIの大小は区別しない
+    for (const query of ["gen", "GEN", "GeNeRaL"]) {
+      const res = await FETCH({
+        path: `/channel/search/?query=${query}`,
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toContain("TESTCHANNEL1");
+    }
+  });
+
+  it("正常 :: name順で返る", async () => {
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_CURSOR_B",
+        name: "CursorChan B",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_A",
+        name: "CursorChan A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=CursorChan",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CURSOR_A",
+        "TESTCHANNEL_CURSOR_B",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_CURSOR_A",
+            "TESTCHANNEL_CURSOR_B",
+          ]),
+        );
+    }
+  });
+
+  it("正常 :: cursorChannelId指定でカーソルより後のみ返る", async () => {
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_CURSOR_A",
+        name: "CursorChan A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_B",
+        name: "CursorChan B",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_CURSOR_C",
+        name: "CursorChan C",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=CursorChan&cursorChannelId=TESTCHANNEL_CURSOR_B",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CURSOR_C",
+      ]);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_CURSOR_A",
+            "TESTCHANNEL_CURSOR_B",
+            "TESTCHANNEL_CURSOR_C",
+          ]),
+        );
+    }
+  });
+
+  it("異常 :: 存在しないcursorChannelIdは400", async () => {
+    const res = await FETCH({
+      path: "/channel/search/?query=Gen&cursorChannelId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor channel does not exists");
+  });
+
+  it("異常 :: 閲覧できないチャンネルはcursorChannelIdに使えない", async () => {
+    //存在するが TESTUSER2 から見えないチャンネルをカーソルに指定する
+    //素通しすると「存在するが不可視(200)」と「存在しない(400)」で応答が変わり存在を推測できる
+    const res = await FETCH({
+      path: "/channel/search/?query=Private&cursorChannelId=TESTCHANNEL3",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor channel does not exists");
+  });
+
+  it("正常 :: 大小が異なる名前でもカーソル継続取得が取りこぼさない", async () => {
+    //NOCASEで畳むと "CursorSame a" と "CursorSame A" が同値になるため、
+    //nameでのタイブレークが無いとページ境界で取りこぼす
+    await db.insert(channels).values([
+      {
+        id: "TESTCHANNEL_NCASE_A",
+        name: "CursorSame a",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_NCASE_B",
+        name: "CursorSame A",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+      {
+        id: "TESTCHANNEL_NCASE_C",
+        name: "CursorSame b",
+        description: "",
+        createdUserId: "TESTUSER",
+      },
+    ]);
+    try {
+      const all = await FETCH({
+        path: "/channel/search/?query=CursorSame",
+        method: "GET",
+      });
+      const jAll = await all.json();
+      expect(jAll.data.length).toBe(3);
+
+      //先頭をカーソルにして残りが漏れなく取れること
+      const res = await FETCH({
+        path: `/channel/search/?query=CursorSame&cursorChannelId=${jAll.data[0].id}`,
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(j.data.length).toBe(2);
+      const returned = j.data.map((c: { id: string }) => c.id);
+      expect(returned).not.toContain(jAll.data[0].id);
+      expect(new Set([...returned, jAll.data[0].id]).size).toBe(3);
+    } finally {
+      await db
+        .delete(channels)
+        .where(
+          inArray(channels.id, [
+            "TESTCHANNEL_NCASE_A",
+            "TESTCHANNEL_NCASE_B",
+            "TESTCHANNEL_NCASE_C",
+          ]),
+        );
+    }
   });
 
   it("プライベートが非表示なのを確認 :: 二番目のユーザー", async () => {
@@ -426,6 +661,78 @@ describe("/channel/search", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.length).toBe(0);
+  });
+
+  it("正常 :: 自分が作成した閲覧制限チャンネルが見える", async () => {
+    //TESTUSER2作成・閲覧ロールはTESTUSERのみのチャンネルを用意する
+    await db.insert(channels).values({
+      id: "TESTCHANNEL_CREATOR",
+      name: "CreatorOnly Room",
+      description: "Created by TESTUSER2",
+      createdUserId: "TESTUSER2",
+    });
+    await db.insert(channelViewableRoles).values({
+      channelId: "TESTCHANNEL_CREATOR",
+      roleId: "ChannelPrivateViewer",
+    });
+    try {
+      //search/get-info/listで可視集合が揃っていることを確認する
+      const res = await FETCH({
+        path: "/channel/search/?query=CreatorOnly",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toEqual([
+        "TESTCHANNEL_CREATOR",
+      ]);
+      //同じチャンネルがget-infoでも取得できる(以前は404で不一致だった)
+      const info = await FETCH({
+        path: "/channel/get-info/TESTCHANNEL_CREATOR",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      expect(info.status).toBe(200);
+
+      const list = await FETCH({
+        path: "/channel/list",
+        method: "GET",
+        useSecondaryUser: true,
+      });
+      const jList = await list.json();
+      expect(jList.data.map((c: { id: string }) => c.id)).toContain(
+        "TESTCHANNEL_CREATOR",
+      );
+    } finally {
+      await db.delete(channels).where(eq(channels.id, "TESTCHANNEL_CREATOR"));
+    }
+  });
+
+  it("正常 :: サーバー管理者は閲覧制限チャンネルも検索できる", async () => {
+    //TESTUSERへ一時的にHOST(manageServer)を付与し、List/Searchの可視集合が管理権限で広がることを確認する
+    await db.insert(roleLinks).values({ userId: "TESTUSER", roleId: "HOST" });
+    try {
+      const res = await FETCH({
+        path: "/channel/search/?query=Private",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((c: { id: string }) => c.id)).toContain("TESTCHANNEL4");
+
+      const list = await FETCH({ path: "/channel/list", method: "GET" });
+      const jList = await list.json();
+      expect(jList.data.map((c: { id: string }) => c.id)).toContain(
+        "TESTCHANNEL4",
+      );
+    } finally {
+      await db
+        .delete(roleLinks)
+        .where(
+          and(eq(roleLinks.userId, "TESTUSER"), eq(roleLinks.roleId, "HOST")),
+        );
+    }
   });
 });
 

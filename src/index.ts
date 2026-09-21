@@ -51,22 +51,34 @@ export const ConstWebPush = {
 
 import { db } from "./db";
 import { serverConfigs } from "./db/schema";
-export const [GIRACLE_SERVER_CONFIG] = await db.select().from(serverConfigs);
+import { externalApi } from "./external/external.module";
+
+//グローバルに使えるGiracleサーバーの設定
+export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect =
+  {} as typeof serverConfigs.$inferSelect;
+
+export async function reloadServerConfig() {
+  const [config] = await db.select().from(serverConfigs);
+  if (config) Object.assign(GIRACLE_SERVER_CONFIG, config);
+}
+
+try {
+  await reloadServerConfig();
+} catch {
+  // DB未初期化時（マイグレーション前やテストロード時）は握りつぶす
+}
+
+/////////////////////////////////////////////////////////////////
+
+const corsOrigins = (Bun.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 export const app = new Elysia({
   //16MB
   serve: { maxRequestBodySize: 16 * 1024 * 1024 },
 })
-  .use(
-    cors({
-      origin: Bun.env.CORS_ORIGIN
-        ? Bun.env.CORS_ORIGIN.split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : false,
-      credentials: true,
-    }),
-  )
   .use(
     Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
   )
@@ -81,6 +93,19 @@ export const app = new Elysia({
     return status(500, "somethin went wrong :(");
   })
   .use(Middleware.RequestLogger)
+  .use(externalApi)
+  .use(
+    cors({
+      //Bot用API(/ext)はサーバー間通信専用のためCORSヘッダを付けない。
+      //corsプラグインのonRequestはアプリ全体に効く(use順では絞れない)ため、origin関数で判定する
+      origin: [
+        (request) =>
+          !new URL(request.url).pathname.startsWith("/ext") &&
+          corsOrigins.includes(request.headers.get("Origin") ?? ""),
+      ],
+      credentials: true,
+    }),
+  )
   .use(wsHandler)
   .use(user)
   .use(channel)
