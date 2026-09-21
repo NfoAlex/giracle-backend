@@ -487,6 +487,66 @@ describe("GET /server/bot", () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("正常 :: query前方一致で絞り込める", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?query=newBot",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.length).toBe(2);
+    expect(j.data.map((b: { botName: string }) => b.botName)).toEqual([
+      "newBot3",
+      "newBot2",
+    ]);
+  });
+
+  it("正常 :: queryは前方一致", async () => {
+    //部分一致なら"BOT_TEST_3"の内部"TEST"にも当たるが、前方一致なので0件
+    const res = await FETCH({
+      path: "/server/bot/all?query=TEST",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: query一致なしは空配列", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?query=NOPE",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryのワイルドカードはリテラル扱い", async () => {
+    //%をワイルドカードとして解釈すると全件返る。エスケープされていれば0件
+    const res = await FETCH({
+      path: "/server/bot/all?query=%25",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryとcursorBotIdを併用できる", async () => {
+    const filtered = await FETCH({
+      path: "/server/bot/all?query=newBot",
+      method: "GET",
+    });
+    const filteredJson = await filtered.json();
+    const res = await FETCH({
+      path: `/server/bot/all?query=newBot&cursorBotId=${filteredJson.data[0].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.map((b: { botName: string }) => b.botName)).toEqual([
+      "newBot2",
+    ]);
+  });
+
   it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
     const allRes = await FETCH({
       path: "/server/bot/all",
