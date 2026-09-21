@@ -206,6 +206,45 @@ describe("GET /server/bot/me", () => {
     expect(j.data[0].botName).toBe("BOT_TEST_3");
   });
 
+  it("正常 :: query前方一致で絞り込める", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=BOT_TEST_2",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_2");
+  });
+
+  it("正常 :: queryは前方一致", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=BOT_TEST_",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(2);
+  });
+
+  it("正常 :: query一致なしは空配列", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=NOPE",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryのワイルドカードはリテラル扱い", async () => {
+    //%をワイルドカードとして解釈すると全件返る。エスケープされていれば0件
+    const res = await FETCH({
+      path: "/server/bot/me?query=%25",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
   it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
     const allRes = await FETCH({
       path: "/server/bot/me",
