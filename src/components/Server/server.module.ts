@@ -41,8 +41,8 @@ export const server = new Elysia({ prefix: "/server" })
 
   .get(
     "/bot/me",
-    async ({ query: { cursorBotId }, CheckToken: { _userId } }) => {
-      const myBots = await ServiceServer.GetBotMe(_userId, cursorBotId);
+    async ({ query: { query, cursorBotId }, CheckToken: { _userId } }) => {
+      const myBots = await ServiceServer.GetBotMe(_userId, query, cursorBotId);
 
       return {
         message: "Fetched my bots",
@@ -51,6 +51,7 @@ export const server = new Elysia({ prefix: "/server" })
     },
     {
       query: t.Object({
+        query: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
         cursorBotId: t.Optional(t.String()),
       }),
       detail: {
@@ -121,7 +122,9 @@ export const server = new Elysia({ prefix: "/server" })
       body: t.Object({
         name: t.String({ minLength: 1, maxLength: 64 }),
         description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
-        permissionChannelIds: t.Optional(t.Array(t.String(), { minItems: 1, maxItems: 100 })),
+        permissionChannelIds: t.Optional(
+          t.Array(t.String(), { minItems: 1, maxItems: 100 }),
+        ),
         useAllChannel: t.Optional(t.Boolean()),
         canFetchUserinfo: t.Optional(t.Boolean()),
         canFetchRoleinfo: t.Optional(t.Boolean()),

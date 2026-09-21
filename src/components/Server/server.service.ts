@@ -62,7 +62,16 @@ export namespace ServiceServer {
     throw status(404, "Banner not found");
   };
 
-  export const GetBotMe = async (userId: string, cursorBotId?: string) => {
+  export const GetBotMe = async (
+    userId: string,
+    query?: string,
+    cursorBotId?: string,
+  ) => {
+    //query未指定なら名前条件を足さない(空文字なら全件)
+    const queryFromName = query
+      ? sql`${botManages.botName} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`
+      : undefined;
+
     let queryFromCursor: SQL | undefined;
     if (cursorBotId) {
       const cursorBot = db
@@ -91,7 +100,9 @@ export namespace ServiceServer {
         createdBy: botManages.createdBy,
       })
       .from(botManages)
-      .where(and(queryFromCursor, eq(botManages.createdBy, userId)))
+      .where(
+        and(queryFromCursor, eq(botManages.createdBy, userId), queryFromName),
+      )
       .limit(50)
       .orderBy(desc(botManages.createdAt), desc(botManages.id));
 
