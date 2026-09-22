@@ -586,8 +586,8 @@ describe("GET /server/bot/me/:botId", () => {
     expect(j.message).toBe("Fetched my bot info");
     expect(j.data.id).toBe("TESTBOT1");
     expect(j.data.botName).toBe("BOT_TEST_1");
-    // tokenCodeは返らない
-    expect(j.data.tokenCode).toBeUndefined();
+    // 所有者はtokenCodeを確認できる
+    expect(j.data.tokenCode).toBe("TESTTOKEN1");
     // remoteUserIdで紐付いたユーザーが展開される
     expect(j.data.user.id).toBe("TESTUSER_BOT_1");
     // チャンネル透過も展開される

@@ -191,7 +191,7 @@ giracle-backend/
 | GET | `/server/config` | ❌ | - | サーバー設定取得 |
 | GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
 | GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`cursorBotId` で継続取得。`approveStatus` を含む） |
-| GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` は返さない） |
+| GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` 含む） |
 | PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400 |
 | PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る） |
 | DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |

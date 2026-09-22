@@ -111,8 +111,8 @@ export namespace ServiceServer {
 
   export const GetBotById = async (botId: string, _userId: string) => {
     const myBot = await db.query.botManages.findFirst({
+      //所有者だけが参照できるルートなのでtokenCodeも返す(外部API利用に必要)
       where: and(eq(botManages.id, botId)),
-      columns: { tokenCode: false },
       with: {
         channelPermissions: true,
         user: true,
