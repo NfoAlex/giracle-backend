@@ -906,7 +906,7 @@ describe("PATCH /server/bot", () => {
     ]);
   });
 
-  it("正常 :: 全透過にすると許可リストが空になり、非透過に戻しても復活しない", async () => {
+  it("正常 :: 全透過にしても許可リストは残り、非透過に戻してもそのまま", async () => {
     const toAll = await FETCH({
       path: "/server/bot",
       method: "PATCH",
@@ -914,16 +914,33 @@ describe("PATCH /server/bot", () => {
     });
     expect(toAll.ok).toBe(true);
     expect((await toAll.json()).data.useAllChannel).toBeTrue();
-    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
 
-    // 古い許可が残っていると非透過に戻した瞬間に復活してしまう
+    // 全透過中でも許可リストは差し替えられる
+    const replace = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL1"] },
+    });
+    expect(replace.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL1"]);
+
+    // 非透過に戻しても許可はそのまま残る
     const toPrivate = await FETCH({
       path: "/server/bot",
       method: "PATCH",
       body: { botId: "TESTBOT1", useAllChannel: false },
     });
     expect(toPrivate.ok).toBe(true);
-    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL1"]);
+
+    // 後続テストの前提(TESTCHANNEL3のみ許可)へ戻す
+    const restore = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(restore.ok).toBe(true);
   });
 
   it("存在しないチャンネルは許可できない", async () => {

@@ -332,8 +332,8 @@ export namespace ServiceServer {
     const effectiveUseAllChannel = useAllChannel ?? currentUseAllChannel;
 
     //チャンネル許可を指定された場合は作成時と同じ検査をする
-    //(全透過なら許可リストは使われないため不要)
-    if (uniqueChannelIds !== undefined && !effectiveUseAllChannel) {
+    //(全透過中でも許可リストは保持するため、指定があれば検査する)
+    if (uniqueChannelIds !== undefined) {
       if (uniqueChannelIds.length > 100) {
         throw status(400, "Too many channels to listen");
       }
@@ -429,19 +429,15 @@ export namespace ServiceServer {
         }
 
         //チャンネル許可の差し替え
-        //全透過に切り替えた場合は許可リストが実効性を失うため消す(残すと後で
-        //非透過に戻した時に古い許可が復活してしまう)
+        //許可リストは全透過中も保持する(消すと非透過に戻した時にリストが
+        //失われるため)。差し替えは指定があった時だけ行う
         let channelsPermitted: BotChannelPermission[] | undefined;
-        if (effectiveUseAllChannel || uniqueChannelIds !== undefined) {
+        if (uniqueChannelIds !== undefined) {
           trx
             .delete(botChannelPermissions)
             .where(eq(botChannelPermissions.botId, botId))
             .run();
-          if (
-            !effectiveUseAllChannel &&
-            uniqueChannelIds !== undefined &&
-            uniqueChannelIds.length !== 0
-          ) {
+          if (uniqueChannelIds.length !== 0) {
             channelsPermitted = trx
               .insert(botChannelPermissions)
               .values(

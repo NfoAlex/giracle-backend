@@ -80,7 +80,7 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 - WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open）。
 - Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
 - `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
-- **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは指定された内容で**差し替え**（全削除 → 再挿入）し、`useAllChannel: true` への切り替え時は行を消す。全透過中は許可リストが使われないため消さないと、後で非透過に戻したときに古い許可が復活してしまう。
+- **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは `permissionChannelIds` 指定時だけ**差し替え**（全削除 → 再挿入）し、全透過（`useAllChannel: true`）でも行は消えない。差し替えなしの更新（`useAllChannel` 切替のみ等）でも既存の許可は保持される。
   - `checkChannelVisibility` は閲覧制限ロールの無いチャンネルを無条件で許可するので、実在しないチャンネル ID を弾くには別途 `Channel` の存在確認が要る（`PUT` / `PATCH` の両方のループで行っている）。
 - **チャンネル許可が変わったときは、接続中の WS の購読を張り替える**（`WSSubscribe` / `WSUnsubscribe`）。解除しないと許可を失ったチャンネルの `channel::*` 配信を受け続ける。全透過の Bot は接続時に全チャンネルを購読しているため、解除側は全チャンネルを対象にする。
 - ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
