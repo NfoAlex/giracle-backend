@@ -448,10 +448,23 @@ describe("DELETE /server/bot", () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "DELETE",
-      body: { botId: TEST__deletingBotId },
-      useSecondaryUser: true,
+      body: { botId: "TESTBOT3" },
     });
-    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+
+    const bot = db
+      .select({ id: botManages.id })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT3"))
+      .get();
+    expect(bot).toBeDefined();
+    const botUser = db
+      .select({ isDeleted: users.isDeleted })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_3"))
+      .get();
+    expect(botUser?.isDeleted).toBeFalse();
   });
 });
 
@@ -836,6 +849,76 @@ describe("PATCH /server/bot", () => {
     expect(t).toBe("Bot name already exists");
   });
 
+  it("既存ユーザー名との衝突で変更がロールバックされる", async () => {
+    const beforeBot = db
+      .select({
+        botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+        canManageUser: botManages.canManageUser,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        tokenCode: botManages.tokenCode,
+      })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT1"))
+      .get();
+    expect(beforeBot).toBeDefined();
+    const beforeUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .get();
+    expect(beforeUser).toBeDefined();
+    const beforeChannelIds = await channelIdsOfBot("TESTBOT1");
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        botName: "testsystemuser2",
+        permissionChannelIds: ["TESTCHANNEL2"],
+        canReadMessage: !beforeBot?.canReadMessage,
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
+
+    const afterBot = db
+      .select({
+        botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+        canManageUser: botManages.canManageUser,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        tokenCode: botManages.tokenCode,
+      })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT1"))
+      .get();
+    expect(afterBot).toBeDefined();
+    expect(afterBot?.botName).toBe(beforeBot?.botName);
+    expect(afterBot?.approveStatus).toBe(beforeBot?.approveStatus);
+    expect(afterBot?.useAllChannel).toBe(beforeBot?.useAllChannel);
+    expect(afterBot?.canReadMessage).toBe(beforeBot?.canReadMessage);
+    expect(afterBot?.canSendMessage).toBe(beforeBot?.canSendMessage);
+    expect(afterBot?.canManageUser).toBe(beforeBot?.canManageUser);
+    expect(afterBot?.canFetchUserinfo).toBe(beforeBot?.canFetchUserinfo);
+    expect(afterBot?.tokenCode).toBe(beforeBot?.tokenCode);
+
+    const afterUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .get();
+    expect(afterUser?.name).toBe(beforeUser?.name);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(beforeChannelIds);
+  });
+
   it("他人のBotは更新できない", async () => {
     const res = await FETCH({
       path: "/server/bot",
@@ -984,6 +1067,74 @@ describe("PATCH /server/bot", () => {
       body: { botId: "TESTBOT1" },
     });
     expect(nothing.ok).toBe(true);
+  });
+
+  it("PATCHで空の許可リストを指定すると全許可を削除する", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", useAllChannel: false })
+      .where(eq(botManages.id, "TESTBOT1"));
+    await db
+      .delete(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+    await db
+      .insert(botChannelPermissions)
+      .values({ botId: "TESTBOT1", channelId: "TESTCHANNEL3" });
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: [] },
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.data.channelPermissions).toEqual([]);
+    expect(j.data.approveStatus).toBe("PENDING");
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+  });
+
+  it("PATCHで重複した許可IDを1件に畳む", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", useAllChannel: false })
+      .where(eq(botManages.id, "TESTBOT1"));
+    await db
+      .delete(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+    await db
+      .insert(botChannelPermissions)
+      .values({ botId: "TESTBOT1", channelId: "TESTCHANNEL3" });
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        permissionChannelIds: ["TESTCHANNEL2", "TESTCHANNEL2"],
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.data.channelPermissions).toHaveLength(1);
+    expect(j.data.channelPermissions[0].channelId).toBe("TESTCHANNEL2");
+    expect(j.data.approveStatus).toBe("PENDING");
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL2"]);
+  });
+
+  it("PATCHで許可チャンネルが101件なら拒否する", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        permissionChannelIds: Array.from(
+          { length: 101 },
+          (_, index) => `INVALID_CHANNEL_${index}`,
+        ),
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Too many channels to listen");
   });
 
   it("正常 :: チャンネル許可の変更でもapproveStatusがPENDINGに戻る", async () => {
