@@ -161,7 +161,7 @@ describe("POST /server/change-config", () => {
     ).toBeTrue();
   });
 
-  it("権限無", async () => {
+  it("権限無し", async () => {
     const res = await FETCH({
       path: "/server/change-config",
       method: "POST",
@@ -175,7 +175,8 @@ describe("POST /server/change-config", () => {
       },
       useSecondaryUser: true,
     });
-    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Role level not enough");
   });
 });
 
@@ -656,6 +657,39 @@ describe("PATCH /server/bot/approval", () => {
       .where(eq(botManages.id, "TESTBOT1"));
   });
 
+  it("全承認ステータスを受け付ける", async () => {
+    try {
+      for (const approvalStatus of [
+        "PENDING",
+        "BLOCKED",
+        "DENIED",
+        "APPROVED",
+      ] as const) {
+        const res = await FETCH({
+          path: "/server/bot/approval",
+          method: "PATCH",
+          body: { botId: "TESTBOT1", approvalStatus },
+        });
+        const j = await res.json();
+        expect(res.status).toBe(200);
+        expect(j.message).toBe("Bot approval updated");
+        expect(j.data).toBe("TESTBOT1");
+        expect(
+          db
+            .select({ approveStatus: botManages.approveStatus })
+            .from(botManages)
+            .where(eq(botManages.id, "TESTBOT1"))
+            .get()?.approveStatus,
+        ).toBe(approvalStatus);
+      }
+    } finally {
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+
   it("存在しないBotデータ", async () => {
     const res = await FETCH({
       path: "/server/bot/approval",
@@ -817,6 +851,84 @@ describe("PATCH /server/bot", () => {
       .update(botManages)
       .set({ approveStatus: "APPROVED", canReadMessage: true })
       .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("拒否済みBotに実差分をつけるとPENDINGに戻る", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", canReadMessage: false },
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("PENDING");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED", canReadMessage: true })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+
+  it("拒否済みBotの説明だけを変更してもDENIEDを維持する", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", botDescription: "denied stays denied" },
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("DENIED");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+
+  it("PENDINGのBotは自動承諾設定でAPPROVEDに戻る", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "PENDING" })
+      .where(eq(botManages.id, "TESTBOT1"));
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: {
+          botId: "TESTBOT1",
+          botDescription: "auto approve pending",
+        },
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("APPROVED");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
   });
 
   it("正常 :: 概要の変更だけだとPENDINGにならない", async () => {
