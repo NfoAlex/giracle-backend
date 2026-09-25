@@ -430,8 +430,9 @@ describe("PUT /server/bot", () => {
         (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
       ),
     ).toBeTrue();
-    // 後続の /server/bot/all の件数判定に影響しないよう、作成したBotは消しておく
+    // 後続テストに影響しないよう、作成したBotの行とBot用ユーザー行を消しておく
     await db.delete(botManages).where(eq(botManages.id, j.data.id));
+    await db.delete(users).where(eq(users.id, j.data.remoteUserId));
   });
 
   it("サーバー管理権限者でも存在しないチャンネルは404(FK違反の500にしない)", async () => {
@@ -771,37 +772,58 @@ describe("PATCH /server/bot", () => {
       .sort();
   };
 
+  it("管理者所有のBotは差分をつけても承認のまま(PutBotの免除と揃える)", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", canReadMessage: false },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("APPROVED");
+
+    await db
+      .update(botManages)
+      .set({ canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
   it("正常 :: 権限変更でapproveStatusがPENDINGに戻る", async () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
       body: {
-        botId: "TESTBOT1",
-        botName: "BOT_TEST_1_RENAMED",
+        botId: "TESTBOT3",
+        botName: "BOT_TEST_3_RENAMED",
         canSendMessage: true,
         canManageUser: true,
       },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
-    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED");
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED");
     expect(j.data.canManageUser).toBeTrue();
     expect(j.data.approveStatus).toBe("PENDING");
     // tokenCodeは返らない
     expect(j.data.tokenCode).toBeUndefined();
     // 作成時と同じくフル情報が同時取得できる
-    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED");
-    expect(j.data.channelPermissions).toEqual([
-      { botId: "TESTBOT1", channelId: "TESTCHANNEL1", id: expect.any(Number) },
-    ]);
+    expect(j.data.user.name).toBe("BOT_TEST_3_RENAMED");
+    // TESTBOT3は許可チャンネルを持たない
+    expect(j.data.channelPermissions).toEqual([]);
 
     // 表示名を参照するusers.name側も揃っている(乖離すると改名が画面に出ない)
     const botUser = db
       .select({ name: users.name })
       .from(users)
-      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .where(eq(users.id, "TESTUSER_BOT_3"))
       .get();
-    expect(botUser?.name).toBe("BOT_TEST_1_RENAMED");
+    expect(botUser?.name).toBe("BOT_TEST_3_RENAMED");
   });
 
   it("正常 :: 名前変更でもapproveStatusがPENDINGに戻る", async () => {
@@ -809,16 +831,17 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", botName: "BOT_TEST_1_RENAMED2" },
+      body: { botId: "TESTBOT3", botName: "BOT_TEST_3_RENAMED2" },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
-    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED2");
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED2");
     expect(j.data.approveStatus).toBe("PENDING");
   });
 
@@ -827,17 +850,18 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", botName: "BOT_TEST_1_RENAMED3" },
+      body: { botId: "TESTBOT3", botName: "BOT_TEST_3_RENAMED3" },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
-    expect(j.data.botName).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED3");
     expect(j.data.approveStatus).toBe("APPROVED");
     GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
   });
@@ -847,14 +871,15 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "BLOCKED", canReadMessage: true })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
       // 権限を実際に変えても(再審査扱いになる差分でも)ステータスは据え置き
-      body: { botId: "TESTBOT1", canReadMessage: false },
+      body: { botId: "TESTBOT3", canReadMessage: false },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -866,7 +891,7 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED", canReadMessage: true })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
   });
 
   it("自動承諾なら拒否済み(DENIED)のBotも編集で復帰する", async () => {
@@ -874,13 +899,14 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "DENIED", canReadMessage: true })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", canReadMessage: false },
+      body: { botId: "TESTBOT3", canReadMessage: false },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -890,7 +916,7 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED", canReadMessage: true })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
   });
 
   it("拒否済みBotに実差分をつけるとPENDINGに戻る", async () => {
@@ -899,12 +925,13 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "DENIED", canReadMessage: true })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
     try {
       const res = await FETCH({
         path: "/server/bot",
         method: "PATCH",
-        body: { botId: "TESTBOT1", canReadMessage: false },
+        body: { botId: "TESTBOT3", canReadMessage: false },
+        useSecondaryUser: true,
       });
       const j = await res.json();
       expect(res.ok).toBeTrue();
@@ -914,7 +941,7 @@ describe("PATCH /server/bot", () => {
       await db
         .update(botManages)
         .set({ approveStatus: "APPROVED", canReadMessage: true })
-        .where(eq(botManages.id, "TESTBOT1"));
+        .where(eq(botManages.id, "TESTBOT3"));
     }
   });
 
@@ -924,12 +951,13 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "DENIED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
     try {
       const res = await FETCH({
         path: "/server/bot",
         method: "PATCH",
-        body: { botId: "TESTBOT1", botDescription: "denied stays denied" },
+        body: { botId: "TESTBOT3", botDescription: "denied stays denied" },
+        useSecondaryUser: true,
       });
       const j = await res.json();
       expect(res.ok).toBeTrue();
@@ -939,7 +967,7 @@ describe("PATCH /server/bot", () => {
       await db
         .update(botManages)
         .set({ approveStatus: "APPROVED" })
-        .where(eq(botManages.id, "TESTBOT1"));
+        .where(eq(botManages.id, "TESTBOT3"));
     }
   });
 
@@ -948,16 +976,17 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "PENDING" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
     GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
     try {
       const res = await FETCH({
         path: "/server/bot",
         method: "PATCH",
         body: {
-          botId: "TESTBOT1",
+          botId: "TESTBOT3",
           botDescription: "auto approve pending",
         },
+        useSecondaryUser: true,
       });
       const j = await res.json();
       expect(res.ok).toBeTrue();
@@ -967,7 +996,7 @@ describe("PATCH /server/bot", () => {
       await db
         .update(botManages)
         .set({ approveStatus: "APPROVED" })
-        .where(eq(botManages.id, "TESTBOT1"));
+        .where(eq(botManages.id, "TESTBOT3"));
     }
   });
 
@@ -976,16 +1005,17 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", botDescription: "testing new description" },
+      body: { botId: "TESTBOT3", botDescription: "testing new description" },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
-    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.id).toBe("TESTBOT3");
     expect(j.data.botDescription).toBe("testing new description");
     expect(j.data.approveStatus).toBe("APPROVED");
   });
@@ -1095,12 +1125,13 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", canFetchUserinfo: true },
+      body: { botId: "TESTBOT3", canFetchUserinfo: true },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -1117,9 +1148,9 @@ describe("PATCH /server/bot", () => {
     expect(res.ok).toBe(true);
     // 追加ではなく差し替え(TESTCHANNEL1が残らない)
     expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
-    // フル情報も同時取得できる
+    // フル情報も同時取得できる(TESTBOT1は改名していないので初期名のまま)
     const j = await res.json();
-    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.user.name).toBe("testbotuser");
     expect(j.data.channelPermissions).toEqual([
       { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
     ]);
@@ -1135,7 +1166,7 @@ describe("PATCH /server/bot", () => {
     expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
     // 許可を指定しない更新でも現状の許可とユーザーがフルで返る
     const j = await res.json();
-    expect(j.data.user.name).toBe("BOT_TEST_1_RENAMED3");
+    expect(j.data.user.name).toBe("testbotuser");
     expect(j.data.channelPermissions).toEqual([
       { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
     ]);
@@ -1225,52 +1256,54 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED", useAllChannel: false })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
     await db
       .delete(botChannelPermissions)
-      .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+      .where(eq(botChannelPermissions.botId, "TESTBOT3"));
     await db
       .insert(botChannelPermissions)
-      .values({ botId: "TESTBOT1", channelId: "TESTCHANNEL3" });
+      .values({ botId: "TESTBOT3", channelId: "TESTCHANNEL3" });
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", permissionChannelIds: [] },
+      body: { botId: "TESTBOT3", permissionChannelIds: [] },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBeTrue();
     expect(j.data.channelPermissions).toEqual([]);
     expect(j.data.approveStatus).toBe("PENDING");
-    expect(await channelIdsOfBot("TESTBOT1")).toEqual([]);
+    expect(await channelIdsOfBot("TESTBOT3")).toEqual([]);
   });
 
   it("PATCHで重複した許可IDを1件に畳む", async () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED", useAllChannel: false })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
     await db
       .delete(botChannelPermissions)
-      .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+      .where(eq(botChannelPermissions.botId, "TESTBOT3"));
     await db
       .insert(botChannelPermissions)
-      .values({ botId: "TESTBOT1", channelId: "TESTCHANNEL3" });
+      .values({ botId: "TESTBOT3", channelId: "TESTCHANNEL3" });
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
       body: {
-        botId: "TESTBOT1",
+        botId: "TESTBOT3",
         permissionChannelIds: ["TESTCHANNEL2", "TESTCHANNEL2"],
       },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBeTrue();
     expect(j.data.channelPermissions).toHaveLength(1);
     expect(j.data.channelPermissions[0].channelId).toBe("TESTCHANNEL2");
     expect(j.data.approveStatus).toBe("PENDING");
-    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL2"]);
+    expect(await channelIdsOfBot("TESTBOT3")).toEqual(["TESTCHANNEL2"]);
   });
 
   it("PATCHで許可チャンネルが101件なら拒否する", async () => {
@@ -1293,12 +1326,13 @@ describe("PATCH /server/bot", () => {
     await db
       .update(botManages)
       .set({ approveStatus: "APPROVED" })
-      .where(eq(botManages.id, "TESTBOT1"));
+      .where(eq(botManages.id, "TESTBOT3"));
 
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
-      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL1"] },
+      body: { botId: "TESTBOT3", permissionChannelIds: ["TESTCHANNEL1"] },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(res.ok).toBe(true);
@@ -1329,4 +1363,25 @@ afterAll(async () => {
   await db
     .insert(botChannelPermissions)
     .values({ channelId: "TESTCHANNEL1", botId: "TESTBOT1" });
+
+  // 承認免除の検証で書き換えたTESTBOT3(非管理者所有)も初期状態へ戻す
+  // (10/11は未承認BotとしてTESTBOT3を使っている)
+  await db
+    .update(botManages)
+    .set({
+      botName: "BOT_TEST_3",
+      approveStatus: "PENDING",
+      canFetchUserinfo: false,
+      canReadMessage: false,
+      canSendMessage: false,
+      canManageUser: false,
+    })
+    .where(eq(botManages.id, "TESTBOT3"));
+  await db
+    .update(users)
+    .set({ name: "testbotuser3" })
+    .where(eq(users.id, "TESTUSER_BOT_3"));
+  await db
+    .delete(botChannelPermissions)
+    .where(eq(botChannelPermissions.botId, "TESTBOT3"));
 });

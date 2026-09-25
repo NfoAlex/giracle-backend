@@ -150,21 +150,27 @@ describe("WS (Bot)", () => {
   }
 
   test("再申請で未承認に戻ったBotは切断される", async () => {
-    const { ws, messages } = await connectBot("TESTTOKEN1");
+    // 管理者所有のBotは再申請が免除されるため、非管理者所有のTESTBOT3で試す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+    const { ws, messages } = await connectBot("TESTTOKEN3");
     expect(ws.readyState).toBe(WebSocket.OPEN);
     try {
       // 権限を変えると再申請(PENDING)になり、承認済みでなくなる
       const res = await FETCH({
         path: "/server/bot",
         method: "PATCH",
-        body: { botId: "TESTBOT1", canManageServerConfig: true },
+        body: { botId: "TESTBOT3", canManageServerConfig: true },
+        useSecondaryUser: true,
       });
       expect(res.ok).toBe(true);
       expect(
         db
           .select({ approveStatus: botManages.approveStatus })
           .from(botManages)
-          .where(eq(botManages.id, "TESTBOT1"))
+          .where(eq(botManages.id, "TESTBOT3"))
           .get()?.approveStatus,
       ).toBe("PENDING");
       // 接続を維持すると channel::* の配信を受け続けるため切断される必要がある
@@ -174,11 +180,11 @@ describe("WS (Bot)", () => {
       }
       expect(ws.readyState).toBe(WebSocket.CLOSED);
     } finally {
-      // 後続のテストのため承認済み・権限フラグを戻す(権限を戻さないと後続テストに漏れる)
+      // 後続のテストのため未承認・権限フラグに戻す(TESTBOT3は既定PENDING)
       await db
         .update(botManages)
-        .set({ approveStatus: "APPROVED", canManageServerConfig: false })
-        .where(eq(botManages.id, "TESTBOT1"));
+        .set({ approveStatus: "PENDING", canManageServerConfig: false })
+        .where(eq(botManages.id, "TESTBOT3"));
     }
   });
   test("承認取消で接続中のBotは切断される", async () => {

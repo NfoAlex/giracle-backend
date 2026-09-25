@@ -371,10 +371,15 @@ export namespace ServiceServer {
         ));
     const channelPermissionChanged = useAllChannelChanged || channelListChanged;
 
+    //管理者所有のBotは作成時(PutBot)と同じく承認を免除する
+    const autoApproved =
+      GIRACLE_SERVER_CONFIG.BotAutoApprove ||
+      (await Util.hasManageServerRole(_userId));
+
     //再承認が必要かどうかフラグ
     let needsReapproval = false;
     //許可設定かBot名を変えているなら再申請扱いにして審査状況を初期化
-    if (!GIRACLE_SERVER_CONFIG.BotAutoApprove) {
+    if (!autoApproved) {
       const permissionChanged = (
         Object.keys(
           currentBotPermissions,
@@ -395,7 +400,7 @@ export namespace ServiceServer {
     const newApproveStatus =
       currentApproveStatus === "BLOCKED"
         ? "BLOCKED"
-        : GIRACLE_SERVER_CONFIG.BotAutoApprove
+        : autoApproved
           ? "APPROVED"
           : needsReapproval
             ? "PENDING"
