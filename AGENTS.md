@@ -81,16 +81,17 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 - Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
 - `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
 - **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは `permissionChannelIds` 指定時だけ**差し替え**（全削除 → 再挿入）し、全透過（`useAllChannel: true`）でも行は消えない。差し替えなしの更新（`useAllChannel` 切替のみ等）でも既存の許可は保持される。
-  - `checkChannelVisibility` は閲覧制限ロールの無いチャンネルを無条件で許可するので、実在しないチャンネル ID を弾くには別途 `Channel` の存在確認が要る（`PUT` / `PATCH` の両方のループで行っている）。
+  - `checkChannelVisibility` は閲覧制限ロールの無いチャンネルを無条件で許可するので、実在しないチャンネル ID を弾くには別途 `Channel` の存在確認が要る（`PUT` / `PATCH` の両方のループで行い、不在は 404 `Channel not found`）。
 - **チャンネル許可が変わったときは、接続中の WS の購読を張り替える**（`WSSubscribe` / `WSUnsubscribe`）。解除しないと許可を失ったチャンネルの `channel::*` 配信を受け続ける。全透過の Bot は接続時に全チャンネルを購読しているため、解除側は全チャンネルを対象にする。
 - ServerConfig の `BotEnabled` / `BotAutoApprove`（既定はいずれも false）は `POST /server/change-config` で変更でき、DB とメモリ（`GIRACLE_SERVER_CONFIG`）の両方を更新する。
   - `BotEnabled`: false の間は `PUT /server/bot` が 400 `Using or creating bot is not allowed` になる。**既定 false なので、有効化しない限り Bot は作成できない。**
   - `BotAutoApprove`: 承認レビュー自体を省く設定。true なら新規作成は `PENDING` ではなく `APPROVED` で作られる（`PutBot`）。
+  - `manageServer` 権限を持つ所有者: `BotAutoApprove` が false でも作成時（`PutBot`）・更新時（`PatchBot`）とも承認が免除され `APPROVED` になる。判定は `Util.hasManageServerRole`。
 - WS も `Authorization` ヘッダに tokenCode を付ければ Bot として接続できる（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open/close）。`user::${remoteUserId}` と許可チャンネル（全透過は既存の全チャンネル）を購読する。**Bot の WS エンドポイントは `/ext/ws`**（通常ユーザーは `/ws`、[src/ws.ts](src/ws.ts)）。Elysia の静的ルーターは同一パスの WS ルートを上書きするため、1 つのパスに両方を登録することはできない。
 
-#### `BotAutoApprove` と更新時の `approveStatus`
+#### 自動承認（`BotAutoApprove` / `manageServer`）と更新時の `approveStatus`
 
-`PatchBot`（`PATCH /server/bot`）で Bot を更新したときの `approveStatus` は次のとおり。**`BLOCKED` は管理者による制裁なので据え置き、`BotAutoApprove: true` なら `DENIED` も `APPROVED` に戻る。**
+`PatchBot`（`PATCH /server/bot`）で Bot を更新したときの `approveStatus` は次のとおり。**`BLOCKED` は管理者による制裁なので据え置き、`BotAutoApprove: true` なら `DENIED` も `APPROVED` に戻る。** 所有者が `manageServer` 権限を持つ場合は下表の `BotAutoApprove: true` 列と同じ扱い（作成時を含め常に `APPROVED`）。
 
 | 更新前の状態 | `BotAutoApprove: true` | `BotAutoApprove: false` |
 |---|---|---|

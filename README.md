@@ -192,8 +192,8 @@ giracle-backend/
 | GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
 | GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`cursorBotId` で継続取得。`approveStatus` を含む） |
 | GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` 含む） |
-| PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400 |
-| PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る） |
+| PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400。`manageServer` 権限者は作成時点で `APPROVED` |
+| PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る。所有者が `manageServer` なら免除） |
 | DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |
 | GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`approveStatus` と要求権限を含む） |
 | PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`APPROVED` 以外にすると WS 切断） |
@@ -401,5 +401,5 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 - **最初に登録したユーザーが `HOST`（全権限）になる。** セットアップ直後の初回登録は必ず管理者本人が行うこと。
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
-- **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。
+- **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。`manageServer` 権限を持つユーザーが作成・更新する Bot も同様に承認が免除される（`BotAutoApprove` が false でも `APPROVED`）。
 - **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続（`/ext/ws`）は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。
