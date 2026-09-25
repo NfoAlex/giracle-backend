@@ -166,10 +166,8 @@ export namespace ServiceServer {
             .from(channels)
             .where(eq(channels.id, channelId))
             .get() !== undefined;
-        if (
-          !channelExists ||
-          !(await Util.checkChannelVisibility(channelId, _userId))
-        )
+        if (!channelExists) throw status(404, "Channel not found");
+        if (!(await Util.checkChannelVisibility(channelId, _userId)))
           throw status(400, "You cannot use a channel you cannot see");
       }
     }
@@ -354,10 +352,8 @@ export namespace ServiceServer {
             .from(channels)
             .where(eq(channels.id, channelId))
             .get() !== undefined;
-        if (
-          !channelExists ||
-          !(await Util.checkChannelVisibility(channelId, _userId))
-        )
+        if (!channelExists) throw status(404, "Channel not found");
+        if (!(await Util.checkChannelVisibility(channelId, _userId)))
           throw status(400, "You cannot use a channel you cannot see");
       }
     }

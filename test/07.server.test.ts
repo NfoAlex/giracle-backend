@@ -434,15 +434,15 @@ describe("PUT /server/bot", () => {
     await db.delete(botManages).where(eq(botManages.id, j.data.id));
   });
 
-  it("サーバー管理権限者でも存在しないチャンネルは400(FK違反の500にしない)", async () => {
+  it("サーバー管理権限者でも存在しないチャンネルは404(FK違反の500にしない)", async () => {
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
     const res = await FETCH({
       path: "/server/bot",
       method: "PUT",
       body: { name: "newBotBogus", permissionChannelIds: ["NOSUCHCHANNEL"] },
     });
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe("You cannot use a channel you cannot see");
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
   });
 });
 
@@ -460,7 +460,7 @@ describe("DELETE /server/bot", () => {
       path: "/server/bot",
       method: "DELETE",
       body: { botId: TEST__deletingBotId },
-      useSecondaryUser: true //セカンダリユーザーとして作成したので
+      useSecondaryUser: true, //セカンダリユーザーとして作成したので
     });
     const j = await res.json();
     expect(j.message).toBe("Bot deleted");
@@ -1178,15 +1178,15 @@ describe("PATCH /server/bot", () => {
     expect(restore.ok).toBe(true);
   });
 
-  it("存在しないチャンネルは許可できない", async () => {
+  it("存在しないチャンネルは404", async () => {
     const res = await FETCH({
       path: "/server/bot",
       method: "PATCH",
       body: { botId: "TESTBOT1", permissionChannelIds: ["NOT_EXIST_CHANNEL"] },
     });
-    expect(res.ok).toBeFalse();
+    expect(res.status).toBe(404);
     const t = await res.text();
-    expect(t).toBe("You cannot use a channel you cannot see");
+    expect(t).toBe("Channel not found");
   });
 
   it("見られないチャンネルは許可できない", async () => {
