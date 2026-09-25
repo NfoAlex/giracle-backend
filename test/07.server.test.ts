@@ -274,6 +274,9 @@ describe("GET /server/bot/me", () => {
   });
 });
 
+/**
+ * `正常`の間は管理者権限を持たないユーザーで試すためにしばらくセカンダリユーザー
+ */
 let TEST__deletingBotId = "";
 let TEST__deletingBotRemoteUserId = "";
 describe("PUT /server/bot", () => {
@@ -290,6 +293,7 @@ describe("PUT /server/bot", () => {
         //同じチャンネルの重複指定(UNIQUE制約で落ちず1件に畳まれること)
         permissionChannelIds: ["TESTCHANNEL1", "TESTCHANNEL1"],
       },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(j.data.botName).toBe("newBot");
@@ -324,6 +328,7 @@ describe("PUT /server/bot", () => {
       path: "/server/bot",
       method: "PUT",
       body: { name: "newBot2", useAllChannel: true },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(j.data.botName).toBe("newBot2");
@@ -338,6 +343,7 @@ describe("PUT /server/bot", () => {
       path: "/server/bot",
       method: "PUT",
       body: { name: "newBot3", useAllChannel: true },
+      useSecondaryUser: true,
     });
     const j = await res.json();
     expect(j.data.botName).toBe("newBot3");
@@ -365,6 +371,7 @@ describe("PUT /server/bot", () => {
       path: "/server/bot",
       method: "PUT",
       body: { name: "newbotX", canFetchUserinfo: true, canManageUser: true },
+      useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
@@ -405,6 +412,38 @@ describe("PUT /server/bot", () => {
       .where(eq(users.name, "testsystemuser2"));
     expect(orphan.length).toBe(1);
   });
+
+  it("サーバー管理権限者は承認待ちを飛ばし、見えないチャンネルも指定できる", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    // TESTCHANNEL3は閲覧制限付き。権限者にだけ閲覧制限が免除される
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBotByAdmin", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    const j = await res.json();
+    expect(j.data.approveStatus).toBe("APPROVED");
+    expect(j.data.useAllChannel).toBeFalse();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
+      ),
+    ).toBeTrue();
+    // 後続の /server/bot/all の件数判定に影響しないよう、作成したBotは消しておく
+    await db.delete(botManages).where(eq(botManages.id, j.data.id));
+  });
+
+  it("サーバー管理権限者でも存在しないチャンネルは400(FK違反の500にしない)", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBotBogus", permissionChannelIds: ["NOSUCHCHANNEL"] },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("You cannot use a channel you cannot see");
+  });
 });
 
 describe("DELETE /server/bot", () => {
@@ -421,6 +460,7 @@ describe("DELETE /server/bot", () => {
       path: "/server/bot",
       method: "DELETE",
       body: { botId: TEST__deletingBotId },
+      useSecondaryUser: true //セカンダリユーザーとして作成したので
     });
     const j = await res.json();
     expect(j.message).toBe("Bot deleted");

@@ -15,6 +15,8 @@ import {
   customEmojis,
   invitations,
   requestLog,
+  roleInfos,
+  roleLinks,
   serverConfigs,
   type User,
   users,
@@ -143,18 +145,32 @@ export namespace ServiceServer {
     if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
       throw status(400, "Using or creating bot is not allowed");
     }
+
+    //サーバー管理権限があればチャンネル検証と承認確認を免除する
+    //(relational queryのwhereはSQLか(列, operators)=>SQLしか取らないためjoinで判定する)
+    const hasManageServerRole =
+      db
+        .select({ userId: roleLinks.userId })
+        .from(roleLinks)
+        .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
+        .where(
+          and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
+        )
+        .get() !== undefined;
+
     //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
     const uniqueChannelIds = [...new Set(permissionChannelIds)];
-    //チャンネル全透過じゃないならチャンネル検査
+    //チャンネル検査
+    //サーバー管理権限がある場合は閲覧制限だけ免除する。実在確認と上限チェックは
+    //管理者でも必須で、飛ばすと許可テーブルのchannelIdがFK違反になり500になる
     if (!useAllChannel) {
       if (uniqueChannelIds.length > 100) {
         throw status(400, "Too many channels to listen");
       }
-      //TODO: どうにかしたい
-      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
-      //実在しないチャンネルIdも素通りしてしまう。ここで弾かないと許可テーブルの
-      //channelIdがFK違反になり500になる
       for (const channelId of uniqueChannelIds) {
+        //TODO: どうにかしたい
+        //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+        //実在しないチャンネルIdも素通りしてしまう。存在は別に確認する
         const channelExists =
           db
             .select({ id: channels.id })
@@ -163,7 +179,8 @@ export namespace ServiceServer {
             .get() !== undefined;
         if (
           !channelExists ||
-          !(await Util.checkChannelVisibility(channelId, _userId))
+          (!hasManageServerRole &&
+            !(await Util.checkChannelVisibility(channelId, _userId)))
         )
           throw status(400, "You cannot use a channel you cannot see");
       }
@@ -196,9 +213,10 @@ export namespace ServiceServer {
             botDescription: description,
             createdBy: _userId,
             remoteUserId: userForBot.id,
-            approveStatus: GIRACLE_SERVER_CONFIG.BotAutoApprove
-              ? "APPROVED"
-              : "PENDING",
+            approveStatus:
+              GIRACLE_SERVER_CONFIG.BotAutoApprove || hasManageServerRole
+                ? "APPROVED"
+                : "PENDING",
             useAllChannel: useAllChannel,
             ...permissionConfig,
           })
