@@ -15,8 +15,6 @@ import {
   customEmojis,
   invitations,
   requestLog,
-  roleInfos,
-  roleLinks,
   serverConfigs,
   type User,
   users,
@@ -146,23 +144,14 @@ export namespace ServiceServer {
       throw status(400, "Using or creating bot is not allowed");
     }
 
-    //サーバー管理権限があればチャンネル検証と承認確認を免除する
-    //(relational queryのwhereはSQLか(列, operators)=>SQLしか取らないためjoinで判定する)
-    const hasManageServerRole =
-      db
-        .select({ userId: roleLinks.userId })
-        .from(roleLinks)
-        .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
-        .where(
-          and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
-        )
-        .get() !== undefined;
+    //サーバー管理権限を持つ所有者のBotは承認を免除する
+    //閲覧制限の免除はcheckChannelVisibilityが同じクエリで判定している
+    const hasManageServerRole = await Util.hasManageServerRole(_userId);
 
     //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
     const uniqueChannelIds = [...new Set(permissionChannelIds)];
     //チャンネル検査
-    //サーバー管理権限がある場合は閲覧制限だけ免除する。実在確認と上限チェックは
-    //管理者でも必須で、飛ばすと許可テーブルのchannelIdがFK違反になり500になる
+    //実在確認は管理者でも必須で、飛ばすと許可テーブルのchannelIdがFK違反になり500になる
     if (!useAllChannel) {
       if (uniqueChannelIds.length > 100) {
         throw status(400, "Too many channels to listen");
@@ -179,8 +168,7 @@ export namespace ServiceServer {
             .get() !== undefined;
         if (
           !channelExists ||
-          (!hasManageServerRole &&
-            !(await Util.checkChannelVisibility(channelId, _userId)))
+          !(await Util.checkChannelVisibility(channelId, _userId))
         )
           throw status(400, "You cannot use a channel you cannot see");
       }
