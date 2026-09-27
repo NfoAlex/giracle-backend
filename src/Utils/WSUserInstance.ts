@@ -13,6 +13,8 @@ type WSInstance = {
   close: () => unknown;
   subscribe: (topic: string) => unknown;
   unsubscribe: (topic: string) => unknown;
+  /** ElysiaWSが持つ生のServerWebSocket。open/closeでラッパーが作り直されるため同一性判定に使う（テストのダミーは未定義でよい） */
+  raw?: unknown;
 };
 
 export namespace WSUserInstance {
@@ -46,8 +48,10 @@ export namespace WSUserInstance {
       return;
     }
 
-    //インスタンス自体の同一性で削除対象を特定する(複数接続時に同一ユーザーの別インスタンスを消さないため)
-    const indexToRemove = currentInstance.indexOf(ws);
+    const indexToRemove = currentInstance.findIndex(
+      (instance) =>
+        instance === ws || (ws.raw !== undefined && instance.raw === ws.raw),
+    );
     if (indexToRemove !== -1) {
       currentInstance.splice(indexToRemove, 1);
     }
