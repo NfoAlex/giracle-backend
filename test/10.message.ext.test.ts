@@ -4,6 +4,7 @@ import { db } from "../src";
 import {
   botManages,
   inboxes,
+  messages,
   notificationConfigs,
   notificationDevices,
   requestLog,
@@ -259,6 +260,38 @@ describe("POST /ext/message/send", () => {
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("Replying message not found");
+  });
+
+  //退出・キック済み(非参加者)への返信は本文漏洩防止のため通知・inbox化されない
+  it("非参加ユーザーへの返信はinbox化されない", async () => {
+    //TESTUSER2はTESTCHANNEL1非参加のため、そこに投稿された彼のメッセージを直接作成
+    const [msg] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER2",
+        content: "left member message",
+      })
+      .returning({ id: messages.id });
+
+    const res = await FETCH({
+      path: "/ext/message/send",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        message: "reply to left member",
+        replyingMessageId: msg.id,
+      },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    const j = await res.json();
+    expect(j).toContainKey("id");
+    const rows = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.messageId, j.id));
+    expect(rows.length).toBe(0);
   });
 });
 

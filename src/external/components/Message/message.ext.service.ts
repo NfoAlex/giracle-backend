@@ -110,12 +110,24 @@ export namespace ExtServiceMessage {
     );
 
     //返信先の送信者に通知(自分自身には通知しない)
-    const replyTargetUserId =
+    let replyTargetUserId: string | null = null;
+    if (
       replyingMessageId &&
       messageReplyingTo &&
       messageReplyingTo.userId !== bot.remoteUserId
-        ? messageReplyingTo.userId
-        : null;
+    ) {
+      //チャンネル参加を検証するついでのユーザーid取得
+      const replyTargetJoin = await db.query.channelJoins.findFirst({
+        where: and(
+          eq(channelJoins.userId, messageReplyingTo.userId),
+          eq(channelJoins.channelId, channelId),
+        ),
+        columns: { userId: true },
+      });
+      if (replyTargetJoin !== undefined) {
+        replyTargetUserId = messageReplyingTo.userId;
+      }
+    }
 
     //メンション用のInbox保存、通知
     {
