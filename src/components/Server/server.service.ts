@@ -973,16 +973,46 @@ export namespace ServiceServer {
   };
 
   export const PatchBotApproval = async (
-    botId: string,
     approvalStatus: BotManage["approveStatus"],
+    botId?: string,
+    remoteUserId?: string,
   ) => {
-    const [botManageUpdated] = await db
-      .update(botManages)
-      .set({
-        approveStatus: approvalStatus,
-      })
-      .where(eq(botManages.id, botId))
-      .returning({ id: botManages.id, remoteUserId: botManages.remoteUserId });
+    //Botデータ取り込み用
+    let botManageUpdated:
+      | {
+          id: string;
+          remoteUserId: string;
+        }
+      | undefined;
+
+    if (botId) {
+      const botManageUpdatedArr = await db
+        .update(botManages)
+        .set({
+          approveStatus: approvalStatus,
+        })
+        .where(eq(botManages.id, botId))
+        .returning({
+          id: botManages.id,
+          remoteUserId: botManages.remoteUserId,
+        });
+
+      botManageUpdated = botManageUpdatedArr[0];
+    }
+    if (remoteUserId) {
+      const botManageUpdatedArr = await db
+        .update(botManages)
+        .set({
+          approveStatus: approvalStatus,
+        })
+        .where(eq(botManages.remoteUserId, remoteUserId))
+        .returning({
+          id: botManages.id,
+          remoteUserId: botManages.remoteUserId,
+        });
+
+      botManageUpdated = botManageUpdatedArr[0];
+    }
 
     if (botManageUpdated === undefined) {
       throw status(404, "Bot not found");

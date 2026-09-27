@@ -629,10 +629,15 @@ export const server = new Elysia({ prefix: "/server" })
   )
   .patch(
     "/bot/approval",
-    async ({ body: { botId, approvalStatus } }) => {
+    async ({ body: { botId, remoteUserId, approvalStatus }, status }) => {
+      if (botId === undefined && remoteUserId === undefined) {
+        return status(400, "BotId or remoteUserId is required.");
+      }
+
       const botIdUpdated = await ServiceServer.PatchBotApproval(
-        botId,
         approvalStatus,
+        botId,
+        remoteUserId,
       );
 
       return {
@@ -642,7 +647,8 @@ export const server = new Elysia({ prefix: "/server" })
     },
     {
       body: t.Object({
-        botId: t.String(),
+        botId: t.Optional(t.String()),
+        remoteUserId: t.Optional(t.String()),
         approvalStatus: t.Union([
           t.Literal("APPROVED"),
           t.Literal("BLOCKED"),
