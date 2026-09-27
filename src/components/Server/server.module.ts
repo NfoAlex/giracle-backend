@@ -81,9 +81,9 @@ export const server = new Elysia({ prefix: "/server" })
     },
   )
   .get(
-    "/bot/:botId",
-    async ({ params: { botId }, CheckToken: { _userId } }) => {
-      const bot = await ServiceServer.GetBotById(botId);
+    "/bot/:remoteUserId",
+    async ({ params: { remoteUserId } }) => {
+      const bot = await ServiceServer.GetBotByRemoteUserId(remoteUserId);
 
       return {
         message: "Fetched bot info",
@@ -92,10 +92,10 @@ export const server = new Elysia({ prefix: "/server" })
     },
     {
       params: t.Object({
-        botId: t.String(),
+        remoteUserId: t.String(),
       }),
       detail: {
-        description: "Bot詳細を取得",
+        description: "Bot詳細をbotユーザーIdで取得",
         tags: ["Server", "Bot"],
       },
     },

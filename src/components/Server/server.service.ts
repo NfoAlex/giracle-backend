@@ -125,9 +125,9 @@ export namespace ServiceServer {
     return myBot;
   };
 
-  export const GetBotById = async (botId: string) => {
+  export const GetBotByRemoteUserId = async (remoteUserId: string) => {
     const bot = await db.query.botManages.findFirst({
-      where: and(eq(botManages.id, botId)),
+      where: and(eq(botManages.remoteUserId, remoteUserId)),
       columns: { tokenCode: false },
       with: {
         user: {

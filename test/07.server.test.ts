@@ -669,11 +669,11 @@ describe("GET /server/bot/me/:botId", () => {
   });
 });
 
-describe("GET /server/bot/:botId", () => {
+describe("GET /server/bot/:remoteUserId", () => {
   it("正常 :: 他人のBotも取得できる・tokenCodeは伏せられる", async () => {
     // TESTBOT3はTESTUSER2所有。/bot/me/:botIdと違って所有者不要
     const res = await FETCH({
-      path: "/server/bot/TESTBOT3",
+      path: "/server/bot/TESTUSER_BOT_3",
       method: "GET",
     });
     const j = await res.json();
@@ -691,7 +691,7 @@ describe("GET /server/bot/:botId", () => {
 
   it("自分のBotでもtokenCodeは返さない", async () => {
     const res = await FETCH({
-      path: "/server/bot/TESTBOT1",
+      path: "/server/bot/TESTUSER_BOT_1",
       method: "GET",
     });
     const j = await res.json();
@@ -700,9 +700,18 @@ describe("GET /server/bot/:botId", () => {
     expect(j.data.tokenCode).toBeUndefined();
   });
 
+  it("BotではないユーザーId", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
   it("存在しないBot", async () => {
     const res = await FETCH({
-      path: "/server/bot/TESTBOT999",
+      path: "/server/bot/TESTUSER_BOT_999",
       method: "GET",
     });
     expect(res.status).toBe(404);
@@ -711,7 +720,7 @@ describe("GET /server/bot/:botId", () => {
 
   it("未認証 :: 401", async () => {
     const res = await FETCH({
-      path: "/server/bot/TESTBOT1",
+      path: "/server/bot/TESTUSER_BOT_1",
       method: "GET",
       excludeCredential: true,
     });
