@@ -857,6 +857,65 @@ describe("PATCH /server/bot/approval", () => {
     expect(await res.text()).toBe("Bot not found");
   });
 
+  it("botId・remoteUserId両方指定 :: botIdのみ更新され二重更新しない", async () => {
+    // 旧実装は両指定で2回UPDATEし、2件目が0件でも1件目だけ変わる事故があった
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        remoteUserId: "TESTUSER_BOT_2",
+        approvalStatus: "DENIED",
+      },
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data).toBe("TESTBOT1");
+    // botId側のみ更新される(remoteUserIdが指す別Botは触らない)
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT2"))
+        .get()?.approveStatus,
+    ).toBe("APPROVED");
+
+    // 後続へ漏らさない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("botIdが存在せずremoteUserIdが有効でも404で何も変わらない(botId優先)", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT999",
+        remoteUserId: "TESTUSER_BOT_1",
+        approvalStatus: "DENIED",
+      },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+    // 部分コミットしない(remoteUserId側も据え置き)
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("APPROVED");
+  });
+
   it("権限無し", async () => {
     const res = await FETCH({
       path: "/server/bot/approval",

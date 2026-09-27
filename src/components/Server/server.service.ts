@@ -1013,8 +1013,7 @@ export namespace ServiceServer {
         });
 
       botManageUpdated = botManageUpdatedArr[0];
-    }
-    if (remoteUserId) {
+    } else if (remoteUserId) {
       const botManageUpdatedArr = await db
         .update(botManages)
         .set({
