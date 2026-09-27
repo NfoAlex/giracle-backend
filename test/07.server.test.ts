@@ -731,6 +731,45 @@ describe("PATCH /server/bot/approval", () => {
     }
   });
 
+  it("正常 :: remoteUserIdでも更新できる", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        remoteUserId: "TESTUSER_BOT_1",
+        approvalStatus: "DENIED",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data).toBe("TESTBOT1");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
+
+    // 後続へ漏らさない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("botId・remoteUserId両方未指定", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        approvalStatus: "APPROVED",
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("BotId or remoteUserId is required.");
+  });
+
   it("存在しないBotデータ", async () => {
     const res = await FETCH({
       path: "/server/bot/approval",
@@ -743,6 +782,19 @@ describe("PATCH /server/bot/approval", () => {
     expect(res.ok).toBeFalse();
     const t = await res.text();
     expect(t).toBe("Bot not found");
+  });
+
+  it("存在しないremoteUserId", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        remoteUserId: "TESTUSER_BOT_999",
+        approvalStatus: "APPROVED",
+      },
+    });
+    expect(res.ok).toBeFalse();
+    expect(await res.text()).toBe("Bot not found");
   });
 
   it("権限無し", async () => {
