@@ -255,6 +255,10 @@ export namespace ExtServiceMessage {
     if (messageEditing === undefined) {
       throw status(404, "Message not found");
     }
+    //Botのアクセス許可(非許可は404/403の差で存在が漏れるため、存在しない時と同様に404で伏せる)
+    if (!ExtUtil.isChannelPermitted(messageEditing.channelId, bot)) {
+      throw status(404, "Message not found");
+    }
     //送信者が自分と違うならエラー
     if (messageEditing.userId !== bot.remoteUserId) {
       throw status(403, "You are not sender of this message");
@@ -262,11 +266,6 @@ export namespace ExtServiceMessage {
     //内容が同じならエラー
     if (messageEditing.content === message) {
       throw status(400, "Message is already same");
-    }
-
-    //Botのアクセス許可
-    if (!ExtUtil.isChannelPermitted(messageEditing.channelId, bot)) {
-      throw status(403, "Channel not permitted");
     }
 
     //メッセージデータを更新する
