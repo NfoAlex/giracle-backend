@@ -113,7 +113,7 @@ export namespace ServiceRole {
 
     //ユーザー存在とロールリンクの確認
     const userWithRoleLink = await db.query.users.findFirst({
-      where: eq(users.id, userId),
+      where: and(eq(users.id, userId), eq(users.isBot, false)),
       with: {
         RoleLink: {
           where: eq(roleLinks.roleId, roleId),

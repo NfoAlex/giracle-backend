@@ -77,9 +77,24 @@ export async function INIT() {
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
-    { id: "TESTUSER_BOT_1", name: "testbotuser", selfIntroduction: "" },
-    { id: "TESTUSER_BOT_2", name: "testbotuser2", selfIntroduction: "" },
-    { id: "TESTUSER_BOT_3", name: "testbotuser3", selfIntroduction: "" },
+    {
+      id: "TESTUSER_BOT_1",
+      name: "testbotuser",
+      selfIntroduction: "",
+      isBot: true,
+    },
+    {
+      id: "TESTUSER_BOT_2",
+      name: "testbotuser2",
+      selfIntroduction: "",
+      isBot: true,
+    },
+    {
+      id: "TESTUSER_BOT_3",
+      name: "testbotuser3",
+      selfIntroduction: "",
+      isBot: true,
+    },
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
