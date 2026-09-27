@@ -432,6 +432,20 @@ describe("DELETE /ext/message/delete", () => {
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Message not found");
   });
+
+  it("許可の無いチャンネルのメッセージは存在を悟られない", async () => {
+    // TESTBOT1 は TESTCHANNEL1 のみ許可。TESTMESSAGE2 は TESTCHANNEL2 の他人のメッセージ
+    const res = await FETCH({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { targetMessageId: "TESTMESSAGE2" },
+      headers: { authorization: "TESTTOKEN1" },
+      excludeCredential: true,
+    });
+    // 所有者チェック(403)より前に権限確認を通し、存在しないメッセージと同一の404で伏せる
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Message not found");
+  });
 });
 
 describe("全透過Bot(useAllChannel)", () => {

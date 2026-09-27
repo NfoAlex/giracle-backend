@@ -297,13 +297,13 @@ export namespace ExtServiceMessage {
     if (messageData === undefined) {
       throw status(404, "Message not found");
     }
+    //Botのアクセス許可(非許可は404/403の差で存在が漏れるため、存在しない時と同様に404で伏せる)
+    if (!ExtUtil.isChannelPermitted(messageData.channelId, bot)) {
+      throw status(404, "Message not found");
+    }
     //送信者が自分(Bot)と違うならエラー
     if (messageData.userId !== bot.remoteUserId) {
       throw status(403, "You are not sender of this message");
-    }
-    //Botのアクセス許可
-    if (!ExtUtil.isChannelPermitted(messageData.channelId, bot)) {
-      throw status(403, "Channel not permitted");
     }
 
     //削除するファイルデータを予め取得
