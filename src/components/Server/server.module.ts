@@ -143,7 +143,8 @@ export const server = new Elysia({ prefix: "/server" })
         name: t.String({ minLength: 1, maxLength: 64 }),
         description: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
         permissionChannelIds: t.Optional(
-          t.Array(t.String(), { minItems: 1, maxItems: 100 }),
+          //件数検査はserviceで重複排除後に行うためmaxItemsは指定しない
+          t.Array(t.String(), { minItems: 1 }),
         ),
         useAllChannel: t.Optional(t.Boolean()),
         canFetchUserinfo: t.Optional(t.Boolean()),
