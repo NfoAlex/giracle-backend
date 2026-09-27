@@ -211,6 +211,37 @@ describe("WS (Bot)", () => {
         .where(eq(botManages.id, "TESTBOT1"));
     }
   });
+  test("botId・remoteUserId両方指定の承認更新でもbotId側の接続中WSが切断される", async () => {
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    // サーバー側切断は非同期イベントなのでcloseイベントをawaitする(時間待ちに依存しない)
+    const closedPromise = new Promise<void>((resolve) =>
+      ws.addEventListener("close", () => resolve()),
+    );
+    try {
+      // 両指定で別Botを指すケース。更新した行のWSを切断しないと非承認Botがchannel::*を受け続ける
+      const res = await FETCH({
+        path: "/server/bot/approval",
+        method: "PATCH",
+        body: {
+          botId: "TESTBOT1",
+          remoteUserId: "TESTUSER_BOT_2",
+          approvalStatus: "DENIED",
+        },
+      });
+      expect(res.ok).toBe(true);
+      // 非APPROVED化は更新した全行の接続中WSを切断する
+      await closedPromise;
+      expect(ws.readyState).toBe(WebSocket.CLOSED);
+      expect(messages.some((m) => m.includes("not approved"))).toBe(true);
+    } finally {
+      // 後続のテストのため承認済みへ戻す
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
   test("Bot削除で接続中のBotは切断される", async () => {
     // 既存フィクスチャを壊さないよう使い捨てBotを直挿しする
     await db.insert(users).values({

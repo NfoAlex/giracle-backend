@@ -992,16 +992,14 @@ export namespace ServiceServer {
     botId?: string,
     remoteUserId?: string,
   ) => {
-    //Botデータ取り込み用
-    let botManageUpdated:
-      | {
-          id: string;
-          remoteUserId: string;
-        }
-      | undefined;
+    //Botデータ取り込み用(更新した全行のWS切断に使う)
+    let botManageUpdatedArr: {
+      id: string;
+      remoteUserId: string;
+    }[] = [];
 
     if (botId) {
-      const botManageUpdatedArr = await db
+      botManageUpdatedArr = await db
         .update(botManages)
         .set({
           approveStatus: approvalStatus,
@@ -1011,10 +1009,8 @@ export namespace ServiceServer {
           id: botManages.id,
           remoteUserId: botManages.remoteUserId,
         });
-
-      botManageUpdated = botManageUpdatedArr[0];
     } else if (remoteUserId) {
-      const botManageUpdatedArr = await db
+      botManageUpdatedArr = await db
         .update(botManages)
         .set({
           approveStatus: approvalStatus,
@@ -1024,22 +1020,23 @@ export namespace ServiceServer {
           id: botManages.id,
           remoteUserId: botManages.remoteUserId,
         });
-
-      botManageUpdated = botManageUpdatedArr[0];
     }
 
-    if (botManageUpdated === undefined) {
+    if (botManageUpdatedArr.length === 0) {
       throw status(404, "Bot not found");
     }
 
     //承認済みでないなら接続中WSを切断(接続を維持するとchannel::*の配信を受け続ける)
+    // 更新した全行のremoteUserIdが対象(1件だけだと更新済みBotのWSが残り配信を受け続ける)
     if (approvalStatus !== "APPROVED") {
-      Util.wsUserInstance.disconnect(
-        botManageUpdated.remoteUserId,
-        "Your bot is not approved yet",
-      );
+      for (const botManageUpdated of botManageUpdatedArr) {
+        Util.wsUserInstance.disconnect(
+          botManageUpdated.remoteUserId,
+          "Your bot is not approved yet",
+        );
+      }
     }
 
-    return botManageUpdated.id;
+    return botManageUpdatedArr[0].id;
   };
 }
