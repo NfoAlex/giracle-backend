@@ -222,8 +222,8 @@ describe("/role/link", async () => {
       },
     });
     const t = await res.text();
-    expect(t).toBe("User not found");
-    expect(res.status).toBe(404);
+    expect(t).toBe("You cannot link role to bot user");
+    expect(res.status).toBe(400);
     expect(res.ok).toBe(false);
   });
 

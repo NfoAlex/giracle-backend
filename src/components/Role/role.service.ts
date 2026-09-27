@@ -113,7 +113,7 @@ export namespace ServiceRole {
 
     //ユーザー存在とロールリンクの確認
     const userWithRoleLink = await db.query.users.findFirst({
-      where: and(eq(users.id, userId), eq(users.isBot, false)),
+      where: eq(users.id, userId),
       with: {
         RoleLink: {
           where: eq(roleLinks.roleId, roleId),
@@ -122,6 +122,9 @@ export namespace ServiceRole {
     });
     if (!userWithRoleLink) {
       throw status(404, "User not found");
+    }
+    if (userWithRoleLink.isBot) {
+      throw status(400, "You cannot link role to bot user");
     }
     if (userWithRoleLink.RoleLink.length > 0) {
       throw status(400, "Role already linked");
