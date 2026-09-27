@@ -165,26 +165,24 @@ export namespace ServiceServer {
 
     //同じチャンネルを重複して渡されても許可テーブルのUNIQUE制約で落ちないよう畳む
     const uniqueChannelIds = [...new Set(permissionChannelIds)];
-    //チャンネル検査
+    //チャンネル検査(全透過でも許可リストは保持するため、useAllChannelによらず行う)
     //実在確認は管理者でも必須で、飛ばすと許可テーブルのchannelIdがFK違反になり500になる
-    if (!useAllChannel) {
-      if (uniqueChannelIds.length > 100) {
-        throw status(400, "Too many channels to listen");
-      }
-      for (const channelId of uniqueChannelIds) {
-        //TODO: どうにかしたい
-        //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
-        //実在しないチャンネルIdも素通りしてしまう。存在は別に確認する
-        const channelExists =
-          db
-            .select({ id: channels.id })
-            .from(channels)
-            .where(eq(channels.id, channelId))
-            .get() !== undefined;
-        if (!channelExists) throw status(404, "Channel not found");
-        if (!(await Util.checkChannelVisibility(channelId, _userId)))
-          throw status(400, "You cannot use a channel you cannot see");
-      }
+    if (uniqueChannelIds.length > 100) {
+      throw status(400, "Too many channels to listen");
+    }
+    for (const channelId of uniqueChannelIds) {
+      //TODO: どうにかしたい
+      //checkChannelVisibilityは閲覧制限の無いチャンネルを無条件で許可するため、
+      //実在しないチャンネルIdも素通りしてしまう。存在は別に確認する
+      const channelExists =
+        db
+          .select({ id: channels.id })
+          .from(channels)
+          .where(eq(channels.id, channelId))
+          .get() !== undefined;
+      if (!channelExists) throw status(404, "Channel not found");
+      if (!(await Util.checkChannelVisibility(channelId, _userId)))
+        throw status(400, "You cannot use a channel you cannot see");
     }
 
     let botCreatedResult:
@@ -225,9 +223,9 @@ export namespace ServiceServer {
           .get();
         if (bot === undefined) throw status(500, "Bot creation failed");
 
-        //チャンネル登録
+        //チャンネル登録(全透過中も許可リストは保持する)
         let channelsPermitted: BotChannelPermission[] | undefined;
-        if (!useAllChannel && uniqueChannelIds.length !== 0) {
+        if (uniqueChannelIds.length !== 0) {
           channelsPermitted = trx
             .insert(botChannelPermissions)
             .values(

@@ -336,6 +336,62 @@ describe("PUT /server/bot", () => {
     expect(j.data.canFetchUserinfo).toBeFalse();
   });
 
+  it("全透過でもpermissionChannelIdsは検査される", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllBogus",
+        useAllChannel: true,
+        permissionChannelIds: ["NOSUCHCHANNEL"],
+      },
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
+
+    const resInvisible = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllInvisible",
+        useAllChannel: true,
+        permissionChannelIds: ["TESTCHANNEL3"],
+      },
+      useSecondaryUser: true,
+    });
+    expect(resInvisible.status).toBe(400);
+    expect(await resInvisible.text()).toBe(
+      "You cannot use a channel you cannot see",
+    );
+  });
+
+  it("全透過でもpermissionChannelIdsは保存される", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllSaved",
+        useAllChannel: true,
+        permissionChannelIds: ["TESTCHANNEL1"],
+      },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL1",
+      ),
+    ).toBeTrue();
+
+    //後続テストに影響しないよう行を消しておく
+    await db.delete(botManages).where(eq(botManages.id, j.data.id));
+    await db.delete(users).where(eq(users.id, j.data.remoteUserId));
+  });
+
   it("正常3 :: 自動透過時には勝手にApproved", async () => {
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
     GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
