@@ -51,8 +51,18 @@ export const ConstWebPush = {
 
 import { db } from "./db";
 import { serverConfigs } from "./db/schema";
-export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect =
-  {} as typeof serverConfigs.$inferSelect;
+//グローバルに使えるGiracleサーバーの設定
+//読込失敗（DB未初期化・設定読込エラー）時もスキーマ既定値で起動を継続するため、初期値として敷いておく
+export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
+  id: 0,
+  name: "Giracle",
+  introduction: "",
+  RegisterAvailable: true,
+  RegisterInviteOnly: true,
+  RegisterAnnounceChannelId: "",
+  MessageMaxLength: 3000,
+  MessageMaxFileSize: 512000,
+};
 
 export async function reloadServerConfig() {
   const [config] = await db.select().from(serverConfigs);
@@ -62,7 +72,7 @@ export async function reloadServerConfig() {
 try {
   await reloadServerConfig();
 } catch {
-  // DB未初期化時（マイグレーション前やテストロード時）は握りつぶす
+  // DB未初期化時（マイグレーション前やテストロード時）は既定値のまま握りつぶす
 }
 
 /////////////////////////////////////////////////////////////////
