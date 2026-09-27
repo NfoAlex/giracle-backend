@@ -77,7 +77,7 @@ Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.t
 - 承認管理: `approveStatus` は PENDING/APPROVED/DENIED/BLOCKED。管理者向けは `/server/bot/all`（一覧）と `/server/bot/approval`（承認状況更新、`checkRoleTerm: "manageServer"`）。Bot 作成者向けは `/server/bot/me` と `/server/bot/me/:botId`。
 - 一覧系は審査に必要な情報を返す。`GetBotMe` は `approveStatus`、管理者用 `GetBot`（`/server/bot/all`）は `approveStatus` + `useAllChannel` + `can*`（要求権限を伏せたまま承認させないため）。
 - **Bot を承認済みでない状態にする・無効化する操作は、接続中の WS も切断する**（`Util.wsUserInstance.disconnect`）。該当は `PatchBotApproval`（BLOCKED/DENIED/PENDING へ変更時）、`PatchBot`（再申請で PENDING に戻った時）、`DeleteBot`（`users.isDeleted` で無効化）。切断しないと接続済み Bot が `channel::*` の配信を受け続ける。
-- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled` を送って切断（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open）。
+- WS 接続時の拒否: `approveStatus !== "APPROVED"` は `Your bot is not approved yet`、BAN/論理削除は `This bot is disabled`、`canReadMessage` が false は `Your bot is not permitted to read messages` を送って切断（[src/external/ws.ext.ts](src/external/ws.ext.ts) の open）。
 - Bot 名は `botManages.botName` と `users.name` の二重保持。`PatchBot` の改名は同一トランザクションで両方を更新する（片方だけだと表示名が参照する `users.name` が旧名のまま残る）。どちらも UNIQUE なので衝突時は 400 `Bot name already exists` に寄せて両方ロールバックする。
 - `PUT /server/bot` の入力検証: `name` は `maxLength: 64`（PATCH と揃える）、`permissionChannelIds` は `Set` で重複排除してから件数・可視性を検査する。
 - **チャンネル許可は `PATCH /server/bot` でも変更できる**（`permissionChannelIds` / `useAllChannel`）。指定された場合は `PUT` と同じ検証（件数 ≤ 100・チャンネルの実在・可視性）を行う。許可テーブルは `permissionChannelIds` 指定時だけ**差し替え**（全削除 → 再挿入）し、全透過（`useAllChannel: true`）でも行は消えない。差し替えなしの更新（`useAllChannel` 切替のみ等）でも既存の許可は保持される。

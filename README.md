@@ -264,7 +264,7 @@ Elysia の静的ルーターは同一パスの WS ルートを上書きするた
 | `user::{userId}` | 該当ユーザー向けイベント |
 | `channel::{channelId}` | 参加済みチャンネルのイベント |
 
-Bot として接続した場合は `user::{remoteUserId}` に加え、許可されたチャンネルの `channel::*` を購読する（`useAllChannel: true` の Bot は接続時点の全チャンネルを購読する）。
+Bot として接続した場合は `user::{remoteUserId}` に加え、許可されたチャンネルの `channel::*` を購読する（`useAllChannel: true` の Bot は接続時点の全チャンネルを購読する）。`channel::*` でメッセージを受信できるため、`canReadMessage` のない Bot は接続時に `ERROR` で切断される。
 
 ### クライアント → サーバー シグナル
 

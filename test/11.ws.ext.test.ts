@@ -113,6 +113,14 @@ describe("WS (Bot)", () => {
     expect(closed).toBe(true);
   });
 
+  test("canReadMessageのないBotはERRORで切断される", async () => {
+    // channel::*の購読を許すと全メッセージを受信できてしまうため接続ごと拒否する
+    // TESTBOT2 は既定で権限フラグを持たない
+    const { messages, closed } = await connectBot("TESTTOKEN2");
+    expect(messages.some((m) => m.includes("not permitted"))).toBe(true);
+    expect(closed).toBe(true);
+  });
+
   /** 期待するメッセージが届くまで待つ。届かなければ最後まで待って呼び出し側の expect が落ちる */
   const waitForMessage = async (messages: string[], probe: string) => {
     for (let i = 0; i < 40 && !messages.some((m) => m.includes(probe)); i++) {
@@ -126,11 +134,11 @@ describe("WS (Bot)", () => {
       .set({ [flag]: value })
       .where(eq(users.id, "TESTUSER_BOT_1"));
 
-  /** TESTBOT2 の全透過フラグを切り替える(呼び出し側で必ず戻す) */
+  /** TESTBOT2 の全透過フラグと受信権限を切り替える(受信検証にはcanReadMessageが要る。呼び出し側で必ず戻す) */
   const setAllChannel = (value: boolean) =>
     db
       .update(botManages)
-      .set({ useAllChannel: value })
+      .set({ useAllChannel: value, canReadMessage: value })
       .where(eq(botManages.id, "TESTBOT2"));
 
   // BANと論理削除は同じ拒否経路のため同一ケースを共有する
@@ -153,7 +161,7 @@ describe("WS (Bot)", () => {
     // 管理者所有のBotは再申請が免除されるため、非管理者所有のTESTBOT3で試す
     await db
       .update(botManages)
-      .set({ approveStatus: "APPROVED" })
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
       .where(eq(botManages.id, "TESTBOT3"));
     const { ws, messages } = await connectBot("TESTTOKEN3");
     expect(ws.readyState).toBe(WebSocket.OPEN);
@@ -183,7 +191,11 @@ describe("WS (Bot)", () => {
       // 後続のテストのため未承認・権限フラグに戻す(TESTBOT3は既定PENDING)
       await db
         .update(botManages)
-        .set({ approveStatus: "PENDING", canManageServerConfig: false })
+        .set({
+          approveStatus: "PENDING",
+          canManageServerConfig: false,
+          canReadMessage: false,
+        })
         .where(eq(botManages.id, "TESTBOT3"));
     }
   });

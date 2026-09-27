@@ -79,6 +79,16 @@ export const extWs = new Elysia().ws("/ws", {
       return;
     }
 
+    //canReadMessageが無いBotでもchannel::*を購読すると全メッセージを受信でき承認がWSで迂回される
+    if (!botData.canReadMessage) {
+      ws.send({
+        signal: "ERROR",
+        data: "Your bot is not permitted to read messages",
+      });
+      ws.close();
+      return;
+    }
+
     ws.subscribe(`user::${botData.remoteUserId}`);
     if (botData.useAllChannel) {
       // 全透過Botは既存の全チャンネルを購読する（Bunのpub/subにワイルドカードが無いため）
