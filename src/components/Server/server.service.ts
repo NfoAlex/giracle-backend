@@ -109,7 +109,7 @@ export namespace ServiceServer {
     return mybot;
   };
 
-  export const GetBotById = async (botId: string, _userId: string) => {
+  export const GetBotMeById = async (botId: string, _userId: string) => {
     const myBot = await db.query.botManages.findFirst({
       //所有者だけが参照できるルートなのでtokenCodeも返す(外部API利用に必要)
       where: and(eq(botManages.id, botId)),
@@ -123,6 +123,21 @@ export namespace ServiceServer {
       throw status(403, "You are not owner of this bot");
 
     return myBot;
+  };
+
+  export const GetBotById = async (botId: string) => {
+    const bot = await db.query.botManages.findFirst({
+      where: and(eq(botManages.id, botId)),
+      columns: { tokenCode: false },
+      with: {
+        user: {
+          columns: { id: true },
+        },
+      },
+    });
+    if (bot === undefined) throw status(404, "Bot not found");
+
+    return bot;
   };
 
   export const PutBot = async (

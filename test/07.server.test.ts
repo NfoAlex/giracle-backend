@@ -669,6 +669,57 @@ describe("GET /server/bot/me/:botId", () => {
   });
 });
 
+describe("GET /server/bot/:botId", () => {
+  it("正常 :: 他人のBotも取得できる・tokenCodeは伏せられる", async () => {
+    // TESTBOT3はTESTUSER2所有。/bot/me/:botIdと違って所有者不要
+    const res = await FETCH({
+      path: "/server/bot/TESTBOT3",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Fetched bot info");
+    expect(j.data.id).toBe("TESTBOT3");
+    expect(j.data.botName).toBe("BOT_TEST_3");
+    expect(j.data.createdBy).toBe("TESTUSER2");
+    // 外部APIの認証情報なので取得ルートでは返さない
+    expect(j.data.tokenCode).toBeUndefined();
+    // remoteUserIdで紐付いたユーザーはidのみ展開される(パスワード等を漏らさない)
+    expect(j.data.user.id).toBe("TESTUSER_BOT_3");
+    expect(Object.keys(j.data.user)).toEqual(["id"]);
+  });
+
+  it("自分のBotでもtokenCodeは返さない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTBOT1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.tokenCode).toBeUndefined();
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTBOT999",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("未認証 :: 401", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTBOT1",
+      method: "GET",
+      excludeCredential: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("PATCH /server/bot/approval", () => {
   it("正常", async () => {
     // 既定値(APPROVED)以外を送り、暗黙補完されずに指定値が反映されることを見る
