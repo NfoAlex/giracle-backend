@@ -196,7 +196,7 @@ giracle-backend/
 | PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る。所有者が `manageServer` なら免除） |
 | DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |
 | GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`approveStatus` と要求権限を含む） |
-| PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`APPROVED` 以外にすると WS 切断） |
+| PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`botId` か `remoteUserId` で指定。`APPROVED` 以外にすると WS 切断） |
 | GET | `/server/custom-emoji` | ✅ | - | カスタム絵文字一覧取得 |
 | GET | `/server/custom-emoji/:code` | ✅ | - | カスタム絵文字取得（キャッシュ: 3日） |
 | GET | `/server/get-invite` | ✅ | `manageServer` | 招待コード一覧取得 |
