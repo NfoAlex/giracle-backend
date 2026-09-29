@@ -5,6 +5,7 @@ import { ExtServiceMessage } from "./message.ext.service";
 
 export const extMessage = new Elysia({ prefix: "/message" })
   .use(ExtMiddleware.CheckApiCode)
+  .use(ExtMiddleware.BotRateLimit)
   .use(ExtMiddleware.CheckPermission)
   .get(
     "/:messageId",
