@@ -70,6 +70,7 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 Bot は `src/external/` 配下の外部 API（prefix `/ext`、[external.module.ts](src/external/external.module.ts)）経由で操作する。module/service 構成は通常の `src/components/<Name>/` と同じ。**Bot 自身の操作（メッセージ送受信など）は `/ext` 配下、Bot の管理（作成・承認・一覧）は `src/components/Server/` 配下の `/server/bot*` にある。** **Bot は `remoteUserId`（紐付いた users の行。`users.isBot` が true）経由でユーザーアカウントを持つ。** メッセージ送信・編集などの操作もすべて `remoteUserId` 名義で行う（`messages.userId = remoteUserId` かつ `isBot: true`）。
 
 - 認証: `ExtMiddleware.CheckApiCode`（[Middleware.ext.ts](src/external/Middleware.ext.ts)）。`Authorization` ヘッダで `BotManage.tokenCode` を照合し、`approveStatus === "APPROVED"` でないと 401。コンテキストに `CheckApiCode: { ...BotManage }` が注入される。
+- レート制限: `/ext` にも Bot 単位の固定ウィンドウ制限がかかる（`CheckApiCode` 内。`RATE_LIMIT_ENABLED=true` のときのみ有効、超過で 429 `Too Many Requests`）。**キーは検証済み Bot の Id**（認証前に tokenCode でバケットを作るとヘッダ偽装で無限に作られる）。グローバル `Middleware.RateLimiter` は実在する Bot を素通しする（二重計上防止）。閾値は `RATE_LIMIT_BOT_COUNT` / `RATE_LIMIT_BOT_TIMEOUT`。
 - 権限: `ExtMiddleware.CheckPermission` macro + ルートオプション `checkPermission: "canSendMessage"` 等で `can*` フラグ（6 種）をチェック。認証同様 module 側で `.use(CheckApiCode).use(CheckPermission)` を併用する。
 - チャンネル許可は `botChannelPermissions`（Bot × Channel の複合）。判定は [src/external/Util.ext.ts](src/external/Util.ext.ts) の `ExtUtil.isChannelPermitted` に集約している。許可のないチャンネルへの読み書きは 403。
   - 全透過（`useAllChannel: true`）は許可テーブルを引かず無条件で許可するが、**存在しないチャンネルは同関数が 404 `Channel not found` を投げる**（存在確認しないと `messages` への INSERT が FK 違反で 500 になるため）。

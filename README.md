@@ -231,7 +231,7 @@ giracle-backend/
 
 ### Bot（外部 API）(`/ext`)
 
-Bot が自身でメッセージ操作を行うための外部 API。通常のユーザー認証（Cookie）ではなく、**`Authorization` ヘッダに `BotManage.tokenCode` を付けて認証する**（[Middleware.ext.ts](src/external/Middleware.ext.ts) の `CheckApiCode`）。`approveStatus === "APPROVED"` でない Bot、および BAN / 論理削除された Bot は 401。詳細な設計は [AGENTS.md](AGENTS.md) の Bot 節を参照。
+Bot が自身でメッセージ操作を行うための外部 API。通常のユーザー認証（Cookie）ではなく、**`Authorization` ヘッダに `BotManage.tokenCode` を付けて認証する**（[Middleware.ext.ts](src/external/Middleware.ext.ts) の `CheckApiCode`）。`approveStatus === "APPROVED"` でない Bot、および BAN / 論理削除された Bot は 401。認証を通った Bot には **Bot 単位の簡易レート制限**（固定ウィンドウ、超過で 429 `Too Many Requests`）がかかる（`RATE_LIMIT_ENABLED=true` のときのみ。閾値は `RATE_LIMIT_BOT_COUNT` / `RATE_LIMIT_BOT_TIMEOUT`）。詳細な設計は [AGENTS.md](AGENTS.md) の Bot 節を参照。
 
 | メソッド | パス | 必要な `can*` | 概要 |
 | ---------- | ------ | --------------- | ------ |
@@ -312,7 +312,7 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 | ------ | ------ |
 | `CheckToken` | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減 |
 | `CheckRoleTerm` | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認 |
-| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
+| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可。Bot（`/ext`）は `CheckApiCode` 側の Bot 単位バケットに委ねるため対象外 |
 | `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化 |
 
 ### 権限（`checkRoleTerm`）の種類
@@ -359,6 +359,8 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 | `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
+| `RATE_LIMIT_BOT_COUNT` | `200` | Bot API（`/ext`）の Bot 単位の制限リクエスト数 |
+| `RATE_LIMIT_BOT_TIMEOUT` | `60` | Bot API（`/ext`）の Bot 単位のウィンドウ幅（秒） |
 | `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
 | `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
 | `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
