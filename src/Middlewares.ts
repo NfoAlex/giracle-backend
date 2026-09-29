@@ -192,8 +192,6 @@ export namespace Middleware {
     async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
-      //Bot認証(tokenCode)単位のバケットを使うかどうか
-      let isBot = false;
       //識別キー
       let key: string = (token.value as string | undefined) ?? "anonymous";
 
@@ -202,7 +200,7 @@ export namespace Middleware {
       //トークンがあってもキャッシュ・DBに実在しないなら無効なので匿名扱いにする(なりすましによるIPブロック回避防止)
       if (tokenValue === undefined) {
         //BotはCookieではなくAuthorizationヘッダで認証する。
-        //実在確認をしないとヘッダ偽装でBot用バケットを無限に作られレート制限を回避される
+        //実在確認をしないとヘッダ偽装で匿名バケットを無限に作られレート制限を回避される
         const authorization = request.headers.get("authorization");
         const botExists = authorization
           ? await db.query.botManages.findFirst({
@@ -210,12 +208,9 @@ export namespace Middleware {
               columns: { id: true },
             })
           : undefined;
-        if (botExists === undefined) {
-          isAnonymous = true;
-        } else {
-          isBot = true;
-          key = `bot:${authorization}`;
-        }
+        //Botの制限は ExtMiddleware.CheckApiCode 側が Bot の Id 単位で行うため、ここでは素通しする
+        if (botExists !== undefined) return;
+        isAnonymous = true;
       } else {
         const cachedToken = tokenCache.get(tokenValue);
         let tokenValid = cachedToken !== undefined;
@@ -275,15 +270,14 @@ export namespace Middleware {
         //ブロックされるけどカウント増加
         bucket.count += 1;
 
-        //制限を超えた場合、認証済みユーザーならトークンを無効化する(Botはセッショントークンを持たないので対象外)
-        if (!isAnonymous && !isBot) {
+        //制限を超えた場合、認証済みユーザーならトークンを無効化する
+        if (!isAnonymous) {
           await db.delete(tokens).where(eq(tokens.token, key));
           //キャッシュにも残っていると最大5分間有効なままになるため合わせて無効化
           invalidateTokenCache(key);
-        } else if (isAnonymous) {
+        } else {
           //匿名の場合の処理
           //カウントがプラス10を超過している場合はIPアドレスでブロック
-          //(BotのバケットキーはIPではないため対象外)
           if (bucket.count > configUsing.limit + 10) {
             await db
               .insert(blockedIPAddresses)
