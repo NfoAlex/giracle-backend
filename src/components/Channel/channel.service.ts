@@ -1,15 +1,5 @@
 import { rm } from "node:fs/promises";
-import {
-  and,
-  eq,
-  exists,
-  gte,
-  inArray,
-  lte,
-  notExists,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
@@ -25,7 +15,6 @@ import {
   users,
 } from "../../db/schema";
 import { Util } from "../../Util";
-import { WSUnsubscribe } from "../../ws";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
@@ -119,83 +108,8 @@ export namespace ServiceChannel {
   };
 
   export const List = async (_userId: string) => {
-    //ロール閲覧制限のないチャンネルリストから取得
-    const channelList = await db
-      .select()
-      .from(channels)
-      .where(
-        notExists(
-          db
-            .select()
-            .from(channelViewableRoles)
-            .where(eq(channelViewableRoles.channelId, channels.id)),
-        ),
-      );
-
-    //ユーザーのロールを取得
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, _userId),
-      with: {
-        RoleLink: true,
-      },
-    });
-    if (!user) {
-      throw status(500, "Internal Server Error");
-    }
-    //指定のロールでしか閲覧できない、また他条件でのチャンネルを取得
-    const roleIds = user.RoleLink.map((roleLink) => roleLink.roleId);
-    //HOSTロールがあるなら全チャンネルを取得
-    if (roleIds.includes("HOST")) {
-      return await db.select().from(channels);
-    }
-
-    const channelsLimited = await db
-      .select()
-      .from(channels)
-      .where(
-        or(
-          //閲覧制限があり、自分がそのロールに所属している
-          roleIds.length > 0
-            ? exists(
-                db
-                  .select()
-                  .from(channelViewableRoles)
-                  .where(
-                    and(
-                      eq(channelViewableRoles.channelId, channels.id),
-                      inArray(channelViewableRoles.roleId, roleIds),
-                    ),
-                  ),
-              )
-            : undefined,
-          //自分が作成した
-          eq(channels.createdUserId, _userId),
-          //自分が参加している
-          exists(
-            db
-              .select()
-              .from(channelJoins)
-              .where(
-                and(
-                  eq(channelJoins.channelId, channels.id),
-                  eq(channelJoins.userId, _userId),
-                ),
-              ),
-          ),
-        ),
-      );
-
-    //重複を取り除く
-    const mergedChannels = [...channelList, ...channelsLimited];
-    //channelIdをキーにしてMapに格納することで重複を排除
-    const uniqueChannelsMap = new Map<string, (typeof mergedChannels)[0]>();
-    for (const channel of mergedChannels) {
-      uniqueChannelsMap.set(channel.id, channel);
-    }
-    //配列化
-    const uniqueChannels = Array.from(uniqueChannelsMap.values());
-
-    return uniqueChannels;
+    //閲覧できるチャンネルを取得(可視判定はGetUserViewableChannelに集約)
+    return await Util.getUserViewableChannel(_userId);
   };
 
   export const GetHistory = async (
@@ -393,23 +307,53 @@ export namespace ServiceChannel {
     };
   };
 
-  export const Search = async (query: string, _userId: string) => {
+  export const Search = async (
+    query: string,
+    _userId: string,
+    cursorChannelId?: string,
+  ) => {
     //閲覧できるチャンネルをId配列で取得
     const channelViewable = await Util.getUserViewableChannel(_userId);
     const channelIdsViewable = channelViewable.map((c) => c.id);
 
-    //チャンネル検索
+    //見えるチャンネルが無ければ検索結果も空
     if (channelIdsViewable.length === 0) return [];
+
+    let cursorChannelName: string | undefined;
+    if (cursorChannelId !== undefined) {
+      const cursorChannel = db
+        .select({ name: channels.name })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.id, cursorChannelId),
+            inArray(channels.id, channelIdsViewable),
+          ),
+        )
+        .get();
+      if (cursorChannel === undefined)
+        throw status(400, "Cursor channel does not exists");
+      cursorChannelName = cursorChannel.name;
+    }
+
+    //チャンネル検索(大小を区別しない前方一致)
+    //LIKEは既定でASCIIの大小を区別しないため、Channel_name_nocase_idxが索引レンジに変換する
     const channelInfos = await db
       .select()
       .from(channels)
       .where(
         and(
           //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
-          sql`${channels.name} LIKE ${`%${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
+          sql`${channels.name} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
           inArray(channels.id, channelIdsViewable),
+          //NOCASEで畳むと別名が同値になるため、nameで決定的にタイブレークして取りこぼしを防ぐ
+          cursorChannelName !== undefined
+            ? sql`(${channels.name} COLLATE NOCASE, ${channels.name}) > (${cursorChannelName}, ${cursorChannelName})`
+            : undefined,
         ),
-      );
+      )
+      .orderBy(sql`${channels.name} COLLATE NOCASE`, channels.name)
+      .limit(50);
 
     return channelInfos;
   };
@@ -640,7 +584,10 @@ export namespace ServiceChannel {
       where: eq(channelJoins.channelId, channelId),
     });
     for (const channelJoinData of joinedUsers) {
-      WSUnsubscribe(channelJoinData.userId, `channel::${channelId}`);
+      Util.wsUserInstance.unsubscribe(
+        channelJoinData.userId,
+        `channel::${channelId}`,
+      );
     }
 
     //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)

@@ -212,6 +212,21 @@ describe("/role/link", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("Botにロールをつけると失敗する", async () => {
+    const res = await FETCH({
+      path: "/role/link",
+      method: "POST",
+      body: {
+        userId: "TESTUSER_BOT_1",
+        roleId: TEST__CREATED_ROLEID,
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("You cannot link role to bot user");
+    expect(res.status).toBe(400);
+    expect(res.ok).toBe(false);
+  });
+
   it("存在しないユーザー", async () => {
     const res = await FETCH({
       path: "/role/link",

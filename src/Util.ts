@@ -9,10 +9,12 @@ import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
+import HasManageServerRole from "./Utils/HasManageServerRole";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
 import { ValidateUrl } from "./Utils/ValidateUrl";
+import { WSUserInstance } from "./Utils/WSUserInstance";
 
 export namespace Util {
   export const calculateReactionTotal = CalculateReactionTotal;
@@ -26,7 +28,9 @@ export namespace Util {
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
   export const getUsersRoleLevel = GetUsersRoleLevel;
+  export const hasManageServerRole = HasManageServerRole;
   export const getSafeFileExtension = GetSafeFileExtension;
   export const getUrlPreviewThumbnailFileName = GetUrlPreviewThumbnailFileName;
   export const readResponseBodyWithByteLimit = ReadResponseBodyWithByteLimit;
+  export const wsUserInstance = WSUserInstance;
 }

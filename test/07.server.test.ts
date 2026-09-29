@@ -1,13 +1,17 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db } from "../src/db";
 import {
+  botChannelPermissions,
+  botManages,
   channelJoinOnDefaults,
   invitations,
+  messages,
   roleInfos,
   roleLinks,
   serverConfigs,
+  users,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -116,10 +120,12 @@ describe("POST /server/change-config", () => {
       method: "POST",
       body: {
         RegisterAvailable: true,
-        RegisterInviteOnly: true,
+        RegisterInviteOnly: false,
         RegisterAnnounceChannelId: "TESTCHANNEL2",
         MessageMaxLength: 123,
         MessageMaxFileSize: 2048,
+        BotEnabled: true,
+        BotAutoApprove: false,
         DefaultJoinChannel: ["TESTCHANNEL1", "TESTCHANNEL2"],
       },
     });
@@ -127,15 +133,21 @@ describe("POST /server/change-config", () => {
     expect(res.ok).toBe(true);
     expect(j.data.name).toBe("test-name"); //変更無い
     expect(j.data.RegisterAvailable).toBeTrue();
-    GIRACLE_SERVER_CONFIG.RegisterAvailable = true;
-    expect(j.data.RegisterInviteOnly).toBeTrue();
-    GIRACLE_SERVER_CONFIG.RegisterInviteOnly = true;
+    expect(GIRACLE_SERVER_CONFIG.RegisterAvailable).toBeTrue();
+    expect(j.data.RegisterInviteOnly).toBeFalse();
+    expect(GIRACLE_SERVER_CONFIG.RegisterInviteOnly).toBeFalse();
     expect(j.data.RegisterAnnounceChannelId).toBe("TESTCHANNEL2");
-    GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId = "TESTCHANNEL2";
+    expect(GIRACLE_SERVER_CONFIG.RegisterAnnounceChannelId).toBe(
+      "TESTCHANNEL2",
+    );
+    expect(j.data.BotEnabled).toBeTrue();
+    expect(GIRACLE_SERVER_CONFIG.BotEnabled).toBeTrue();
+    expect(j.data.BotAutoApprove).toBeFalse();
+    expect(GIRACLE_SERVER_CONFIG.BotAutoApprove).toBeFalse();
     expect(j.data.MessageMaxLength).toBe(123);
-    GIRACLE_SERVER_CONFIG.MessageMaxLength = 123;
+    expect(GIRACLE_SERVER_CONFIG.MessageMaxLength).toBe(123);
     expect(j.data.MessageMaxFileSize).toBe(2048);
-    GIRACLE_SERVER_CONFIG.MessageMaxFileSize = 2048;
+    expect(GIRACLE_SERVER_CONFIG.MessageMaxFileSize).toBe(2048);
 
     const sc = db.select().from(serverConfigs).limit(1).get();
     expect(sc).toBeDefined();
@@ -149,7 +161,7 @@ describe("POST /server/change-config", () => {
     ).toBeTrue();
   });
 
-  it("権限無", async () => {
+  it("権限無し", async () => {
     const res = await FETCH({
       path: "/server/change-config",
       method: "POST",
@@ -163,6 +175,1440 @@ describe("POST /server/change-config", () => {
       },
       useSecondaryUser: true,
     });
-    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Role level not enough");
   });
+});
+
+describe("GET /server/bot/me", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+    });
+    const j = await res.json();
+    // GetBotMeはdesc(createdAt)順(新しい順)
+    expect(j.data.length).toBe(2);
+    expect(j.data[0].botName).toBe("BOT_TEST_2");
+    expect(j.data[1].botName).toBe("BOT_TEST_1");
+    //申請者が自分のBotの審査状況を確認できる
+    expect(j.data[0].approveStatus).toBe("APPROVED");
+    expect(j.data[1].approveStatus).toBe("APPROVED");
+  });
+
+  it("正常 :: secondary", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_3");
+  });
+
+  it("正常 :: query前方一致で絞り込める", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=BOT_TEST_2",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_2");
+  });
+
+  it("正常 :: queryは前方一致", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=BOT_TEST_",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(2);
+  });
+
+  it("正常 :: query一致なしは空配列", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?query=NOPE",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryのワイルドカードはリテラル扱い", async () => {
+    //%をワイルドカードとして解釈すると全件返る。エスケープされていれば0件
+    const res = await FETCH({
+      path: "/server/bot/me?query=%25",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
+    const allRes = await FETCH({
+      path: "/server/bot/me",
+      method: "GET",
+    });
+    const all = await allRes.json();
+    // 無カーソル時は新しい順なので先頭がBOT_TEST_2
+    const res = await FETCH({
+      path: `/server/bot/me?cursorBotId=${all.data[0].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    // BOT_TEST_2より古いBOT_TEST_1のみが返る
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].botName).toBe("BOT_TEST_1");
+  });
+
+  it("異常 :: cursorBotIdが存在しない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me?cursorBotId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor bot does not exists");
+  });
+});
+
+/**
+ * `正常`の間は管理者権限を持たないユーザーで試すためにしばらくセカンダリユーザー
+ */
+let TEST__deletingBotId = "";
+let TEST__deletingBotRemoteUserId = "";
+describe("PUT /server/bot", () => {
+  it("正常", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBot",
+        description: "This is a new bot",
+        canFetchUserinfo: true,
+        canManageUser: true,
+        //同じチャンネルの重複指定(UNIQUE制約で落ちず1件に畳まれること)
+        permissionChannelIds: ["TESTCHANNEL1", "TESTCHANNEL1"],
+      },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot");
+    expect(j.data.botDescription).toBe("This is a new bot");
+    expect(j.data.useAllChannel).toBeFalse();
+    expect(j.data.canFetchUserinfo).toBeTrue();
+    expect(j.data.user.name).toBe("newBot");
+    expect(j.data.user.name).toBe("newBot");
+    expect(j.data.channelPermissions).toBeDefined();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL1",
+      ),
+    ).toBeTrue();
+
+    //チャンネル透過もできていることを確認
+    const perms = db
+      .select({ channelId: botChannelPermissions.channelId })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, j.data.id))
+      .all();
+    expect(perms.length).toBe(1);
+    expect(perms[0].channelId).toBe("TESTCHANNEL1");
+
+    TEST__deletingBotId = j.data.id;
+    TEST__deletingBotRemoteUserId = j.data.remoteUserId;
+  });
+
+  it("正常2 :: 全チャンネル透過", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot2", useAllChannel: true },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot2");
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(j.data.canFetchUserinfo).toBeFalse();
+  });
+
+  it("全透過でもpermissionChannelIdsは検査される", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllBogus",
+        useAllChannel: true,
+        permissionChannelIds: ["NOSUCHCHANNEL"],
+      },
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
+
+    const resInvisible = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllInvisible",
+        useAllChannel: true,
+        permissionChannelIds: ["TESTCHANNEL3"],
+      },
+      useSecondaryUser: true,
+    });
+    expect(resInvisible.status).toBe(400);
+    expect(await resInvisible.text()).toBe(
+      "You cannot use a channel you cannot see",
+    );
+  });
+
+  it("全透過でもpermissionChannelIdsは保存される", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: {
+        name: "newBotAllSaved",
+        useAllChannel: true,
+        permissionChannelIds: ["TESTCHANNEL1"],
+      },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL1",
+      ),
+    ).toBeTrue();
+
+    //後続テストに影響しないよう行を消しておく
+    await db.delete(botManages).where(eq(botManages.id, j.data.id));
+    await db.delete(users).where(eq(users.id, j.data.remoteUserId));
+  });
+
+  it("正常3 :: 自動透過時には勝手にApproved", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBot3", useAllChannel: true },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.botName).toBe("newBot3");
+    expect(j.data.useAllChannel).toBeTrue();
+    expect(j.data.canFetchUserinfo).toBeFalse();
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+  });
+
+  it("見えないチャンネルでBot作成しようとする", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBotDeny", permissionChannelIds: ["TESTCHANNEL3"] },
+      useSecondaryUser: true,
+    });
+    const t = await res.text();
+    expect(t).toBe("You cannot use a channel you cannot see");
+  });
+
+  it("ボット利用が許可されてないないときの作成", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newbotX", canFetchUserinfo: true, canManageUser: true },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+  });
+
+  it("Bot作成失敗時にユーザー行が残らない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    //BOT_TEST_1 は INIT() が作る TESTBOT1 の botName と衝突する
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "BOT_TEST_1" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
+
+    //トランザクションが巻き戻り、Bot用のユーザー行が孤児として残らない
+    const orphan = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, "BOT_TEST_1"));
+    expect(orphan.length).toBe(0);
+  });
+
+  it("既存ユーザー名と衝突するBotは作成できない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "testsystemuser2" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
+
+    const orphan = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, "testsystemuser2"));
+    expect(orphan.length).toBe(1);
+  });
+
+  it("サーバー管理権限者は承認待ちを飛ばし、見えないチャンネルも指定できる", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    // TESTCHANNEL3は閲覧制限付き。権限者にだけ閲覧制限が免除される
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBotByAdmin", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    const j = await res.json();
+    expect(j.data.approveStatus).toBe("APPROVED");
+    expect(j.data.useAllChannel).toBeFalse();
+    expect(
+      j.data.channelPermissions.some(
+        (c: { channelId: string }) => c.channelId === "TESTCHANNEL3",
+      ),
+    ).toBeTrue();
+    // 後続テストに影響しないよう、作成したBotの行とBot用ユーザー行を消しておく
+    await db.delete(botManages).where(eq(botManages.id, j.data.id));
+    await db.delete(users).where(eq(users.id, j.data.remoteUserId));
+  });
+
+  it("サーバー管理権限者でも存在しないチャンネルは404(FK違反の500にしない)", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PUT",
+      body: { name: "newBotBogus", permissionChannelIds: ["NOSUCHCHANNEL"] },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
+  });
+});
+
+describe("DELETE /server/bot", () => {
+  it("正常 :: メッセージを送ったBotも削除できる", async () => {
+    // Botがメッセージを送った状態にする(投稿済みメッセージは削除で消えないこと)
+    await db.insert(messages).values({
+      content: "bot message",
+      userId: TEST__deletingBotRemoteUserId,
+      channelId: "TESTCHANNEL1",
+      isBot: true,
+    });
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "DELETE",
+      body: { botId: TEST__deletingBotId },
+      useSecondaryUser: true, //セカンダリユーザーとして作成したので
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Bot deleted");
+
+    // ユーザーはソフトデリートされ、メッセージは残る
+    const [botUser] = await db
+      .select({ isDeleted: users.isDeleted })
+      .from(users)
+      .where(eq(users.id, TEST__deletingBotRemoteUserId));
+    expect(botUser?.isDeleted).toBe(true);
+    const remain = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.userId, TEST__deletingBotRemoteUserId));
+    expect(remain.length).toBe(1);
+
+    // チャンネル権限は botId cascade で消えていること
+    const perms = await db
+      .select({ id: botChannelPermissions.id })
+      .from(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, TEST__deletingBotId));
+    expect(perms.length).toBe(0);
+  });
+
+  it("他人のBotは削除できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "DELETE",
+      body: { botId: "TESTBOT3" },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+
+    const bot = db
+      .select({ id: botManages.id })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT3"))
+      .get();
+    expect(bot).toBeDefined();
+    const botUser = db
+      .select({ isDeleted: users.isDeleted })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_3"))
+      .get();
+    expect(botUser?.isDeleted).toBeFalse();
+  });
+});
+
+describe("GET /server/bot/all", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(j.data.length).toBe(5);
+    expect(j.data[0].botName).toBe("newBot3");
+    expect(j.data[1].botName).toBe("newBot2");
+    expect(j.data[2].botName).toBe("BOT_TEST_3");
+    expect(j.data[3].botName).toBe("BOT_TEST_2");
+    expect(j.data[4].botName).toBe("BOT_TEST_1");
+
+    //承認者が審査状況と要求権限を確認できる
+    const target = j.data.find((b: { id: string }) => b.id === "TESTBOT1");
+    expect(target.approveStatus).toBe("APPROVED");
+    expect(target.useAllChannel).toBeFalse();
+    expect(target.canReadMessage).toBeTrue();
+    //全透過の申請もそのまま見える
+    expect(j.data[0].useAllChannel).toBeTrue();
+  });
+
+  it("権限無し", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+  });
+
+  it("正常 :: query前方一致で絞り込める", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?query=newBot",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.length).toBe(2);
+    expect(j.data.map((b: { botName: string }) => b.botName)).toEqual([
+      "newBot3",
+      "newBot2",
+    ]);
+  });
+
+  it("正常 :: queryは前方一致", async () => {
+    //部分一致なら"BOT_TEST_3"の内部"TEST"にも当たるが、前方一致なので0件
+    const res = await FETCH({
+      path: "/server/bot/all?query=TEST",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: query一致なしは空配列", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?query=NOPE",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryのワイルドカードはリテラル扱い", async () => {
+    //%をワイルドカードとして解釈すると全件返る。エスケープされていれば0件
+    const res = await FETCH({
+      path: "/server/bot/all?query=%25",
+      method: "GET",
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBe(0);
+  });
+
+  it("正常 :: queryとcursorBotIdを併用できる", async () => {
+    const filtered = await FETCH({
+      path: "/server/bot/all?query=newBot",
+      method: "GET",
+    });
+    const filteredJson = await filtered.json();
+    const res = await FETCH({
+      path: `/server/bot/all?query=newBot&cursorBotId=${filteredJson.data[0].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.map((b: { botName: string }) => b.botName)).toEqual([
+      "newBot2",
+    ]);
+  });
+
+  it("正常 :: cursorBotId指定でカーソルより古いBotのみ返る", async () => {
+    const allRes = await FETCH({
+      path: "/server/bot/all",
+      method: "GET",
+    });
+    const all = await allRes.json();
+    // 生成ミリ秒が同値でも並びが揺れないよう、絶対順序ではなく無カーソル応答との対応で検証する
+    const res = await FETCH({
+      path: `/server/bot/all?cursorBotId=${all.data[2].id}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data.map((b: { id: string }) => b.id)).toEqual(
+      all.data.slice(3).map((b: { id: string }) => b.id),
+    );
+  });
+
+  it("異常 :: cursorBotIdが存在しない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/all?cursorBotId=garbage",
+      method: "GET",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Cursor bot does not exists");
+  });
+});
+
+describe("GET /server/bot/me/:botId", () => {
+  it("正常", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Fetched my bot info");
+    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.botName).toBe("BOT_TEST_1");
+    // 所有者はtokenCodeを確認できる
+    expect(j.data.tokenCode).toBe("TESTTOKEN1");
+    // remoteUserIdで紐付いたユーザーが展開される
+    expect(j.data.user.id).toBe("TESTUSER_BOT_1");
+    // チャンネル透過も展開される
+    expect(j.data.channelPermissions.length).toBe(1);
+    expect(j.data.channelPermissions[0].channelId).toBe("TESTCHANNEL1");
+  });
+
+  it("他人のBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT3",
+      method: "GET",
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not owner of this bot");
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/me/TESTBOT999",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+});
+
+describe("GET /server/bot/:remoteUserId", () => {
+  it("正常 :: 他人のBotも取得できる・tokenCodeは伏せられる", async () => {
+    // TESTBOT3はTESTUSER2所有。/bot/me/:botIdと違って所有者不要
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER_BOT_3",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Fetched bot info");
+    expect(j.data.id).toBe("TESTBOT3");
+    expect(j.data.botName).toBe("BOT_TEST_3");
+    expect(j.data.createdBy).toBe("TESTUSER2");
+    // 外部APIの認証情報なので取得ルートでは返さない
+    expect(j.data.tokenCode).toBeUndefined();
+    // remoteUserIdで紐付いたユーザーはidのみ展開される(パスワード等を漏らさない)
+    expect(j.data.user.id).toBe("TESTUSER_BOT_3");
+    expect(Object.keys(j.data.user)).toEqual(["id"]);
+  });
+
+  it("自分のBotでもtokenCodeは返さない", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER_BOT_1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("TESTBOT1");
+    expect(j.data.tokenCode).toBeUndefined();
+  });
+
+  it("BotではないユーザーId", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER_BOT_999",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("未認証 :: 401", async () => {
+    const res = await FETCH({
+      path: "/server/bot/TESTUSER_BOT_1",
+      method: "GET",
+      excludeCredential: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("PATCH /server/bot/approval", () => {
+  it("正常", async () => {
+    // 既定値(APPROVED)以外を送り、暗黙補完されずに指定値が反映されることを見る
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        approvalStatus: "DENIED",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data).toBe("TESTBOT1");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
+
+    // 後続へ漏らさない(このdescribeはTESTBOT1の状態を書き換えるため)
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("全承認ステータスを受け付ける", async () => {
+    try {
+      for (const approvalStatus of [
+        "PENDING",
+        "BLOCKED",
+        "DENIED",
+        "APPROVED",
+      ] as const) {
+        const res = await FETCH({
+          path: "/server/bot/approval",
+          method: "PATCH",
+          body: { botId: "TESTBOT1", approvalStatus },
+        });
+        const j = await res.json();
+        expect(res.status).toBe(200);
+        expect(j.message).toBe("Bot approval updated");
+        expect(j.data).toBe("TESTBOT1");
+        expect(
+          db
+            .select({ approveStatus: botManages.approveStatus })
+            .from(botManages)
+            .where(eq(botManages.id, "TESTBOT1"))
+            .get()?.approveStatus,
+        ).toBe(approvalStatus);
+      }
+    } finally {
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
+
+  it("正常 :: remoteUserIdでも更新できる", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        remoteUserId: "TESTUSER_BOT_1",
+        approvalStatus: "DENIED",
+      },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data).toBe("TESTBOT1");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
+
+    // 後続へ漏らさない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("botId・remoteUserId両方未指定", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        approvalStatus: "APPROVED",
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("BotId or remoteUserId is required.");
+  });
+
+  it("存在しないBotデータ", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT999",
+        approvalStatus: "APPROVED",
+      },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot not found");
+  });
+
+  it("存在しないremoteUserId", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        remoteUserId: "TESTUSER_BOT_999",
+        approvalStatus: "APPROVED",
+      },
+    });
+    expect(res.ok).toBeFalse();
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("botId・remoteUserId両方指定 :: botIdのみ更新され二重更新しない", async () => {
+    // 旧実装は両指定で2回UPDATEし、2件目が0件でも1件目だけ変わる事故があった
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        remoteUserId: "TESTUSER_BOT_2",
+        approvalStatus: "DENIED",
+      },
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data).toBe("TESTBOT1");
+    // botId側のみ更新される(remoteUserIdが指す別Botは触らない)
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("DENIED");
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT2"))
+        .get()?.approveStatus,
+    ).toBe("APPROVED");
+
+    // 後続へ漏らさない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("botIdが存在せずremoteUserIdが有効でも404で何も変わらない(botId優先)", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT999",
+        remoteUserId: "TESTUSER_BOT_1",
+        approvalStatus: "DENIED",
+      },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+    // 部分コミットしない(remoteUserId側も据え置き)
+    expect(
+      db
+        .select({ approveStatus: botManages.approveStatus })
+        .from(botManages)
+        .where(eq(botManages.id, "TESTBOT1"))
+        .get()?.approveStatus,
+    ).toBe("APPROVED");
+  });
+
+  it("権限無し", async () => {
+    const res = await FETCH({
+      path: "/server/bot/approval",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        approvalStatus: "APPROVED",
+      },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+  });
+});
+
+// ファイル末尾に置く(TESTBOT1のbotNameを書き換えるため、GET /server/bot/all の期待値と干渉する)
+describe("PATCH /server/bot", () => {
+  /** 指定Botに許可されているチャンネルId(順序非依存で比較するためソートする) */
+  const channelIdsOfBot = async (botId: string) => {
+    const bot = await db.query.botManages.findFirst({
+      where: eq(botManages.id, botId),
+      with: { channelPermissions: { columns: { channelId: true } } },
+    });
+    return (bot?.channelPermissions ?? [])
+      .map((permission) => permission.channelId)
+      .sort();
+  };
+
+  it("管理者所有のBotは差分をつけても承認のまま(PutBotの免除と揃える)", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", canReadMessage: false },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("APPROVED");
+
+    await db
+      .update(botManages)
+      .set({ canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT1"));
+  });
+
+  it("正常 :: 権限変更でapproveStatusがPENDINGに戻る", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT3",
+        botName: "BOT_TEST_3_RENAMED",
+        canSendMessage: true,
+        canManageUser: true,
+      },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED");
+    expect(j.data.canManageUser).toBeTrue();
+    expect(j.data.approveStatus).toBe("PENDING");
+    // tokenCodeは返らない
+    expect(j.data.tokenCode).toBeUndefined();
+    // 作成時と同じくフル情報が同時取得できる
+    expect(j.data.user.name).toBe("BOT_TEST_3_RENAMED");
+    // TESTBOT3は許可チャンネルを持たない
+    expect(j.data.channelPermissions).toEqual([]);
+
+    // 表示名を参照するusers.name側も揃っている(乖離すると改名が画面に出ない)
+    const botUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_3"))
+      .get();
+    expect(botUser?.name).toBe("BOT_TEST_3_RENAMED");
+  });
+
+  it("正常 :: 名前変更でもapproveStatusがPENDINGに戻る", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", botName: "BOT_TEST_3_RENAMED2" },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED2");
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
+
+  it("正常 :: サーバー設定が自動承諾になっているなら承諾のまま", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", botName: "BOT_TEST_3_RENAMED3" },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.botName).toBe("BOT_TEST_3_RENAMED3");
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+  });
+
+  it("自動承諾でもブロック済みのBotは復活しない", async () => {
+    // 管理者によるBLOCKEDは制裁なので、所有者の変更操作で解除されてはならない
+    await db
+      .update(botManages)
+      .set({ approveStatus: "BLOCKED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      // 権限を実際に変えても(再審査扱いになる差分でも)ステータスは据え置き
+      body: { botId: "TESTBOT3", canReadMessage: false },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("BLOCKED");
+    // 編集自体は弾かれない
+    expect(j.data.canReadMessage).toBeFalse();
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT3"));
+  });
+
+  it("自動承諾なら拒否済み(DENIED)のBotも編集で復帰する", async () => {
+    // 自動承諾は管理者が承認レビュー自体を不要とする設定なので、DENIEDでも承認に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", canReadMessage: false },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("APPROVED");
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT3"));
+  });
+
+  it("拒否済みBotに実差分をつけるとPENDINGに戻る", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED", canReadMessage: true })
+      .where(eq(botManages.id, "TESTBOT3"));
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT3", canReadMessage: false },
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("PENDING");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED", canReadMessage: true })
+        .where(eq(botManages.id, "TESTBOT3"));
+    }
+  });
+
+  it("拒否済みBotの説明だけを変更してもDENIEDを維持する", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "DENIED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT3", botDescription: "denied stays denied" },
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("DENIED");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT3"));
+    }
+  });
+
+  it("PENDINGのBotは自動承諾設定でAPPROVEDに戻る", async () => {
+    const previousAutoApprove = GIRACLE_SERVER_CONFIG.BotAutoApprove;
+    await db
+      .update(botManages)
+      .set({ approveStatus: "PENDING" })
+      .where(eq(botManages.id, "TESTBOT3"));
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: {
+          botId: "TESTBOT3",
+          botDescription: "auto approve pending",
+        },
+        useSecondaryUser: true,
+      });
+      const j = await res.json();
+      expect(res.ok).toBeTrue();
+      expect(j.data.approveStatus).toBe("APPROVED");
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = previousAutoApprove;
+      await db
+        .update(botManages)
+        .set({ approveStatus: "APPROVED" })
+        .where(eq(botManages.id, "TESTBOT3"));
+    }
+  });
+
+  it("正常 :: 概要の変更だけだとPENDINGにならない", async () => {
+    // 申請承認済みの状態に戻す
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", botDescription: "testing new description" },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("TESTBOT3");
+    expect(j.data.botDescription).toBe("testing new description");
+    expect(j.data.approveStatus).toBe("APPROVED");
+  });
+
+  it("既存のBot名には変更できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", botName: "BOT_TEST_2" },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot name already exists");
+  });
+
+  it("既存ユーザー名との衝突で変更がロールバックされる", async () => {
+    const beforeBot = db
+      .select({
+        botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+        canManageUser: botManages.canManageUser,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        tokenCode: botManages.tokenCode,
+      })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT1"))
+      .get();
+    expect(beforeBot).toBeDefined();
+    const beforeUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .get();
+    expect(beforeUser).toBeDefined();
+    const beforeChannelIds = await channelIdsOfBot("TESTBOT1");
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        botName: "testsystemuser2",
+        permissionChannelIds: ["TESTCHANNEL2"],
+        canReadMessage: !beforeBot?.canReadMessage,
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot name already exists");
+
+    const afterBot = db
+      .select({
+        botName: botManages.botName,
+        approveStatus: botManages.approveStatus,
+        useAllChannel: botManages.useAllChannel,
+        canReadMessage: botManages.canReadMessage,
+        canSendMessage: botManages.canSendMessage,
+        canManageUser: botManages.canManageUser,
+        canFetchUserinfo: botManages.canFetchUserinfo,
+        tokenCode: botManages.tokenCode,
+      })
+      .from(botManages)
+      .where(eq(botManages.id, "TESTBOT1"))
+      .get();
+    expect(afterBot).toBeDefined();
+    expect(afterBot?.botName).toBe(beforeBot?.botName);
+    expect(afterBot?.approveStatus).toBe(beforeBot?.approveStatus);
+    expect(afterBot?.useAllChannel).toBe(beforeBot?.useAllChannel);
+    expect(afterBot?.canReadMessage).toBe(beforeBot?.canReadMessage);
+    expect(afterBot?.canSendMessage).toBe(beforeBot?.canSendMessage);
+    expect(afterBot?.canManageUser).toBe(beforeBot?.canManageUser);
+    expect(afterBot?.canFetchUserinfo).toBe(beforeBot?.canFetchUserinfo);
+    expect(afterBot?.tokenCode).toBe(beforeBot?.tokenCode);
+
+    const afterUser = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, "TESTUSER_BOT_1"))
+      .get();
+    expect(afterUser?.name).toBe(beforeUser?.name);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(beforeChannelIds);
+  });
+
+  it("他人のBotは更新できない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", botName: "hijack" },
+    });
+    expect(res.ok).toBeFalse();
+  });
+
+  it("存在しないBot", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT999", botName: "ghost" },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot not found");
+  });
+
+  it("正常 :: 権限のみ変更でもapproveStatusがPENDINGに戻る", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", canFetchUserinfo: true },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.canFetchUserinfo).toBeTrue();
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
+
+  it("正常 :: チャンネル許可を差し替えられる", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(res.ok).toBe(true);
+    // 追加ではなく差し替え(TESTCHANNEL1が残らない)
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+    // フル情報も同時取得できる(TESTBOT1は改名していないので初期名のまま)
+    const j = await res.json();
+    expect(j.data.user.name).toBe("testbotuser");
+    expect(j.data.channelPermissions).toEqual([
+      { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
+    ]);
+  });
+
+  it("正常 :: 許可を指定しない更新では許可リストが変わらない", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", botDescription: "keep permissions" },
+    });
+    expect(res.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+    // 許可を指定しない更新でも現状の許可とユーザーがフルで返る
+    const j = await res.json();
+    expect(j.data.user.name).toBe("testbotuser");
+    expect(j.data.channelPermissions).toEqual([
+      { botId: "TESTBOT1", channelId: "TESTCHANNEL3", id: expect.any(Number) },
+    ]);
+  });
+
+  it("正常 :: 全透過にしても許可リストは残り、非透過に戻してもそのまま", async () => {
+    const toAll = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", useAllChannel: true },
+    });
+    expect(toAll.ok).toBe(true);
+    expect((await toAll.json()).data.useAllChannel).toBeTrue();
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL3"]);
+
+    // 全透過中でも許可リストは差し替えられる
+    const replace = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL1"] },
+    });
+    expect(replace.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL1"]);
+
+    // 非透過に戻しても許可はそのまま残る
+    const toPrivate = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", useAllChannel: false },
+    });
+    expect(toPrivate.ok).toBe(true);
+    expect(await channelIdsOfBot("TESTBOT1")).toEqual(["TESTCHANNEL1"]);
+
+    // 後続テストの前提(TESTCHANNEL3のみ許可)へ戻す
+    const restore = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(restore.ok).toBe(true);
+  });
+
+  it("存在しないチャンネルは404", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["NOT_EXIST_CHANNEL"] },
+    });
+    expect(res.status).toBe(404);
+    const t = await res.text();
+    expect(t).toBe("Channel not found");
+  });
+
+  it("見られないチャンネルは許可できない", async () => {
+    // TESTUSERはGOD権限を持つため全チャンネルが見える。TESTBOT3の所有者(TESTUSER2)で試す
+    // (TESTCHANNEL3/4 はTESTUSER2から見えないプライベートチャンネル)
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", permissionChannelIds: ["TESTCHANNEL4"] },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("You cannot use a channel you cannot see");
+  });
+
+  it("正常 :: 差分が無くてもエラーにならない", async () => {
+    // 更新対象が空だとdrizzleが "No values to set" で500になるため、許可指定のみの
+    // 差分無し更新と、指定なし更新の両方で通ることを固定する
+    const sameChannel = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1", permissionChannelIds: ["TESTCHANNEL3"] },
+    });
+    expect(sameChannel.ok).toBe(true);
+
+    const nothing = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT1" },
+    });
+    expect(nothing.ok).toBe(true);
+  });
+
+  it("PATCHで空の許可リストを指定すると全許可を削除する", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", useAllChannel: false })
+      .where(eq(botManages.id, "TESTBOT3"));
+    await db
+      .delete(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, "TESTBOT3"));
+    await db
+      .insert(botChannelPermissions)
+      .values({ botId: "TESTBOT3", channelId: "TESTCHANNEL3" });
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", permissionChannelIds: [] },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.data.channelPermissions).toEqual([]);
+    expect(j.data.approveStatus).toBe("PENDING");
+    expect(await channelIdsOfBot("TESTBOT3")).toEqual([]);
+  });
+
+  it("PATCHで重複した許可IDを1件に畳む", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED", useAllChannel: false })
+      .where(eq(botManages.id, "TESTBOT3"));
+    await db
+      .delete(botChannelPermissions)
+      .where(eq(botChannelPermissions.botId, "TESTBOT3"));
+    await db
+      .insert(botChannelPermissions)
+      .values({ botId: "TESTBOT3", channelId: "TESTCHANNEL3" });
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT3",
+        permissionChannelIds: ["TESTCHANNEL2", "TESTCHANNEL2"],
+      },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBeTrue();
+    expect(j.data.channelPermissions).toHaveLength(1);
+    expect(j.data.channelPermissions[0].channelId).toBe("TESTCHANNEL2");
+    expect(j.data.approveStatus).toBe("PENDING");
+    expect(await channelIdsOfBot("TESTBOT3")).toEqual(["TESTCHANNEL2"]);
+  });
+
+  it("PATCHで許可チャンネルが101件なら拒否する", async () => {
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: {
+        botId: "TESTBOT1",
+        permissionChannelIds: Array.from(
+          { length: 101 },
+          (_, index) => `INVALID_CHANNEL_${index}`,
+        ),
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Too many channels to listen");
+  });
+
+  it("正常 :: チャンネル許可の変更でもapproveStatusがPENDINGに戻る", async () => {
+    await db
+      .update(botManages)
+      .set({ approveStatus: "APPROVED" })
+      .where(eq(botManages.id, "TESTBOT3"));
+
+    const res = await FETCH({
+      path: "/server/bot",
+      method: "PATCH",
+      body: { botId: "TESTBOT3", permissionChannelIds: ["TESTCHANNEL1"] },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.approveStatus).toBe("PENDING");
+  });
+});
+
+// PATCHは共有状態(TESTBOT1のbotName/approveStatus)を書き換えるため、後続のテストファイルへ漏らさないよう戻す
+afterAll(async () => {
+  await db
+    .update(botManages)
+    .set({
+      botName: "BOT_TEST_1",
+      approveStatus: "APPROVED",
+      useAllChannel: false,
+    })
+    .where(eq(botManages.id, "TESTBOT1"));
+  // 改名でusers.nameも書き換わるため揃えて戻す
+  await db
+    .update(users)
+    .set({ name: "testbotuser" })
+    .where(eq(users.id, "TESTUSER_BOT_1"));
+  // チャンネル許可も初期状態(INIT()と同じ TESTCHANNEL1 のみ)へ戻す
+  // (10/11の「TESTBOT1はTESTCHANNEL1のみ許可」という前提を壊さないため)
+  await db
+    .delete(botChannelPermissions)
+    .where(eq(botChannelPermissions.botId, "TESTBOT1"));
+  await db
+    .insert(botChannelPermissions)
+    .values({ channelId: "TESTCHANNEL1", botId: "TESTBOT1" });
+
+  // 承認免除の検証で書き換えたTESTBOT3(非管理者所有)も初期状態へ戻す
+  // (10/11は未承認BotとしてTESTBOT3を使っている)
+  await db
+    .update(botManages)
+    .set({
+      botName: "BOT_TEST_3",
+      approveStatus: "PENDING",
+      canFetchUserinfo: false,
+      canReadMessage: false,
+      canSendMessage: false,
+      canManageUser: false,
+    })
+    .where(eq(botManages.id, "TESTBOT3"));
+  await db
+    .update(users)
+    .set({ name: "testbotuser3" })
+    .where(eq(users.id, "TESTUSER_BOT_3"));
+  await db
+    .delete(botChannelPermissions)
+    .where(eq(botChannelPermissions.botId, "TESTBOT3"));
 });

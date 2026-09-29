@@ -49,9 +49,9 @@ bun dev
 giracle-backend/
 ├── src/
 │   ├── index.ts              # エントリーポイント・サーバー起動
-│   ├── ws.ts                 # WebSocket ハンドラ
+│   ├── ws.ts                 # WebSocket ハンドラ (通常ユーザー /ws)
 │   ├── Middlewares.ts        # ミドルウェア定義
-│   ├── Utils/                # 共通ユーティリティ
+│   ├── Utils/                # 共通ユーティリティ (WSインスタンス管理 WSUserInstance 等)
 │   ├── db/                   # DB接続・スキーマ・シード (Drizzle)
 │   │   ├── index.ts          # bun:sqlite + drizzle() インスタンス
 │   │   ├── schema.ts         # テーブル定義 + relations + 型export
@@ -76,6 +76,15 @@ giracle-backend/
 │       └── User/
 │           ├── user.module.ts
 │           └── user.service.ts
+├── external/                 # Bot 用外部 API (/ext)
+│   ├── external.module.ts    # /ext 配下のルート登録
+│   ├── ws.ext.ts             # WebSocket ハンドラ (Bot /ext/ws)
+│   ├── Middleware.ext.ts     # CheckApiCode / CheckPermission
+│   ├── Util.ext.ts           # ExtUtil (チャンネル許可判定)
+│   └── components/
+│       └── Message/
+│           ├── message.ext.module.ts
+│           └── message.ext.service.ts
 ├── drizzle.config.ts         # drizzle-kit 設定
 ├── drizzle/                  # マイグレーションSQL (drizzle-kit generate の出力)
 └── STORAGE/                  # アップロードファイル保存先
@@ -128,7 +137,7 @@ giracle-backend/
 | GET | `/channel/get-info/:channelId` | ✅ | - | チャンネル情報取得 |
 | GET | `/channel/list` | ✅ | - | チャンネル一覧取得 |
 | POST | `/channel/get-history/:channelId` | ✅ | - | メッセージ履歴取得（ページネーション対応） |
-| GET | `/channel/search` | ✅ | - | チャンネル検索 |
+| GET | `/channel/search` | ✅ | - | チャンネル検索（`query` は大小を区別しない前方一致。`cursorChannelId` で継続取得。名前順で最大50件） |
 | POST | `/channel/invite` | ✅ | `manageChannel` | ユーザーをチャンネルへ招待（WS通知: `channel::Join`） |
 | POST | `/channel/kick` | ✅ | `manageChannel` | ユーザーをチャンネルからキック（WS通知: `channel::Left`） |
 | POST | `/channel/update` | ✅ | `manageChannel` | チャンネル情報更新（WS通知: `channel::UpdateChannel`） |
@@ -181,6 +190,14 @@ giracle-backend/
 | ---------- | ------ | ------ | ------ | ------ |
 | GET | `/server/config` | ❌ | - | サーバー設定取得 |
 | GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
+| GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`cursorBotId` で継続取得。`approveStatus` を含む） |
+| GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` 含む） |
+| GET | `/server/bot/:remoteUserId` | ✅ | - | Bot 詳細取得（bot ユーザーId指定。ログイン済みなら所有者不要。`tokenCode` は含まない） |
+| PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400。`manageServer` 権限者は作成時点で `APPROVED` |
+| PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る。所有者が `manageServer` なら免除） |
+| DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |
+| GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`approveStatus` と要求権限を含む） |
+| PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`botId` か `remoteUserId` で指定。`APPROVED` 以外にすると WS 切断） |
 | GET | `/server/custom-emoji` | ✅ | - | カスタム絵文字一覧取得 |
 | GET | `/server/custom-emoji/:code` | ✅ | - | カスタム絵文字取得（キャッシュ: 3日） |
 | GET | `/server/get-invite` | ✅ | `manageServer` | 招待コード一覧取得 |
@@ -212,17 +229,42 @@ giracle-backend/
 
 ---
 
-## WebSocket (`/ws`)
+### Bot（外部 API）(`/ext`)
 
-接続時に Cookie または `?token` クエリパラメータでトークン認証。
+Bot が自身でメッセージ操作を行うための外部 API。通常のユーザー認証（Cookie）ではなく、**`Authorization` ヘッダに `BotManage.tokenCode` を付けて認証する**（[Middleware.ext.ts](src/external/Middleware.ext.ts) の `CheckApiCode`）。`approveStatus === "APPROVED"` でない Bot、および BAN / 論理削除された Bot は 401。認証を通った Bot には **Bot 単位の簡易レート制限**（固定ウィンドウ、超過で 429 `Too Many Requests`）がかかる（`RATE_LIMIT_ENABLED=true` のときのみ。閾値は `RATE_LIMIT_BOT_COUNT` / `RATE_LIMIT_BOT_TIMEOUT`）。詳細な設計は [AGENTS.md](AGENTS.md) の Bot 節を参照。
+
+| メソッド | パス | 必要な `can*` | 概要 |
+| ---------- | ------ | --------------- | ------ |
+| GET | `/ext/message/:messageId` | `canReadMessage` | メッセージ取得 |
+| POST | `/ext/message/send` | `canSendMessage` | メッセージ送信（WS通知: `message::SendMessage`、URLプレビュー生成） |
+| POST | `/ext/message/edit` | `canSendMessage` | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
+| DELETE | `/ext/message/delete` | `canSendMessage` | メッセージ削除（WS通知: `message::MessageDeleted`。自分の送信メッセージのみ） |
+| WS | `/ext/ws` | - | Bot 用 WebSocket 接続（`Authorization: <tokenCode>`。下記 WebSocket 節を参照） |
+
+- 権限フラグ（`can*`）は 6 種: `canFetchUserinfo` / `canFetchRoleinfo` / `canManageUser` / `canManageServerConfig` / `canReadMessage` / `canSendMessage`。ルートオプション `checkPermission` で判定する。
+- チャンネルへのアクセス可否は `botChannelPermissions`（Bot × Channel）で判定する。許可のないチャンネルへの送信・編集・削除は 403、取得は存在を伏せるため 404 `Message not found`。`useAllChannel: true` の Bot は許可テーブルを引かず全チャンネルを対象にするが、存在しないチャンネルへの送信は 404 `Channel not found`。許可の変更は `PATCH /server/bot`（`permissionChannelIds` / `useAllChannel`）で行う。
+- Bot の作成・承認は `/server/bot*`（前述の Server モジュール）で行う。**`ServerConfig.BotEnabled` が false の間は Bot を作成できない（既定 false）。**
+
+---
+
+## WebSocket
+
+通常ユーザー用は `/ws`、Bot用は `/ext/ws` に分かれている。
+
+- **通常ユーザー (`/ws`)** — 接続時に Cookie または `?token` クエリパラメータでトークン認証。
+- **Bot (`/ext/ws`)** — `Authorization` ヘッダに `tokenCode` を付ける（Cookie は不要）。`approveStatus === "APPROVED"` でないと接続できず、BAN / 論理削除済みも拒否される。
+
+Elysia の静的ルーターは同一パスの WS ルートを上書きするため、両者を 1 つのパスに共存させることはできない。実装は通常ユーザーが [src/ws.ts](src/ws.ts)、Bot が [src/external/ws.ext.ts](src/external/ws.ext.ts)。
 
 ### 接続時の購読チャンネル
 
 | WS チャンネル | 対象 |
 | --------------- | ------ |
-| `GLOBAL` | 全ユーザー共通イベント |
+| `GLOBAL` | 全ユーザー共通イベント（通常ユーザーのみ。Bot は購読しない） |
 | `user::{userId}` | 該当ユーザー向けイベント |
 | `channel::{channelId}` | 参加済みチャンネルのイベント |
+
+Bot として接続した場合は `user::{remoteUserId}` に加え、許可されたチャンネルの `channel::*` を購読する（`useAllChannel: true` の Bot は接続時点の全チャンネルを購読する）。`channel::*` でメッセージを受信できるため、`canReadMessage` のない Bot は接続時に `ERROR` で切断される。
 
 ### クライアント → サーバー シグナル
 
@@ -258,6 +300,7 @@ giracle-backend/
 | `server::ConfigUpdate` | サーバー設定更新 |
 | `server::CustomEmojiUploaded` | カスタム絵文字追加 |
 | `server::CustomEmojiDeleted` | カスタム絵文字削除 |
+| `ERROR` | エラー（Bot未承認・トークン無効・BAN等。送信後に切断される） |
 
 ---
 
@@ -269,7 +312,7 @@ giracle-backend/
 | ------ | ------ |
 | `CheckToken` | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減 |
 | `CheckRoleTerm` | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認 |
-| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
+| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可。Bot（`/ext`）は `CheckApiCode` 側の Bot 単位バケットに委ねるため対象外 |
 | `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化 |
 
 ### 権限（`checkRoleTerm`）の種類
@@ -316,6 +359,8 @@ giracle-backend/
 | `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
+| `RATE_LIMIT_BOT_COUNT` | `200` | Bot API（`/ext`）の Bot 単位の制限リクエスト数 |
+| `RATE_LIMIT_BOT_TIMEOUT` | `60` | Bot API（`/ext`）の Bot 単位のウィンドウ幅（秒） |
 | `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
 | `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
 | `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
@@ -359,3 +404,5 @@ giracle-backend/
 - **最初に登録したユーザーが `HOST`（全権限）になる。** セットアップ直後の初回登録は必ず管理者本人が行うこと。
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
+- **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。`manageServer` 権限を持つユーザーが作成・更新する Bot も同様に承認が免除される（`BotAutoApprove` が false でも `APPROVED`）。
+- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続（`/ext/ws`）は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。

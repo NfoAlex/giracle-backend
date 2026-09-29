@@ -123,6 +123,9 @@ export namespace ServiceRole {
     if (!userWithRoleLink) {
       throw status(404, "User not found");
     }
+    if (userWithRoleLink.isBot) {
+      throw status(400, "You cannot link role to bot user");
+    }
     if (userWithRoleLink.RoleLink.length > 0) {
       throw status(400, "Role already linked");
     }

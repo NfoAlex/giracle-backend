@@ -10,7 +10,7 @@ import {
   tokens,
   users,
 } from "../src/db/schema";
-import { userWSInstance, WSDisconnectUser } from "../src/ws";
+import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
 
 // sharpのresizeを通せる最小PNG(1x1px)
@@ -892,7 +892,7 @@ describe("/user/ban & /user/unban", () => {
     expect(t).toBe("You can't unban yourself");
   });
 
-  it("正常 :: BAN時に既存のWS接続が切断されること（WSDisconnectUser）", () => {
+  it("正常 :: BAN時に既存のWS接続が切断されること（Util.wsUserInstance.disconnect）", () => {
     //BAN後もWS接続が生き残ると新着メッセージを受け取り続けてしまう
     const closed: string[] = [];
     const fakeWs = (id: string) =>
@@ -904,18 +904,62 @@ describe("/user/ban & /user/unban", () => {
         // biome-ignore lint/suspicious/noExplicitAny: 生のWSインスタンスを模したダミーのため
       }) as any;
 
-    userWSInstance.set("WS_DISCONNECT_TEST_USER", [
+    Util.wsUserInstance.instances.set("WS_DISCONNECT_TEST_USER", [
       fakeWs("ws1"),
       fakeWs("ws2"),
     ]);
 
-    WSDisconnectUser("WS_DISCONNECT_TEST_USER");
+    Util.wsUserInstance.disconnect("WS_DISCONNECT_TEST_USER");
 
     expect(closed).toEqual(["ws1", "ws2"]);
-    expect(userWSInstance.has("WS_DISCONNECT_TEST_USER")).toBe(false);
+    expect(Util.wsUserInstance.instances.has("WS_DISCONNECT_TEST_USER")).toBe(
+      false,
+    );
 
     //未接続ユーザーでもエラーにならない
-    expect(() => WSDisconnectUser("NOT_CONNECTED_USER")).not.toThrow();
+    expect(() =>
+      Util.wsUserInstance.disconnect("NOT_CONNECTED_USER"),
+    ).not.toThrow();
+  });
+
+  it("正常 :: WSインスタンス削除がラッパー再生成に追従すること（Util.wsUserInstance.remove）", () => {
+    //Elysiaはopen/closeごとにElysiaWSラッパーをnewし直すため、close時のwsはopen時のwsと別オブジェクト。
+    //生のServerWebSocket(raw)が同一なら削除対象として扱わないと、切断後もインスタンスが残り続ける
+    const raw1 = { id: "raw1" };
+    const raw2 = { id: "raw2" };
+    const fakeWs = (raw: unknown) => ({
+      send: () => {},
+      close: () => {},
+      subscribe: () => {},
+      unsubscribe: () => {},
+      raw,
+    });
+
+    Util.wsUserInstance.add("WS_REMOVE_TEST_USER", fakeWs(raw1));
+    Util.wsUserInstance.add("WS_REMOVE_TEST_USER", fakeWs(raw2));
+
+    //open時とは別オブジェクトだがrawが同一 → 削除される
+    Util.wsUserInstance.remove("WS_REMOVE_TEST_USER", fakeWs(raw1));
+    const remaining = Util.wsUserInstance.instances.get("WS_REMOVE_TEST_USER");
+    expect(remaining?.length).toBe(1);
+    expect(remaining?.[0].raw).toBe(raw2);
+
+    Util.wsUserInstance.remove("WS_REMOVE_TEST_USER", fakeWs(raw2));
+    expect(Util.wsUserInstance.instances.has("WS_REMOVE_TEST_USER")).toBe(
+      false,
+    );
+
+    //raw未定義のダミーは参照一致でのみ削除する（別接続を誤って消さないため）
+    const dummyA = fakeWs(undefined);
+    Util.wsUserInstance.add("WS_REMOVE_TEST_USER", dummyA);
+    Util.wsUserInstance.remove("WS_REMOVE_TEST_USER", fakeWs(undefined));
+    expect(
+      Util.wsUserInstance.instances.get("WS_REMOVE_TEST_USER")?.length,
+    ).toBe(1);
+    Util.wsUserInstance.remove("WS_REMOVE_TEST_USER", dummyA);
+    expect(Util.wsUserInstance.instances.has("WS_REMOVE_TEST_USER")).toBe(
+      false,
+    );
   });
 });
 
