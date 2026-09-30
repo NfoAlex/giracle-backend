@@ -188,6 +188,21 @@ export const channel = new Elysia({ prefix: "/channel" })
         query: t.String({ minLength: 1, maxLength: 100 }),
         cursorChannelId: t.Optional(t.String()),
       }),
+      response: {
+        200: t.Object({
+          message: t.Literal("Searched channels"),
+          data: t.Array(
+            t.Object({
+              id: t.String(),
+              name: t.String(),
+              description: t.String(),
+              isArchived: t.Boolean(),
+              createdUserId: t.String(),
+            }),
+          ),
+        }),
+        400: t.Literal("Cursor channel does not exist"),
+      },
       detail: {
         description:
           "チャンネル情報を検索します。queryは大小を区別しない前方一致、cursorChannelIdで継続取得(名前順・最大50件)",

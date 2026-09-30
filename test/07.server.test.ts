@@ -270,7 +270,7 @@ describe("GET /server/bot/me", () => {
       method: "GET",
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Cursor bot does not exists");
+    expect(await res.text()).toBe("Cursor bot does not exist");
   });
 });
 
@@ -300,7 +300,6 @@ describe("PUT /server/bot", () => {
     expect(j.data.botDescription).toBe("This is a new bot");
     expect(j.data.useAllChannel).toBeFalse();
     expect(j.data.canFetchUserinfo).toBeTrue();
-    expect(j.data.user.name).toBe("newBot");
     expect(j.data.user.name).toBe("newBot");
     expect(j.data.channelPermissions).toBeDefined();
     expect(
@@ -682,7 +681,7 @@ describe("GET /server/bot/all", () => {
       method: "GET",
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Cursor bot does not exists");
+    expect(await res.text()).toBe("Cursor bot does not exist");
   });
 });
 

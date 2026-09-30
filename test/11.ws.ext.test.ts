@@ -289,6 +289,7 @@ describe("WS (Bot)", () => {
       id: "TESTUSER_BOT_TMP",
       name: "testbotuser_tmp",
       selfIntroduction: "",
+      isBot: true,
     });
     await db.insert(botManages).values({
       id: "TESTBOT_TMP",

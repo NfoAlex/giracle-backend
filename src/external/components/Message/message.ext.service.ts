@@ -253,7 +253,10 @@ export namespace ExtServiceMessage {
       throw status(400, "Message is empty");
     }
 
-    if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+    if (
+      GIRACLE_SERVER_CONFIG.MessageMaxLength &&
+      message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength
+    ) {
       throw status(
         400,
         `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,

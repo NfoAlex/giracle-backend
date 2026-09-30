@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import { unlink } from "node:fs/promises";
 import * as path from "node:path";
 import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
@@ -80,7 +78,7 @@ export namespace ServiceServer {
         .where(eq(botManages.id, cursorBotId))
         .get();
       if (cursorBot === undefined)
-        throw status(400, "Cursor bot does not exists");
+        throw status(400, "Cursor bot does not exist");
       queryFromCursor = or(
         lt(botManages.createdAt, cursorBot.createdAt),
         and(
@@ -953,7 +951,7 @@ export namespace ServiceServer {
         .where(eq(botManages.id, cursorBotId))
         .get();
       if (cursorBot === undefined)
-        throw status(400, "Cursor bot does not exists");
+        throw status(400, "Cursor bot does not exist");
       queryFromCursor = or(
         lt(botManages.createdAt, cursorBot.createdAt),
         and(

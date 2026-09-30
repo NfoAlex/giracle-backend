@@ -332,7 +332,7 @@ export namespace ServiceChannel {
         )
         .get();
       if (cursorChannel === undefined)
-        throw status(400, "Cursor channel does not exists");
+        throw status(400, "Cursor channel does not exist");
       cursorChannelName = cursorChannel.name;
     }
 

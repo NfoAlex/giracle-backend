@@ -76,15 +76,15 @@ giracle-backend/
 │       └── User/
 │           ├── user.module.ts
 │           └── user.service.ts
-├── external/                 # Bot 用外部 API (/ext)
-│   ├── external.module.ts    # /ext 配下のルート登録
-│   ├── ws.ext.ts             # WebSocket ハンドラ (Bot /ext/ws)
-│   ├── Middleware.ext.ts     # CheckApiCode / CheckPermission
-│   ├── Util.ext.ts           # ExtUtil (チャンネル許可判定)
-│   └── components/
-│       └── Message/
-│           ├── message.ext.module.ts
-│           └── message.ext.service.ts
+│   └── external/             # Bot 用外部 API (/ext)
+│       ├── external.module.ts    # /ext 配下のルート登録
+│       ├── ws.ext.ts             # WebSocket ハンドラ (Bot /ext/ws)
+│       ├── Middleware.ext.ts     # CheckApiCode / CheckPermission
+│       ├── Util.ext.ts           # ExtUtil (チャンネル許可判定)
+│       └── components/
+│           └── Message/
+│               ├── message.ext.module.ts
+│               └── message.ext.service.ts
 ├── drizzle.config.ts         # drizzle-kit 設定
 ├── drizzle/                  # マイグレーションSQL (drizzle-kit generate の出力)
 └── STORAGE/                  # アップロードファイル保存先
@@ -190,13 +190,13 @@ giracle-backend/
 | ---------- | ------ | ------ | ------ | ------ |
 | GET | `/server/config` | ❌ | - | サーバー設定取得 |
 | GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
-| GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`cursorBotId` で継続取得。`approveStatus` を含む） |
+| GET | `/server/bot/me` | ✅ | - | 自分の Bot 一覧取得（`query` で名前検索、`cursorBotId` で継続取得。`approveStatus` を含む） |
 | GET | `/server/bot/me/:botId` | ✅ | - | 自分の Bot 詳細取得（所有者専用。`tokenCode` 含む） |
 | GET | `/server/bot/:remoteUserId` | ✅ | - | Bot 詳細取得（bot ユーザーId指定。ログイン済みなら所有者不要。`tokenCode` は含まない） |
 | PUT | `/server/bot` | ✅ | - | Bot 作成（申請）。`BotEnabled` が false の間は 400。`manageServer` 権限者は作成時点で `APPROVED` |
 | PATCH | `/server/bot` | ✅ | - | 自分の Bot 更新（改名・説明・権限・チャンネル許可。`BotAutoApprove` が false なら再申請で `PENDING` に戻る。所有者が `manageServer` なら免除） |
 | DELETE | `/server/bot` | ✅ | - | 自分の Bot 削除（論理削除。WS 切断） |
-| GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`approveStatus` と要求権限を含む） |
+| GET | `/server/bot/all` | ✅ | `manageServer` | Bot 一覧取得（審査用。`query` で名前検索、`cursorBotId` で継続取得。`approveStatus` と要求権限を含む） |
 | PATCH | `/server/bot/approval` | ✅ | `manageServer` | Bot 承認状況更新（`botId` か `remoteUserId` で指定。`APPROVED` 以外にすると WS 切断） |
 | GET | `/server/custom-emoji` | ✅ | - | カスタム絵文字一覧取得 |
 | GET | `/server/custom-emoji/:code` | ✅ | - | カスタム絵文字取得（キャッシュ: 3日） |
@@ -283,6 +283,7 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 | `channel::Join` | チャンネル参加 |
 | `channel::Left` | チャンネル退出 |
 | `channel::UpdateChannel` | チャンネル情報更新 |
+| `channel::Deleted` | チャンネル削除 |
 | `message::SendMessage` | 新規メッセージ |
 | `message::UpdateMessage` | メッセージ編集 / URLプレビュー更新 |
 | `message::MessageDeleted` | メッセージ削除 |
@@ -406,4 +407,4 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 - **モジュールは `*.module.ts`（ルーティング＋バリデーション）と `*.service.ts`（ロジック）のペアで構成される。** 認証は `Middleware.CheckToken`、権限チェックはルート定義の `checkRoleTerm` オプションで付与する。
 - **管理系ルートを追加するときは `checkRoleTerm` の付け忘れに注意する。** 指定しないと「認証さえ通れば誰でも実行可能」になる。
 - **Bot 機能は既定で無効。** `ServerConfig.BotEnabled` が false の間は `PUT /server/bot` が 400 になり Bot を作成できない。`POST /server/change-config`（`manageServer`）で `BotEnabled: true` にして有効化する。`BotAutoApprove: true` にすると承認レビューを省き、作成時点で `APPROVED` になる。`manageServer` 権限を持つユーザーが作成・更新する Bot も同様に承認が免除される（`BotAutoApprove` が false でも `APPROVED`）。
-- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続（`/ext/ws`）は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。
+- **Bot を作成しただけでは承認されない。** 既定は `PENDING` で、`PATCH /server/bot/approval`（`manageServer`）で `APPROVED` にするまで `/ext` の各 API は 401、WS 接続（`/ext/ws`）は `ERROR` シグナルを送って切断される。`APPROVED` 以外（`PENDING` / `DENIED` / `BLOCKED`）にすると接続中の WS も切断される（`PATCH /server/bot/approval`・再申請を伴う `PATCH /server/bot`・`DELETE /server/bot` が対象）。ただし `BLOCKED` は所有者の編集では解除されず据え置き（`PATCH /server/bot` は選択肢に含めない）。
