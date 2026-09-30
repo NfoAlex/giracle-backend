@@ -231,7 +231,7 @@ giracle-backend/
 
 ### Bot（外部 API）(`/ext`)
 
-Bot が自身でメッセージ操作を行うための外部 API。通常のユーザー認証（Cookie）ではなく、**`Authorization` ヘッダに `BotManage.tokenCode` を付けて認証する**（[Middleware.ext.ts](src/external/Middleware.ext.ts) の `CheckApiCode`）。`approveStatus === "APPROVED"` でない Bot、および BAN / 論理削除された Bot は 401。認証を通った Bot には **Bot 単位の簡易レート制限**（固定ウィンドウ、超過で 429 `Too Many Requests`）がかかる（`RATE_LIMIT_ENABLED=true` のときのみ。閾値は `RATE_LIMIT_BOT_COUNT` / `RATE_LIMIT_BOT_TIMEOUT`）。詳細な設計は [AGENTS.md](AGENTS.md) の Bot 節を参照。
+Bot が自身でメッセージ操作を行うための外部 API。通常のユーザー認証（Cookie）ではなく、**`Authorization` ヘッダに `BotManage.tokenCode` を付けて認証する**（[Middleware.ext.ts](src/external/Middleware.ext.ts) の `CheckApiCode`）。`approveStatus === "APPROVED"` でない Bot、および BAN / 論理削除された Bot は 401。認証を通った Bot には **Bot 単位の簡易レート制限**（固定ウィンドウ、超過で 429 `Too Many Requests`）がかかる（`RATE_LIMIT_BOT_ENABLED=true` のときのみ。閾値は `RATE_LIMIT_BOT_COUNT` / `RATE_LIMIT_BOT_TIMEOUT`）。詳細な設計は [AGENTS.md](AGENTS.md) の Bot 節を参照。
 
 | メソッド | パス | 必要な `can*` | 概要 |
 | ---------- | ------ | --------------- | ------ |
@@ -359,6 +359,7 @@ Bot として接続した場合は `user::{remoteUserId}` に加え、許可さ�
 | `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
+| `RATE_LIMIT_BOT_ENABLED` | - | `"true"` で Bot API（`/ext`）の Bot 単位レート制限を有効化（`RATE_LIMIT_ENABLED` とは独立） |
 | `RATE_LIMIT_BOT_COUNT` | `200` | Bot API（`/ext`）の Bot 単位の制限リクエスト数 |
 | `RATE_LIMIT_BOT_TIMEOUT` | `60` | Bot API（`/ext`）の Bot 単位のウィンドウ幅（秒） |
 | `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |

@@ -45,15 +45,14 @@ export namespace ExtMiddleware {
 
   // Bot 単位のレート制限（固定ウィンドウ）。認証通過後（Bot の実在が確定した後）に Bot の Id で数える。
   // 認証されていないリクエストはバケットを作らない（IP 判定は Middleware.RateLimiter 側の担当）。
+  // 有効化は RATE_LIMIT_BOT_ENABLED 単独で行い、無効ならルート側で .use() しない
+  //（Middleware.RateLimiter と同じくモジュール読込時に環境変数を1度だけ評価する）。
   // ルート側で CheckApiCode の後に .use() すること（先に使うと CheckApiCode がコンテキストに無い）。
   export const BotRateLimit = new Elysia({ name: "BotRateLimit" })
     .use(CheckApiCode)
     .onBeforeHandle({ as: "scoped" }, ({ CheckApiCode }) => {
       if (CheckApiCode === undefined)
         throw status(500, "CheckApiCode should be alive");
-
-      //通常APIの RateLimiter と同じく RATE_LIMIT_ENABLED でのみ有効
-      if (Bun.env.RATE_LIMIT_ENABLED !== "true") return;
 
       const limit = Number.parseInt(Bun.env.RATE_LIMIT_BOT_COUNT ?? "200", 10);
       const windowMs =
