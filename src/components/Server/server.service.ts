@@ -516,13 +516,16 @@ export namespace ServiceServer {
       throw e;
     }
 
-    //再申請で未承認に戻ったなら、接続中のWSも切断する(接続を維持するとchannel::*の配信を受け続ける)
+    //承認済みでない、または受信権限を失ったなら接続中WSを切断
+    //(接続を維持するとchannel::*の配信を受け続ける。再接続はopen側の同じ判定で拒否される)
     //更新対象0件での undefined は上で500に寄せているため、ここでは有るはず
     if (bot === undefined) throw status(500, "Bot data should be available");
-    if (bot.approveStatus !== "APPROVED") {
+    if (bot.approveStatus !== "APPROVED" || !bot.canReadMessage) {
       Util.wsUserInstance.disconnect(
         bot.remoteUserId,
-        "Your bot is not approved yet",
+        bot.approveStatus !== "APPROVED"
+          ? "Your bot is not approved yet"
+          : "Your bot is not permitted to read messages",
       );
     } else if (channelPermissionChanged) {
       //チャンネル許可が変わったなら、接続中のWSの購読を新しい許可に合わせる

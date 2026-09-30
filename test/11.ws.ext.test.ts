@@ -254,6 +254,35 @@ describe("WS (Bot)", () => {
         .where(eq(botManages.id, "TESTBOT1"));
     }
   });
+  test("canReadMessageを落とすと接続中のBotは切断される", async () => {
+    //承認免除(自動承認)のBotは再申請でPENDINGに戻らないため、切断はcanReadMessageの判定で行う必要がある
+    GIRACLE_SERVER_CONFIG.BotAutoApprove = true;
+    const { ws, messages } = await connectBot("TESTTOKEN1");
+    const closedPromise = new Promise<void>((resolve) =>
+      ws.addEventListener("close", () => resolve()),
+    );
+    try {
+      const res = await FETCH({
+        path: "/server/bot",
+        method: "PATCH",
+        body: { botId: "TESTBOT1", canReadMessage: false },
+      });
+      expect(res.ok).toBe(true);
+      //切断しないと購読済みのchannel::*を受信し続ける
+      await closedPromise;
+      expect(ws.readyState).toBe(WebSocket.CLOSED);
+      expect(messages.some((m) => m.includes("not permitted to read"))).toBe(
+        true,
+      );
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotAutoApprove = false;
+      // 後続のテストのため権限を戻す
+      await db
+        .update(botManages)
+        .set({ canReadMessage: true })
+        .where(eq(botManages.id, "TESTBOT1"));
+    }
+  });
   test("Bot削除で接続中のBotは切断される", async () => {
     // 既存フィクスチャを壊さないよう使い捨てBotを直挿しする
     await db.insert(users).values({
