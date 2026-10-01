@@ -196,6 +196,7 @@ export const server = new Elysia({ prefix: "/server" })
         canSendMessage,
       },
       CheckToken: { _userId },
+      server
     }) => {
       const bot = await ServiceServer.PatchBot(botId, _userId, {
         botName,
@@ -209,6 +210,14 @@ export const server = new Elysia({ prefix: "/server" })
         canReadMessage,
         canSendMessage,
       });
+
+      server?.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::ProfileUpdate",
+          data: bot.user,
+        }),
+      );
 
       return {
         message: "Bot updated",
