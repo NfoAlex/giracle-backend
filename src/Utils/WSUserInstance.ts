@@ -1,6 +1,6 @@
 /**
- * ユーザー(Bot含む)ごとのWSインスタンス管理。
- * 通常ユーザー用ハンドラ(src/ws.ts)とBot用ハンドラ(src/external/ws.ext.ts)の両方から使う共通処理。
+ * ユーザーごとのWSインスタンス管理。
+ * 通常ユーザー用ハンドラ(src/ws.ts)から使う共通処理。
  * 参照形: Util.wsUserInstance.add(...)
  */
 
@@ -63,7 +63,7 @@ export namespace WSUserInstance {
   }
 
   /**
-   * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN・Bot無効化時等に使用)
+   * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN時等に使用)
    * @param userId
    * @param reason
    */
