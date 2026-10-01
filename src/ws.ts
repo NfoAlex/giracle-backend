@@ -118,27 +118,34 @@ export const wsHandler = new Elysia().ws("/ws", {
 
     //トークンを取得して有効か調べる
     const token = ws.data.cookie?.token?.value;
-    if (!token) {
-      return;
-    }
-
-    const userToken = await db.query.tokens.findFirst({
-      where: eq(tokens.token, token as string),
-    });
-    if (!userToken) {
-      return;
-    }
+    //トークン行が消えている(サインアウト直後等)場合でも切断は記録する必要があるため
+    //トークンが無い/引けないときは生WSの同一性からuserIdを引く
+    const userToken =
+      token !== undefined
+        ? await db.query.tokens.findFirst({
+            where: eq(tokens.token, token as string),
+          })
+        : undefined;
 
     //このユーザーWSインスタンス削除
-    Util.wsUserInstance.remove(userToken.userId, ws);
+    let removedUserId: string | undefined;
+    if (userToken !== undefined) {
+      Util.wsUserInstance.remove(userToken.userId, ws);
+      removedUserId = userToken.userId;
+    } else {
+      removedUserId = Util.wsUserInstance.removeByInstance(ws);
+    }
 
-    if (!Util.wsUserInstance.instances.has(userToken.userId)) {
+    if (
+      removedUserId !== undefined &&
+      !Util.wsUserInstance.instances.has(removedUserId)
+    ) {
       //ユーザー切断通知
       ws.publish(
         "GLOBAL",
         JSON.stringify({
           signal: "user::Disconnected",
-          data: userToken.userId,
+          data: removedUserId,
         }),
       );
     }

@@ -63,6 +63,34 @@ export namespace WSUserInstance {
   }
 
   /**
+   * 生のWSインスタンス(raw)一致でインスタンスマップから削除する
+   * close時はトークン行が消えている(サインアウト直後等)ことがあり、userIdをトークンから引けない場合があるため
+   * @param ws
+   * @returns 削除できた場合のuserId、見つからなければundefined
+   */
+  export function removeByInstance(ws: WSInstance): string | undefined {
+    //rawが無いと同一性判定ができない(テストのダミー等)
+    if (ws.raw === undefined) {
+      return undefined;
+    }
+    for (const [userId, instanceList] of instances) {
+      const indexToRemove = instanceList.findIndex(
+        (instance) => instance.raw === ws.raw,
+      );
+      if (indexToRemove === -1) {
+        continue;
+      }
+      instanceList.splice(indexToRemove, 1);
+      //もしインスタンスが0になったら削除
+      if (instanceList.length === 0) {
+        instances.delete(userId);
+      }
+      return userId;
+    }
+    return undefined;
+  }
+
+  /**
    * 指定のユーザーIdのWSインスタンスをすべて切断する(BAN時等に使用)
    * @param userId
    * @param reason

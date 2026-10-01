@@ -961,6 +961,50 @@ describe("/user/ban & /user/unban", () => {
       false,
     );
   });
+
+  it("正常 :: トークン行が無いcloseでもraw一致でuserIdを引いて削除すること（Util.wsUserInstance.removeByInstance）", () => {
+    //close時にトークン行が消えている(サインアウト直後等)場合、userIdをトークンから引けない。
+    //raw一致で削除しないとインスタンスが残り、user::Disconnectedが飛ばずオンライン表示が固定化する
+    const raw = { id: "rawSignOut" };
+    const raw2 = { id: "rawRemaining" };
+    const fakeWs = (raw: unknown) => ({
+      send: () => {},
+      close: () => {},
+      subscribe: () => {},
+      unsubscribe: () => {},
+      raw,
+    });
+
+    Util.wsUserInstance.add("WS_BYINSTANCE_TEST_USER", fakeWs(raw));
+    Util.wsUserInstance.add("WS_BYINSTANCE_TEST_USER", fakeWs(raw2));
+
+    //open時とは別オブジェクトだがrawが同一
+    expect(Util.wsUserInstance.removeByInstance(fakeWs(raw))).toBe(
+      "WS_BYINSTANCE_TEST_USER",
+    );
+    expect(
+      Util.wsUserInstance.instances.get("WS_BYINSTANCE_TEST_USER")?.length,
+    ).toBe(1);
+
+    //最後の1本を消すとエントリごと消える
+    expect(Util.wsUserInstance.removeByInstance(fakeWs(raw2))).toBe(
+      "WS_BYINSTANCE_TEST_USER",
+    );
+    expect(Util.wsUserInstance.instances.has("WS_BYINSTANCE_TEST_USER")).toBe(
+      false,
+    );
+
+    //raw未定義は同一性判定不可のため見つからない扱い
+    const dummy = fakeWs(undefined);
+    Util.wsUserInstance.add("WS_BYINSTANCE_TEST_USER", dummy);
+    expect(Util.wsUserInstance.removeByInstance(fakeWs(undefined))).toBe(
+      undefined,
+    );
+    expect(
+      Util.wsUserInstance.instances.get("WS_BYINSTANCE_TEST_USER")?.length,
+    ).toBe(1);
+    Util.wsUserInstance.instances.delete("WS_BYINSTANCE_TEST_USER");
+  });
 });
 
 describe("/user/delete", () => {
