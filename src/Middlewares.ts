@@ -199,17 +199,10 @@ export namespace Middleware {
 
       //トークンがあってもキャッシュ・DBに実在しないなら無効なので匿名扱いにする(なりすましによるIPブロック回避防止)
       if (tokenValue === undefined) {
-        //BotはCookieではなくAuthorizationヘッダで認証する。
-        //実在確認をしないとヘッダ偽装で匿名バケットを無限に作られレート制限を回避される
-        const authorization = request.headers.get("authorization");
-        const botExists = authorization
-          ? await db.query.botManages.findFirst({
-              where: eq(botManages.tokenCode, authorization),
-              columns: { id: true },
-            })
-          : undefined;
-        //Botの制限は ExtMiddleware.CheckApiCode 側が Bot の Id 単位で行うため、ここでは素通しする
-        if (botExists !== undefined) return;
+        //BotはCookieではなくAuthorizationヘッダで認証し、/ext の制限は
+        //ExtMiddleware.BotRateLimit が Bot の Id 単位で行う。
+        //(/ext はindex.tsのuse順でRateLimiterの対象外。ここでAuthorizationを見て
+        // 実在Botを素通しさせると、/ext以外のルートでもヘッダを付けるだけで制限を回避できてしまう)
         isAnonymous = true;
       } else {
         const cachedToken = tokenCache.get(tokenValue);
