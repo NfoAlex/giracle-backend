@@ -99,14 +99,16 @@ export const wsHandler = new Elysia().ws("/ws", {
 
     //このユーザーWSインスタンス保存
     Util.wsUserInstance.add(user.id, ws);
-    //ユーザー接続通知
-    ws.publish(
-      "GLOBAL",
-      JSON.stringify({
-        signal: "user::Connected",
-        data: user.id,
-      }),
-    );
+    //ユーザー接続通知(複数端末接続では最初の1回だけ。切断側の最終1回と揃える)
+    if (Util.wsUserInstance.instances.get(user.id)?.length === 1) {
+      ws.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::Connected",
+          data: user.id,
+        }),
+      );
+    }
 
     //console.log("index :: 新しいWS接続");
   },
