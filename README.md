@@ -241,6 +241,7 @@ giracle-backend/
 | `channel::Join` | チャンネル参加 |
 | `channel::Left` | チャンネル退出 |
 | `channel::UpdateChannel` | チャンネル情報更新 |
+| `channel::Deleted` | チャンネル削除 |
 | `message::SendMessage` | 新規メッセージ |
 | `message::UpdateMessage` | メッセージ編集 / URLプレビュー更新 |
 | `message::MessageDeleted` | メッセージ削除 |
