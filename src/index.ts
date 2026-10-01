@@ -90,11 +90,6 @@ export const app = new Elysia({
   //16MB
   serve: { maxRequestBodySize: 16 * 1024 * 1024 },
 })
-  .use(Middleware.RequestLogger)
-  .use(externalApi)
-  .use(
-    Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
-  )
   .onError(({ error, code }) => {
     if (code === "NOT_FOUND") return status(404, "Not Found :(");
     if (process.env.NODE_ENV !== "test") {
@@ -105,6 +100,11 @@ export const app = new Elysia({
     }
     return status(500, "somethin went wrong :(");
   })
+  .use(Middleware.RequestLogger)
+  .use(externalApi)
+  .use(
+    Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
+  )
   .use(
     cors({
       //Bot用API(/ext)はサーバー間通信専用のためCORSヘッダを付けない。
