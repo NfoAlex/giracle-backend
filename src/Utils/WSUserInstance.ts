@@ -28,12 +28,12 @@ export namespace WSUserInstance {
    */
   export function add(userId: string, ws: WSInstance) {
     const currentInstance = instances.get(userId);
-    //存在しない場合普通にset
-    if (!currentInstance) {
-      instances.set(userId, [ws]);
+    //存在しない場合普通にset、あれば末尾に追加
+    if (currentInstance) {
+      currentInstance.push(ws);
       return;
     }
-    instances.set(userId, [...currentInstance, ws]);
+    instances.set(userId, [ws]);
   }
 
   /**

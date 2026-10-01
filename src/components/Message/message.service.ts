@@ -178,10 +178,7 @@ export namespace ServiceMessage {
         throw status(403, "You are not allowed to view this channel");
       }
     } else {
-      const viewableChannels = await Util.getUserViewableChannel(
-        _userId,
-        false,
-      );
+      const viewableChannels = await Util.getUserViewableChannel(_userId);
       viewableChannelIds = viewableChannels.map((channel) => channel.id);
     }
 
