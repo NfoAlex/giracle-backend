@@ -583,7 +583,7 @@ describe("/channel/search", async () => {
       method: "GET",
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Cursor channel does not exists");
+    expect(await res.text()).toBe("Cursor channel does not exist");
   });
 
   it("異常 :: 閲覧できないチャンネルはcursorChannelIdに使えない", async () => {
@@ -595,7 +595,7 @@ describe("/channel/search", async () => {
       useSecondaryUser: true,
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Cursor channel does not exists");
+    expect(await res.text()).toBe("Cursor channel does not exist");
   });
 
   it("正常 :: 大小が異なる名前でもカーソル継続取得が取りこぼさない", async () => {

@@ -694,7 +694,7 @@ export namespace ServiceMessage {
     }
     //自分による指定リアクションの存在確認
     if (messageWithReaction.MessageReaction.length === 0) {
-      throw status(404, "Reaction does not exists");
+      throw status(404, "Reaction does not exist");
     }
 
     //リアクションを削除

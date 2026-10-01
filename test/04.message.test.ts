@@ -928,7 +928,7 @@ describe("/message/delete-emoji-reaction", async () => {
       },
     });
     const t = await res.text();
-    expect(t).toBe("Reaction does not exists");
+    expect(t).toBe("Reaction does not exist");
   });
 
   it("存在しないメッセージ", async () => {
