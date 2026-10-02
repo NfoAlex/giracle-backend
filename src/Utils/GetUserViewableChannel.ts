@@ -14,18 +14,17 @@ import {
   channelJoins,
   channels,
   channelViewableRoles,
+  roleInfos,
   roleLinks,
 } from "../db/schema";
 
 /**
  * 指定のユーザーが閲覧できるチャンネル情報を取得する
  * @param _userId - ユーザーId
- * @param _onlyJoinedChannel - 参加しているチャンネルのみを取得するか
  * @returns
  */
 export default async function GetUserViewableChannel(
   _userId: string,
-  _onlyJoinedChannel = false,
 ): Promise<Channel[]> {
   //ユーザーのロールを取得
   const userRolesLinks = await db
@@ -34,6 +33,19 @@ export default async function GetUserViewableChannel(
     .where(eq(roleLinks.userId, _userId));
   //ユーザーのロールIdを配列化
   const userRoleIds = userRolesLinks.map((role) => role.roleId);
+
+  //manageServer権限を持つなら全チャンネルが見れる(CheckChannelVisibilityの判定と揃える)
+  if (userRoleIds.length > 0) {
+    const hasManageServer = db
+      .select({ userId: roleLinks.userId })
+      .from(roleLinks)
+      .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
+      .where(
+        and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
+      )
+      .get();
+    if (hasManageServer !== undefined) return await db.select().from(channels);
+  }
 
   //閲覧ロールが設定されているもので自分のロールがあるなら見れる
   const hasViewableRoleCondition =
@@ -93,10 +105,5 @@ export default async function GetUserViewableChannel(
     joinedCondition,
   );
 
-  const whereCondition = _onlyJoinedChannel
-    ? //参加しているチャンネルのみを取得する場合はチャンネルに参加しているか確認
-      and(viewableOr, joinedCondition)
-    : viewableOr;
-
-  return await db.select().from(channels).where(whereCondition);
+  return await db.select().from(channels).where(viewableOr);
 }

@@ -403,12 +403,7 @@ export const user = new Elysia({ prefix: "/user" })
   .get(
     "/verify-token",
     ({ CheckToken: { _userId } }) => {
-      //もし空ならトークンが無効
-      if (_userId === "") {
-        throw status(401, "Token is invalid");
-      }
-
-      //トークンが有効
+      //CheckTokenが有効なuserIdを保証するため、ここでの再検証は不要
       return {
         message: "Token is valid",
         data: {
@@ -420,15 +415,6 @@ export const user = new Elysia({ prefix: "/user" })
       detail: {
         description: "トークンの検証",
         tags: ["User"],
-      },
-      response: {
-        200: t.Object({
-          message: t.Literal("Token is valid"),
-          data: t.Object({
-            userId: t.String(),
-          }),
-        }),
-        401: t.Literal("Token is invalid"),
       },
     },
   )

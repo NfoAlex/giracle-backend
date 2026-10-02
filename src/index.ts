@@ -51,7 +51,33 @@ export const ConstWebPush = {
 
 import { db } from "./db";
 import { serverConfigs } from "./db/schema";
-export const [GIRACLE_SERVER_CONFIG] = await db.select().from(serverConfigs);
+//グローバルに使えるGiracleサーバーの設定
+//ServerConfigが引けないときはスキーマ既定値で埋める(未設定で招待制チェックや文字数上限が素通りするのを防ぐ)
+export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
+  id: 0,
+  name: "Giracle",
+  introduction: "",
+  RegisterAvailable: true,
+  RegisterInviteOnly: true,
+  RegisterAnnounceChannelId: "",
+  MessageMaxLength: 3000,
+  MessageMaxFileSize: 512000,
+};
+
+export async function reloadServerConfig() {
+  const [config] = await db.select().from(serverConfigs);
+  if (!config) {
+    throw new Error("Server config not found");
+  }
+  Object.assign(GIRACLE_SERVER_CONFIG, config);
+}
+
+try {
+  await reloadServerConfig();
+} catch (e) {
+  // 取得できない場合スキーマ既定値のまま。設定変更が効かないので通知は出す
+  console.error("index :: ServerConfigの取得に失敗。既定値で起動します", e);
+}
 
 export const app = new Elysia({
   //16MB
