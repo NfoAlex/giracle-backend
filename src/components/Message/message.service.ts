@@ -446,7 +446,7 @@ export namespace ServiceMessage {
     }
 
     //DB上の関連データをまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
-    QueryMessage.removeMessageCascade({ messageId });
+    QueryMessage.deleteMessage({ messageId });
 
     return messageData;
   };

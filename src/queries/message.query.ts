@@ -284,7 +284,7 @@ export namespace QueryMessage {
   };
 
   //メッセージに紐づく子データ(inboxのrestrict FKを含む)を子→親の順に1トランザクションで削除
-  export const removeMessageCascade = (query: { messageId: string }) => {
+  export const deleteMessage = (query: { messageId: string }) => {
     db.transaction((tx) => {
       tx.delete(messageUrlPreviews)
         .where(eq(messageUrlPreviews.messageId, query.messageId))
