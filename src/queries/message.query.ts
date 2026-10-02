@@ -33,14 +33,8 @@ export namespace QueryMessage {
     });
   };
 
-  export const getSingleForVisibility = (query: { messageId: string }) => {
-    return db.query.messages.findFirst({
-      where: eq(messages.id, query.messageId),
-      columns: { id: true, channelId: true },
-    });
-  };
-
-  export const getSingleForDelete = (query: { messageId: string }) => {
+  //メッセージの存在確認や基本情報確認用の最低限取得
+  export const getSingleWithMinimum = (query: { messageId: string }) => {
     return db.query.messages.findFirst({
       where: eq(messages.id, query.messageId),
       columns: { id: true, userId: true, channelId: true },

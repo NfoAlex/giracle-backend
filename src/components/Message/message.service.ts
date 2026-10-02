@@ -413,13 +413,13 @@ export namespace ServiceMessage {
 
   export const Delete = async (messageId: string, _userId: string) => {
     //取得
-    const messageData = await QueryMessage.getSingleForDelete({ messageId });
+    const messageData = await QueryMessage.getSingleWithMinimum({ messageId });
     if (messageData === undefined) {
       throw status(404, "Message not found");
     }
     if (messageData.userId !== _userId) {
       //メッセージの送信者でないならサーバー管理権限を確認する
-      const canManageServer = await db
+      const canManageServer = db
         .select({ userId: roleLinks.userId })
         .from(roleLinks)
         .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
@@ -549,7 +549,7 @@ export namespace ServiceMessage {
     const skip = (cursor - 1) * 30;
     const length = 30;
     //メッセージが存在するか確認 (チャンネル可視性判定にchannelIdだけ必要)
-    const message = await QueryMessage.getSingleForVisibility({ messageId });
+    const message = await QueryMessage.getSingleWithMinimum({ messageId });
     if (message === undefined) {
       throw status(400, "Message not found or is private");
     }
