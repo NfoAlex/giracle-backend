@@ -61,10 +61,11 @@ export namespace QueryRole {
   };
 
   export const removeRole = async (query: { roleId: string }) => {
-    //ユーザーのロール付与情報を全削除
-    await db.delete(roleLinks).where(eq(roleLinks.roleId, query.roleId));
-    //ロール情報を削除
-    await db.delete(roleInfos).where(eq(roleInfos.id, query.roleId));
+    //ロール付与情報→ロール本体の順に削除(FKがrestrictのため)。bun-sqlite は同期トランザクションなのでコールバックに await を入れない
+    db.transaction((tx) => {
+      tx.delete(roleLinks).where(eq(roleLinks.roleId, query.roleId)).run();
+      tx.delete(roleInfos).where(eq(roleInfos.id, query.roleId)).run();
+    });
   };
 
   export const update = async (query: {
