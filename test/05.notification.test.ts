@@ -231,6 +231,18 @@ describe("/notification/mute", () => {
     expect(j.data.userId).toBe("TESTUSER");
   });
 
+  it("mute-channel :: 閲覧不可チャンネルは 404 (存在列挙防止)", async () => {
+    // TESTCHANNEL4 は CompletePrivate ロール限定で TESTUSER2 は閲覧不可
+    const res = await FETCH({
+      path: "/notification/mute-channel",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL4" },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+  });
+
   it("muted-channels :: 追加後リストに現れる", async () => {
     const res = await FETCH({
       path: "/notification/muted-channels",

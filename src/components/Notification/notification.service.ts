@@ -1,5 +1,6 @@
 import { status } from "elysia";
 import { QueryNotification } from "../../queries/notification.query";
+import { Util } from "../../Util";
 import type { WebPushKeys } from "./types";
 
 export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
@@ -97,6 +98,10 @@ export namespace ServiceNotification {
   };
 
   export const MuteChannel = async (channelId: string, _userId: string) => {
+    // 閲覧不可チャンネルは存在しないものと同じ扱い（存在列挙を防ぐ）
+    const visible = await Util.checkChannelVisibility(channelId, _userId);
+    if (!visible) throw status(404, "Channel not found");
+
     const channelMuted = await QueryNotification.insertMuteChannel({
       channelId,
       requestSender: _userId,
