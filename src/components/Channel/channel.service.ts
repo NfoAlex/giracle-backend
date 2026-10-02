@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
@@ -14,16 +14,15 @@ import {
   messages,
   users,
 } from "../../db/schema";
+import { QueryChannel } from "../../queries/channel.query";
 import { Util } from "../../Util";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoined = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
+    const channelJoined = await QueryChannel.getJoin({
+      channelId,
+      userId: _userId,
     });
     //既に参加している
     if (channelJoined !== undefined) {
@@ -31,9 +30,7 @@ export namespace ServiceChannel {
     }
 
     //チャンネルが存在するか確認
-    const channelData = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-    });
+    const channelData = await QueryChannel.getSingle({ channelId });
     //チャンネルが存在しない
     if (channelData === undefined) {
       throw status(404, "Channel not found");
@@ -43,26 +40,22 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
 
-    await db.insert(channelJoins).values({
-      userId: _userId,
-      channelId,
-    });
+    await QueryChannel.insertJoin({ channelId, userId: _userId });
 
     return;
   };
 
   export const Leave = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoinData = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
+    const channelJoinData = await QueryChannel.getJoin({
+      channelId,
+      userId: _userId,
     });
     if (channelJoinData === undefined) {
       throw status(404, "You are not joined this channel");
     }
 
+    //TODO: message.query.ts を作ったときに置き換える
     //既読時間データを削除
     await db
       .delete(messageReadTimes)
@@ -73,14 +66,7 @@ export namespace ServiceChannel {
         ),
       );
     //チャンネル参加データを削除
-    await db
-      .delete(channelJoins)
-      .where(
-        and(
-          eq(channelJoins.userId, _userId),
-          eq(channelJoins.channelId, channelId),
-        ),
-      );
+    await QueryChannel.removeJoin({ channelId, userId: _userId });
   };
 
   export const GetInfo = async (channelId: string, _userId: string) => {
@@ -89,15 +75,8 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
 
-    const channelData = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-      with: {
-        ChannelViewableRole: {
-          columns: {
-            roleId: true,
-          },
-        },
-      },
+    const channelData = await QueryChannel.getSingleWithViewableRole({
+      channelId,
     });
 
     if (channelData === undefined) {
@@ -123,10 +102,7 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //チャンネルの存在確認
-    const channel = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-      columns: { id: true },
-    });
+    const channel = await QueryChannel.getSingleId({ channelId });
     if (channel === undefined) {
       throw status(404, "Channel not found");
     }
@@ -148,6 +124,7 @@ export namespace ServiceChannel {
     let messageDataFrom: Message | undefined;
     //基準位置になるメッセージIdが指定されているなら
     if (messageIdFrom !== undefined) {
+      //TODO: message.query.ts を作ったときに置き換える
       //取得、格納
       messageDataFrom = await db.query.messages.findFirst({
         where: eq(messages.id, messageIdFrom),
@@ -169,6 +146,7 @@ export namespace ServiceChannel {
     //履歴を取得する
     //新しい方向への取得は昇順で直接取得することで、範囲境界を求める事前クエリを省く
     const fetchNewer = fetchDirection === "newer" && timeFrom !== undefined;
+    //TODO: message.query.ts を作ったときに置き換える
     const history = await db.query.messages.findMany({
       where:
         timeFrom !== undefined
@@ -191,6 +169,7 @@ export namespace ServiceChannel {
     if (fetchNewer) history.reverse();
 
     //履歴の最新・最初まで取得したかどうかを判別するため、取得方向に必要な側のみ取得
+    //TODO: message.query.ts を作ったときに置き換える
     const firstMessageOfChannel =
       fetchDirection === "newer"
         ? await db.query.messages.findFirst({
@@ -321,41 +300,21 @@ export namespace ServiceChannel {
 
     let cursorChannelName: string | undefined;
     if (cursorChannelId !== undefined) {
-      const cursorChannel = db
-        .select({ name: channels.name })
-        .from(channels)
-        .where(
-          and(
-            eq(channels.id, cursorChannelId),
-            inArray(channels.id, channelIdsViewable),
-          ),
-        )
-        .get();
+      const cursorChannel = await QueryChannel.getCursorChannel({
+        cursorChannelId,
+        viewableChannelIds: channelIdsViewable,
+      });
       if (cursorChannel === undefined)
         throw status(400, "Cursor channel does not exist");
       cursorChannelName = cursorChannel.name;
     }
 
     //チャンネル検索(大小を区別しない前方一致)
-    //LIKEは既定でASCIIの大小を区別しないため、Channel_name_nocase_idxが索引レンジに変換する
-    const channelInfos = await db
-      .select()
-      .from(channels)
-      .where(
-        and(
-          //ワイルドカード(%,_)を無効化してLIKE検索(item 15)
-          sql`${channels.name} LIKE ${`${Util.escapeLikePattern(query)}%`} ESCAPE '\\'`,
-          inArray(channels.id, channelIdsViewable),
-          //NOCASEで畳むと別名が同値になるため、nameで決定的にタイブレークして取りこぼしを防ぐ
-          cursorChannelName !== undefined
-            ? sql`(${channels.name} COLLATE NOCASE, ${channels.name}) > (${cursorChannelName}, ${cursorChannelName})`
-            : undefined,
-        ),
-      )
-      .orderBy(sql`${channels.name} COLLATE NOCASE`, channels.name)
-      .limit(50);
-
-    return channelInfos;
+    return await QueryChannel.searchViewableChannels({
+      query,
+      viewableChannelIds: channelIdsViewable,
+      cursorChannelName,
+    });
   };
 
   export const Invite = async (
@@ -364,19 +323,15 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかをチャンネル情報と共に確認
-    const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
-      with: {
-        channel: true,
-      },
+    const requestedUsersChannelJoin = await QueryChannel.getJoinWithChannel({
+      channelId,
+      userId: _userId,
     });
     if (!requestedUsersChannelJoin?.channel) {
       throw status(403, "You are not joined this channel or channel not found");
     }
 
+    //TODO: QueryUserを作ったときに置き換える
     //対象ユーザーの存在を参加情報とともに確認
     const user = await db.query.users.findFirst({
       where: eq(users.id, targetUserId),
@@ -398,10 +353,7 @@ export namespace ServiceChannel {
     }
 
     //チャンネル参加させる
-    await db.insert(channelJoins).values({
-      userId: targetUserId,
-      channelId,
-    });
+    await QueryChannel.insertJoin({ channelId, userId: targetUserId });
 
     return;
   };
@@ -417,16 +369,15 @@ export namespace ServiceChannel {
     }
 
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかを確認
-    const requestedUsersChannelJoin = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
+    const requestedUsersChannelJoin = await QueryChannel.getJoin({
+      channelId,
+      userId: _userId,
     });
     if (!requestedUsersChannelJoin) {
       throw status(403, "You are not joined this channel");
     }
 
+    //TODO: message.query.ts を作ったときに置き換える
     //既読時間データを削除(Leaveと対称にする)
     await db
       .delete(messageReadTimes)
@@ -437,14 +388,7 @@ export namespace ServiceChannel {
         ),
       );
     //チャンネル参加データを削除(退出させる)
-    await db
-      .delete(channelJoins)
-      .where(
-        and(
-          eq(channelJoins.userId, targetUserId),
-          eq(channelJoins.channelId, channelId),
-        ),
-      );
+    await QueryChannel.removeJoin({ channelId, userId: targetUserId });
 
     return;
   };
@@ -458,9 +402,7 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //チャンネルの存在を確認
-    const channel = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-    });
+    const channel = await QueryChannel.getSingle({ channelId });
     if (channel === undefined) {
       throw status(404, "Channel not found");
     }
@@ -494,10 +436,7 @@ export namespace ServiceChannel {
 
     //チャンネルデータを更新する
     if (Object.keys(updatingValues).length > 0) {
-      await db
-        .update(channels)
-        .set(updatingValues)
-        .where(eq(channels.id, channelId));
+      await QueryChannel.updateChannel({ channelId, values: updatingValues });
     }
 
     //チャンネル閲覧ロールを更新
@@ -506,29 +445,15 @@ export namespace ServiceChannel {
       const uniqueRoleIds = [...new Set(viewableRole)];
 
       //現在の閲覧可能roleIdを削除、指定されたroleId全件を挿入(1トランザクションにまとめて中間状態を無くす)
-      db.transaction((tx) => {
-        tx.delete(channelViewableRoles)
-          .where(eq(channelViewableRoles.channelId, channelId))
-          .run();
-
-        if (uniqueRoleIds.length > 0) {
-          tx.insert(channelViewableRoles)
-            .values(uniqueRoleIds.map((roleId) => ({ channelId, roleId })))
-            .run();
-        }
+      await QueryChannel.replaceViewableRoles({
+        channelId,
+        roleIds: uniqueRoleIds,
       });
     }
 
     //更新後のデータを取得
-    const channelDataUpdated = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-      with: {
-        ChannelViewableRole: {
-          columns: {
-            roleId: true,
-          },
-        },
-      },
+    const channelDataUpdated = await QueryChannel.getSingleWithViewableRole({
+      channelId,
     });
 
     return channelDataUpdated;
@@ -539,14 +464,11 @@ export namespace ServiceChannel {
     description: string,
     _userId: string,
   ) => {
-    const [newChannel] = await db
-      .insert(channels)
-      .values({
-        name: channelName,
-        description: description,
-        createdUserId: _userId,
-      })
-      .returning();
+    const newChannel = await QueryChannel.insertChannel({
+      channelName,
+      description,
+      requestSender: _userId,
+    });
 
     return newChannel;
   };
@@ -557,9 +479,7 @@ export namespace ServiceChannel {
     server: Bun.Server<unknown> | null,
   ) => {
     //チャンネルの存在を確認
-    const channel = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-    });
+    const channel = await QueryChannel.getSingle({ channelId });
     if (channel === undefined) {
       throw status(404, "Channel not found");
     }
@@ -580,9 +500,7 @@ export namespace ServiceChannel {
       }),
     );
     //チャンネルに参加しているユーザーのWS登録を解除
-    const joinedUsers = await db.query.channelJoins.findMany({
-      where: eq(channelJoins.channelId, channelId),
-    });
+    const joinedUsers = await QueryChannel.getJoinsByChannel({ channelId });
     for (const channelJoinData of joinedUsers) {
       Util.wsUserInstance.unsubscribe(
         channelJoinData.userId,
@@ -590,6 +508,7 @@ export namespace ServiceChannel {
       );
     }
 
+    //TODO: messageReadTimes/messageFileAttached/messages の削除は message.query.ts を作ったときに分離する
     //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)
     db.transaction((tx) => {
       tx.delete(messageReadTimes)
