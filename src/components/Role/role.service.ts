@@ -39,9 +39,7 @@ export namespace ServiceRole {
       if (E.message === "Role name already exists") {
         throw status(400, "Role name already exists");
       }
-      if (E.message === "Database error") {
-        throw status(400, "Database error");
-      }
+      throw status(500, "Database error");
     });
 
     return newRole;
@@ -75,11 +73,8 @@ export namespace ServiceRole {
     const roleUpdated = await QueryRole.update({
       roleId,
       roleData,
-    }).catch((e) => {
-      const E = e as Error;
-      if (E.message === "Database error") {
-        throw status(500, "Database error");
-      }
+    }).catch(() => {
+      throw status(500, "Database error");
     });
 
     return roleUpdated;
@@ -157,14 +152,11 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    QueryRole.removeLink({
+    await QueryRole.removeLink({
       userId,
       roleId,
-    }).catch((e) => {
-      const E = e as Error;
-      if (E.message === "Database error") {
-        throw status(500, "Database error");
-      }
+    }).catch(() => {
+      throw status(500, "Database error");
     });
 
     return;
