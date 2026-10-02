@@ -60,6 +60,12 @@ export namespace ServiceNotification {
       keys: input.keys,
       deviceName: input.deviceName,
       requestSender: input.userId,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Cannot register another user's device") {
+        throw status(403, "Cannot register another user's device");
+      }
+      throw e;
     });
 
     return deviceRegistered;

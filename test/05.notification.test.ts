@@ -148,6 +148,30 @@ describe("/notification/device", () => {
     expect(j1.data.id).toBe(j2.data.id);
   });
 
+  it("register :: 他人の token は 403 (所有権を乗っ取らせない)", async () => {
+    const hijackToken = "hijack-target-token";
+    await FETCH({
+      path: "/notification/device/register",
+      method: "POST",
+      body: { token: hijackToken, platform: "android" },
+    });
+
+    const res = await FETCH({
+      path: "/notification/device/register",
+      method: "POST",
+      body: { token: hijackToken, platform: "android" },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(403);
+
+    // 所有者は TESTUSER のまま
+    const row = await db.query.notificationDevices.findFirst({
+      where: eq(notificationDevices.token, hijackToken),
+    });
+    expect(row?.userId).toBe("TESTUSER");
+  });
+
   it("unregister :: 他人の token は 403", async () => {
     const res = await FETCH({
       path: "/notification/device/unregister",
