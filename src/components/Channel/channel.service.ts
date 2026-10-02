@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
@@ -11,10 +11,10 @@ import {
   channelViewableRoles,
   messageFileAttached,
   messageReadTimes,
-  messages,
   users,
 } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
+import { QueryMessage } from "../../queries/message.query";
 import { Util } from "../../Util";
 
 export namespace ServiceChannel {
@@ -55,7 +55,7 @@ export namespace ServiceChannel {
       throw status(404, "You are not joined this channel");
     }
 
-    //TODO: message.query.ts を作ったときに置き換える
+    //TODO: 既読時間用のQuery層を作ったときに置き換える
     //既読時間データを削除
     await db
       .delete(messageReadTimes)
@@ -124,10 +124,9 @@ export namespace ServiceChannel {
     let messageDataFrom: Message | undefined;
     //基準位置になるメッセージIdが指定されているなら
     if (messageIdFrom !== undefined) {
-      //TODO: message.query.ts を作ったときに置き換える
       //取得、格納
-      messageDataFrom = await db.query.messages.findFirst({
-        where: eq(messages.id, messageIdFrom),
+      messageDataFrom = await QueryMessage.getSingle({
+        messageId: messageIdFrom,
       });
       //無ければエラー
       if (!messageDataFrom) {
@@ -146,45 +145,23 @@ export namespace ServiceChannel {
     //履歴を取得する
     //新しい方向への取得は昇順で直接取得することで、範囲境界を求める事前クエリを省く
     const fetchNewer = fetchDirection === "newer" && timeFrom !== undefined;
-    //TODO: message.query.ts を作ったときに置き換える
-    const history = await db.query.messages.findMany({
-      where:
-        timeFrom !== undefined
-          ? and(
-              eq(messages.channelId, channelId),
-              fetchNewer
-                ? gte(messages.createdAt, timeFrom)
-                : lte(messages.createdAt, timeFrom),
-            )
-          : eq(messages.channelId, channelId),
-      with: {
-        MessageUrlPreview: true,
-        MessageFileAttached: true,
-      },
-      limit: fetchLength,
-      orderBy: (t, { asc, desc }) =>
-        fetchNewer ? asc(t.createdAt) : desc(t.createdAt),
+    const history = await QueryMessage.getHistory({
+      channelId,
+      timeFrom,
+      fetchNewer,
+      fetchLength,
     });
     //レスポンスは常に新しい順で返す
     if (fetchNewer) history.reverse();
 
     //履歴の最新・最初まで取得したかどうかを判別するため、取得方向に必要な側のみ取得
-    //TODO: message.query.ts を作ったときに置き換える
     const firstMessageOfChannel =
       fetchDirection === "newer"
-        ? await db.query.messages.findFirst({
-            columns: { id: true },
-            where: eq(messages.channelId, channelId),
-            orderBy: (t, { asc }) => asc(t.createdAt),
-          })
+        ? await QueryMessage.getOldestId({ channelId })
         : undefined;
     const latestMessageOfChannel =
       fetchDirection !== "newer"
-        ? await db.query.messages.findFirst({
-            columns: { id: true },
-            where: eq(messages.channelId, channelId),
-            orderBy: (t, { desc }) => desc(t.createdAt),
-          })
+        ? await QueryMessage.getNewestId({ channelId })
         : undefined;
 
     //取得した履歴が最新まで取得したか、または最初まで取得したかを判別
@@ -377,7 +354,7 @@ export namespace ServiceChannel {
       throw status(403, "You are not joined this channel");
     }
 
-    //TODO: message.query.ts を作ったときに置き換える
+    //TODO: 既読時間用のQuery層を作ったときに置き換える
     //既読時間データを削除(Leaveと対称にする)
     await db
       .delete(messageReadTimes)
@@ -508,19 +485,20 @@ export namespace ServiceChannel {
       );
     }
 
-    //TODO: messageReadTimes/messageFileAttached/messages の削除は message.query.ts を作ったときに分離する
     //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)
     db.transaction((tx) => {
+      //TODO: 既読時間用のQuery層を作ったときに置き換える
       tx.delete(messageReadTimes)
         .where(eq(messageReadTimes.channelId, channelId))
         .run();
       tx.delete(channelViewableRoles)
         .where(eq(channelViewableRoles.channelId, channelId))
         .run();
+      //TODO: 添付ファイル用のQuery層を作ったときに置き換える
       tx.delete(messageFileAttached)
         .where(eq(messageFileAttached.channelId, channelId))
         .run();
-      tx.delete(messages).where(eq(messages.channelId, channelId)).run();
+      QueryMessage.removeByChannelInTx(tx, { channelId });
       tx.delete(channelJoins)
         .where(eq(channelJoins.channelId, channelId))
         .run();
