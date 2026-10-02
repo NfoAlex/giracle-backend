@@ -55,18 +55,18 @@ export namespace ServiceNotification {
       throw status(400, "Missing keys for web platform");
     }
 
+    // 既存トークンの所有者が別人なら拒否（upsert での userId 上書きで乗っ取られるのを防ぐ）
+    const device = await QueryNotification.getDevice({ token: input.token });
+    if (device !== undefined && device.userId !== input.userId) {
+      throw status(403, "Cannot register another user's device");
+    }
+
     const deviceRegistered = await QueryNotification.insertDevice({
       token: input.token,
       platform: input.platform,
       keys: input.keys,
       deviceName: input.deviceName,
       requestSender: input.userId,
-    }).catch((e) => {
-      const E = e as Error;
-      if (E.message === "Cannot register another user's device") {
-        throw status(403, "Cannot register another user's device");
-      }
-      throw e;
     });
 
     return deviceRegistered;

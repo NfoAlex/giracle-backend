@@ -42,6 +42,12 @@ export namespace QueryNotification {
       .get();
   };
 
+  export const getDevice = (query: { token: string }) => {
+    return db.query.notificationDevices.findFirst({
+      where: eq(notificationDevices.token, query.token),
+    });
+  };
+
   export const insertDevice = async (query: {
     token: string;
     platform: string;
@@ -50,15 +56,6 @@ export namespace QueryNotification {
     requestSender: string;
   }) => {
     const keysJson = query.keys ? JSON.stringify(query.keys) : null;
-
-    // 既存トークンの所有者が別人なら拒否（upsert での userId 上書きで乗っ取られるのを防ぐ）
-    const existing = await db.query.notificationDevices.findFirst({
-      where: eq(notificationDevices.token, query.token),
-    });
-    if (existing !== undefined && existing.userId !== query.requestSender) {
-      throw new Error("Cannot register another user's device");
-    }
-
     const [device] = await db
       .insert(notificationDevices)
       .values({
