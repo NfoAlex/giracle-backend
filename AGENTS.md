@@ -67,7 +67,7 @@ server?.publish(
 ```
 
 - signal 名は `対象::イベント名`（PascalCase）。新規 signal を追加したら README の一覧に追記する。
-- ユーザーの購読チャンネルを増減させるときは [src/ws.ts](src/ws.ts) の `WSSubscribe(userId, wsChannel)` / `WSUnsubscribe(userId, wsChannel)` を使う。`userWSInstance`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
+- ユーザーの購読チャンネルを増減させるときは [src/Utils/WSUserInstance.ts](src/Utils/WSUserInstance.ts) の `Util.wsUserInstance.subscribe(userId, wsChannel)` / `Util.wsUserInstance.unsubscribe(userId, wsChannel)` を使う。`Util.wsUserInstance.instances`（Map<userId, ws[]>）が複数端末の同時接続を管理している。
 - URL プレビューはミドルウェア `UrlPreviewControl` が担当。メッセージ送信/編集ルートにルートオプション `bindUrlPreview: true` を付けると `afterResponse` で OGP 取得 → DB 保存 → `message::UpdateMessage` を publish する。
 
 ### 通知（Inbox / Web Push）
