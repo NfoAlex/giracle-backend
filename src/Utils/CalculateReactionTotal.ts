@@ -22,6 +22,7 @@ export async function CalculateReactionTotalBulk(
   if (messageIds.length === 0) return result;
 
   //対象メッセージの全リアクションを一括取得
+  //TODO: リアクション用のQuery層を作ったときに置き換える
   const allReactions = await db.query.messageReactions.findMany({
     where: inArray(messageReactions.messageId, messageIds),
     orderBy: (t, { asc }) => asc(t.reactedAt),

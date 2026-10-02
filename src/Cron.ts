@@ -16,6 +16,7 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
     const THUMBNAIL_DIR = "./STORAGE/thumbnail";
 
     for (let loop = 0; loop < MAX_LOOPS; loop++) {
+      //TODO: サムネイル用のQuery層を作ったときに置き換える
       const expiredRows = db
         .select()
         .from(messageUrlPreviewThumbnails)
@@ -38,6 +39,7 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
       }
 
       // 選択後に再生成されてfileNameが変わっていた行は削除しない (孤児ファイル防止)
+      //TODO: サムネイル用のQuery層を作ったときに置き換える
       await db
         .delete(messageUrlPreviewThumbnails)
         .where(
