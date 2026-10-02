@@ -1,18 +1,13 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { status } from "elysia";
 import { db } from "../..";
-import { roleInfos, roleLinks, users } from "../../db/schema";
+import { roleLinks, users } from "../../db/schema";
+import { QueryRole } from "../../queries/role.query";
 import { Util } from "../../Util";
 
 export namespace ServiceRole {
   export const Search = async (name: string) => {
-    const roles = await db
-      .select()
-      .from(roleInfos)
-      .where(
-        //ワイルドカード(%,_)を無効化してLIKE検索(監査#16)
-        sql`${roleInfos.name} LIKE ${`%${Util.escapeLikePattern(name)}%`} ESCAPE '\\'`,
-      );
+    const roles = await QueryRole.getList({ name });
 
     return roles;
   };
@@ -35,23 +30,19 @@ export namespace ServiceRole {
       throw status(400, "Role power is too powerful");
     }
 
-    const [newRole] = await db
-      .insert(roleInfos)
-      .values({
-        name: roleName,
-        createdUserId: _userId,
-        ...rolePower,
-      })
-      .returning()
-      .catch((e) => {
-        if (
-          e instanceof Error &&
-          e.message.includes("UNIQUE constraint failed")
-        ) {
-          throw status(400, "Role name already exists");
-        }
-        throw status(500, "Database error");
-      });
+    const newRole = await QueryRole.insertRole({
+      roleName,
+      rolePower,
+      requestSender: _userId,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Role name already exists") {
+        throw status(400, "Role name already exists");
+      }
+      if (E.message === "Database error") {
+        throw status(400, "Database error");
+      }
+    });
 
     return newRole;
   };
@@ -81,17 +72,15 @@ export namespace ServiceRole {
       throw status(400, "Role power is too powerful");
     }
 
-    const [roleUpdated] = await db
-      .update(roleInfos)
-      .set({
-        ...roleData,
-      })
-      .where(eq(roleInfos.id, roleId))
-      .returning()
-      .catch((e) => {
-        console.error("role.service :: Update :: db error", e);
+    const roleUpdated = await QueryRole.update({
+      roleId,
+      roleData,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Database error") {
         throw status(500, "Database error");
-      });
+      }
+    });
 
     return roleUpdated;
   };
@@ -111,6 +100,7 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
+    //TODO: QueryUserを作ったときに置き換える
     //ユーザー存在とロールリンクの確認
     const userWithRoleLink = await db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -127,16 +117,10 @@ export namespace ServiceRole {
       throw status(400, "Role already linked");
     }
 
-    await db
-      .insert(roleLinks)
-      .values({
-        userId, //指定のユーザーId
-        roleId,
-      })
-      .catch((e) => {
-        console.error("role.service :: Link(db ロール付与処理) : ", { e });
-        throw status(500, "Database error");
-      });
+    await QueryRole.insertLink({
+      userId,
+      roleId,
+    });
 
     return;
   };
@@ -151,6 +135,7 @@ export namespace ServiceRole {
       throw status(400, "You cannot unlink default role");
     }
 
+    //TODO: QueryUserを作ったときに置き換える
     //ユーザー存在とロールリンクの確認
     const targetUserWithRole = await db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -172,13 +157,15 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    await db
-      .delete(roleLinks)
-      .where(and(eq(roleLinks.userId, userId), eq(roleLinks.roleId, roleId)))
-      .catch((e) => {
-        console.error("role.service :: Unlink :: db error", e);
+    QueryRole.removeLink({
+      userId,
+      roleId,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Database error") {
         throw status(500, "Database error");
-      });
+      }
+    });
 
     return;
   };
@@ -189,18 +176,13 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    //ユーザーのロール付与情報を全削除
-    await db.delete(roleLinks).where(eq(roleLinks.roleId, roleId));
-    //ロール情報を削除
-    await db.delete(roleInfos).where(eq(roleInfos.id, roleId));
+    await QueryRole.removeRole({ roleId });
 
     return;
   };
 
   export const GetInfo = async (id: string) => {
-    const role = await db.query.roleInfos.findFirst({
-      where: eq(roleInfos.id, id),
-    });
+    const role = QueryRole.getSingle({ roleId: id });
     //ロールが存在しない
     if (!role) {
       throw status(404, "Role not found");
@@ -210,7 +192,7 @@ export namespace ServiceRole {
   };
 
   export const List = async () => {
-    const roles = await db.query.roleInfos.findMany();
+    const roles = await QueryRole.getList();
     return roles;
   };
 }
