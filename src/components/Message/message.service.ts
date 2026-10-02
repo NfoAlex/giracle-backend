@@ -192,7 +192,8 @@ export namespace ServiceMessage {
       throw status(400, "You are not joined to this channel");
 
     //サーバー設定からメッセージの最大ファイルサイズを取得
-    const maxFileSize = GIRACLE_SERVER_CONFIG.MessageMaxFileSize ?? 1024 * 1024 * 100;
+    const maxFileSize =
+      GIRACLE_SERVER_CONFIG.MessageMaxFileSize ?? 1024 * 1024 * 100;
     //ファイルサイズが最大ファイルサイズを超える場合はエラー
     if (file.size > maxFileSize) {
       throw status(400, "File size is too large");
