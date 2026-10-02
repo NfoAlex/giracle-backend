@@ -159,15 +159,14 @@ describe("/notification/device", () => {
     expect(res.status).toBe(403);
   });
 
-  it("unregister :: 存在しない token は null 返却で成功扱い", async () => {
+  it("unregister :: 存在しない token は 400", async () => {
     const res = await FETCH({
       path: "/notification/device/unregister",
       method: "POST",
       body: { token: "definitely-not-registered" },
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.token).toBeNull();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
   });
 
   it("unregister :: 自分の端末を解除", async () => {
