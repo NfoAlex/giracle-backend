@@ -5,13 +5,13 @@ import { db } from ".";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
 import {
   blockedIPAddresses,
-  messages,
   messageUrlPreviews,
   requestLog,
   roleInfos,
   roleLinks,
   tokens,
 } from "./db/schema";
+import { QueryMessage } from "./queries/message.query";
 import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
@@ -342,6 +342,7 @@ export namespace Middleware {
             });
 
             // 編集された時用に現在のURLプレビュー情報を削除
+            //TODO: URLプレビュー用のQuery層を作ったときに置き換える
             await db
               .delete(messageUrlPreviews)
               .where(eq(messageUrlPreviews.messageId, messageId));
@@ -396,6 +397,7 @@ export namespace Middleware {
             // OGPデータが存在する場合、または編集によってURLがすべて消えた場合のみ更新・通知
             if (creatingPreviewDataArr.length > 0 || messageData.isEdited) {
               if (creatingPreviewDataArr.length > 0) {
+                //TODO: URLプレビュー用のQuery層を作ったときに置き換える
                 await db
                   .insert(messageUrlPreviews)
                   .values(
@@ -403,11 +405,8 @@ export namespace Middleware {
                   );
               }
 
-              const messageUpdated = await db.query.messages.findFirst({
-                where: eq(messages.id, messageId),
-                with: {
-                  MessageUrlPreview: true,
-                },
+              const messageUpdated = await QueryMessage.getSingleWithPreviews({
+                messageId,
               });
 
               if (messageUpdated) {
