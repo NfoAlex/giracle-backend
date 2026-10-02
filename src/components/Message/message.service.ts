@@ -181,6 +181,7 @@ export namespace ServiceMessage {
     file: File,
     _userId: string,
   ) => {
+    //TODO: channelJoins.query.tsができたら持ってくる
     const joinedChannel = await db.query.channelJoins.findFirst({
       where: and(
         eq(channelJoins.userId, _userId),

@@ -53,6 +53,7 @@ export namespace QueryChannel {
       );
   };
 
+  //TODO: 分離
   export const getJoinsByChannel = async (query: { channelId: string }) => {
     return await db.query.channelJoins.findMany({
       where: eq(channelJoins.channelId, query.channelId),
