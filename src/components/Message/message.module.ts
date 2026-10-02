@@ -541,6 +541,7 @@ export const message = new Elysia({ prefix: "/message" })
             .where(eq(channelJoins.userId, replyTargetUserId));
 
           if (channelJoin.length !== 0) {
+            //TODO: Inbox用のQuery層を作ったときに置き換える
             await db.insert(inboxes).values({
               userId: replyTargetUserId,
               messageId: messageSaved.id,
