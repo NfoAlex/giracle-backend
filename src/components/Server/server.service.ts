@@ -8,10 +8,10 @@ import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   channelJoinOnDefaults,
   customEmojis,
-  invitations,
   requestLog,
   users,
 } from "../../db/schema";
+import { QueryInvite } from "../../queries/invite.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
 
 export namespace ServiceServer {
@@ -58,8 +58,7 @@ export namespace ServiceServer {
   };
 
   export const GetInvite = async () => {
-    //TODO: invitation用のQuery層を作ったときに置き換える
-    const invites = await db.query.invitations.findMany();
+    const invites = await QueryInvite.getList();
     return invites;
   };
 
@@ -68,22 +67,17 @@ export namespace ServiceServer {
     maxUsage: number = 5,
     _userId: string,
   ) => {
-    //TODO: invitation用のQuery層を作ったときに置き換える
-    const [newInvite] = await db
-      .insert(invitations)
-      .values({
-        inviteCode,
-        createdUserId: _userId,
-        maxUsage,
-      })
-      .returning();
+    const newInvite = await QueryInvite.insertInvite({
+      inviteCode,
+      maxUsage,
+      requestSender: _userId,
+    });
 
     return newInvite;
   };
 
   export const DeleteInvite = async (inviteId: number) => {
-    //TODO: invitation用のQuery層を作ったときに置き換える
-    await db.delete(invitations).where(eq(invitations.id, inviteId));
+    await QueryInvite.removeInvite({ inviteId });
 
     return;
   };
