@@ -33,7 +33,7 @@ export namespace ServiceNotification {
     if (input.mode !== undefined && !isValidMode(input.mode)) {
       throw status(400, "Invalid mode");
     }
-    const config = QueryNotification.updateConfig({
+    const config = await QueryNotification.updateConfig({
       enabled: input.enabled,
       mode: input.mode,
       requestSender: _userId,
@@ -96,7 +96,7 @@ export namespace ServiceNotification {
   };
 
   export const GetMutedChannels = async (_userId: string) => {
-    const channels = QueryNotification.getMutedChannels({
+    const channels = await QueryNotification.getMutedChannels({
       requestSender: _userId,
     });
     return channels;
