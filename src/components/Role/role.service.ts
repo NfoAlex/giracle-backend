@@ -1,5 +1,6 @@
 import { status } from "elysia";
 import { QueryRole } from "../../queries/role.query";
+import { QueryRoleLink } from "../../queries/roleLink.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
@@ -105,7 +106,7 @@ export namespace ServiceRole {
       throw status(400, "Role already linked");
     }
 
-    await QueryRole.insertLink({
+    await QueryRoleLink.insertLink({
       userId,
       roleId,
     });
@@ -140,7 +141,7 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    await QueryRole.removeLink({
+    await QueryRoleLink.removeLink({
       userId,
       roleId,
     }).catch(() => {

@@ -1,26 +1,22 @@
 import { rm } from "node:fs/promises";
-import { and, eq } from "drizzle-orm";
 import { status } from "elysia";
 import { imageSize } from "image-size";
 import { db } from "../..";
 import type { Message } from "../../db/schema";
-import {
-  channelJoinOnDefaults,
-  channelJoins,
-  channels,
-  channelViewableRoles,
-  messageReadTimes,
-} from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
+import { QueryChannelJoin } from "../../queries/channelJoin.query";
+import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
+import { QueryChannelViewableRole } from "../../queries/channelViewableRole.query";
 import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
+import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
 export namespace ServiceChannel {
   export const Join = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoined = await QueryChannel.getJoin({
+    const channelJoined = await QueryChannelJoin.getJoin({
       channelId,
       userId: _userId,
     });
@@ -40,14 +36,14 @@ export namespace ServiceChannel {
       throw status(404, "Channel not found");
     }
 
-    await QueryChannel.insertJoin({ channelId, userId: _userId });
+    await QueryChannelJoin.insertJoin({ channelId, userId: _userId });
 
     return;
   };
 
   export const Leave = async (channelId: string, _userId: string) => {
     //チャンネル参加データが存在するか確認
-    const channelJoinData = await QueryChannel.getJoin({
+    const channelJoinData = await QueryChannelJoin.getJoin({
       channelId,
       userId: _userId,
     });
@@ -55,18 +51,13 @@ export namespace ServiceChannel {
       throw status(404, "You are not joined this channel");
     }
 
-    //TODO: 既読時間用のQuery層を作ったときに置き換える
     //既読時間データを削除
-    await db
-      .delete(messageReadTimes)
-      .where(
-        and(
-          eq(messageReadTimes.channelId, channelId),
-          eq(messageReadTimes.userId, _userId),
-        ),
-      );
+    await QueryMessageReadTime.removeByChannelAndUser({
+      channelId,
+      userId: _userId,
+    });
     //チャンネル参加データを削除
-    await QueryChannel.removeJoin({ channelId, userId: _userId });
+    await QueryChannelJoin.removeJoin({ channelId, userId: _userId });
   };
 
   export const GetInfo = async (channelId: string, _userId: string) => {
@@ -300,10 +291,12 @@ export namespace ServiceChannel {
     _userId: string,
   ) => {
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかをチャンネル情報と共に確認
-    const requestedUsersChannelJoin = await QueryChannel.getJoinWithChannel({
-      channelId,
-      userId: _userId,
-    });
+    const requestedUsersChannelJoin = await QueryChannelJoin.getJoinWithChannel(
+      {
+        channelId,
+        userId: _userId,
+      },
+    );
     if (!requestedUsersChannelJoin?.channel) {
       throw status(403, "You are not joined this channel or channel not found");
     }
@@ -322,7 +315,7 @@ export namespace ServiceChannel {
     }
 
     //チャンネル参加させる
-    await QueryChannel.insertJoin({ channelId, userId: targetUserId });
+    await QueryChannelJoin.insertJoin({ channelId, userId: targetUserId });
 
     return;
   };
@@ -338,7 +331,7 @@ export namespace ServiceChannel {
     }
 
     //このリクエストをしたユーザーがチャンネルに参加しているかどうかを確認
-    const requestedUsersChannelJoin = await QueryChannel.getJoin({
+    const requestedUsersChannelJoin = await QueryChannelJoin.getJoin({
       channelId,
       userId: _userId,
     });
@@ -346,18 +339,13 @@ export namespace ServiceChannel {
       throw status(403, "You are not joined this channel");
     }
 
-    //TODO: 既読時間用のQuery層を作ったときに置き換える
     //既読時間データを削除(Leaveと対称にする)
-    await db
-      .delete(messageReadTimes)
-      .where(
-        and(
-          eq(messageReadTimes.channelId, channelId),
-          eq(messageReadTimes.userId, targetUserId),
-        ),
-      );
+    await QueryMessageReadTime.removeByChannelAndUser({
+      channelId,
+      userId: targetUserId,
+    });
     //チャンネル参加データを削除(退出させる)
-    await QueryChannel.removeJoin({ channelId, userId: targetUserId });
+    await QueryChannelJoin.removeJoin({ channelId, userId: targetUserId });
 
     return;
   };
@@ -414,7 +402,7 @@ export namespace ServiceChannel {
       const uniqueRoleIds = [...new Set(viewableRole)];
 
       //現在の閲覧可能roleIdを削除、指定されたroleId全件を挿入(1トランザクションにまとめて中間状態を無くす)
-      await QueryChannel.replaceViewableRoles({
+      await QueryChannelViewableRole.replaceByChannel({
         channelId,
         roleIds: uniqueRoleIds,
       });
@@ -469,7 +457,7 @@ export namespace ServiceChannel {
       }),
     );
     //チャンネルに参加しているユーザーのWS登録を解除
-    const joinedUsers = await QueryChannel.getJoinsByChannel({ channelId });
+    const joinedUsers = await QueryChannelJoin.getJoinsByChannel({ channelId });
     for (const channelJoinData of joinedUsers) {
       Util.wsUserInstance.unsubscribe(
         channelJoinData.userId,
@@ -479,22 +467,13 @@ export namespace ServiceChannel {
 
     //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)
     db.transaction((tx) => {
-      //TODO: 既読時間用のQuery層を作ったときに置き換える
-      tx.delete(messageReadTimes)
-        .where(eq(messageReadTimes.channelId, channelId))
-        .run();
-      tx.delete(channelViewableRoles)
-        .where(eq(channelViewableRoles.channelId, channelId))
-        .run();
+      QueryMessageReadTime.removeByChannelInTx(tx, { channelId });
+      QueryChannelViewableRole.removeByChannelInTx(tx, { channelId });
       QueryMessageFileAttached.removeByChannelInTx(tx, { channelId });
       QueryMessage.removeByChannelInTx(tx, { channelId });
-      tx.delete(channelJoins)
-        .where(eq(channelJoins.channelId, channelId))
-        .run();
-      tx.delete(channelJoinOnDefaults)
-        .where(eq(channelJoinOnDefaults.channelId, channelId))
-        .run();
-      tx.delete(channels).where(eq(channels.id, channelId)).run();
+      QueryChannelJoin.removeByChannelInTx(tx, { channelId });
+      QueryChannelJoinOnDefault.removeByChannelInTx(tx, { channelId });
+      QueryChannel.removeByChannelInTx(tx, { channelId });
     });
 
     //添付ファイルの実体を削除(DBの外側なのでトランザクション後に実行)

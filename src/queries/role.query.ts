@@ -1,7 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "..";
-import { roleInfos, roleLinks } from "../db/schema";
+import { roleInfos } from "../db/schema";
 import { Util } from "../Util";
+import { QueryRoleLink } from "./roleLink.query";
 
 export namespace QueryRole {
   export const getList = async (opt?: { name: string }) => {
@@ -63,7 +64,7 @@ export namespace QueryRole {
   export const removeRole = async (query: { roleId: string }) => {
     //ロール付与情報→ロール本体の順に削除(FKがrestrictのため)。bun-sqlite は同期トランザクションなのでコールバックに await を入れない
     db.transaction((tx) => {
-      tx.delete(roleLinks).where(eq(roleLinks.roleId, query.roleId)).run();
+      QueryRoleLink.removeByRoleInTx(tx, { roleId: query.roleId });
       tx.delete(roleInfos).where(eq(roleInfos.id, query.roleId)).run();
     });
   };
@@ -93,45 +94,5 @@ export namespace QueryRole {
       });
 
     return roleUpdated;
-  };
-
-  export const insertLink = async (query: {
-    userId: string;
-    roleId: string;
-  }) => {
-    const [roleLinkInserted] = await db
-      .insert(roleLinks)
-      .values({
-        userId: query.userId, //指定のユーザーId
-        roleId: query.roleId,
-      })
-      .returning()
-      .catch((e) => {
-        console.error("role.query :: QueryRole.insertLink : db error", e);
-        throw new Error("Database error");
-      });
-
-    return roleLinkInserted;
-  };
-
-  export const removeLink = async (query: {
-    userId: string;
-    roleId: string;
-  }) => {
-    const [roleUnlinked] = await db
-      .delete(roleLinks)
-      .where(
-        and(
-          eq(roleLinks.userId, query.userId),
-          eq(roleLinks.roleId, query.roleId),
-        ),
-      )
-      .returning()
-      .catch((e) => {
-        console.error("role.query :: QueryRole.remoteUnlink : db error", e);
-        throw new Error("Database error");
-      });
-
-    return roleUnlinked;
   };
 }
