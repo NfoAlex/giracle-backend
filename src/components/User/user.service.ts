@@ -1,12 +1,15 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, eq, not } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { channelJoins, passwords, roleLinks, tokens } from "../../db/schema";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
+import { QueryChannelJoin } from "../../queries/channelJoin.query";
+import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryInvite } from "../../queries/invite.query";
+import { QueryPassword } from "../../queries/password.query";
+import { QueryRoleLink } from "../../queries/roleLink.query";
+import { QueryToken } from "../../queries/token.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
@@ -74,20 +77,16 @@ export namespace ServiceUser {
         selfIntroduction: `こんにちは、${username}です。`,
       });
 
-      tx.insert(passwords)
-        .values({
-          userId: newUser.id,
-          password: passwordHashed,
-          salt: salt,
-        })
-        .run();
+      QueryPassword.insertInTx(tx, {
+        userId: newUser.id,
+        password: passwordHashed,
+        salt: salt,
+      });
 
-      tx.insert(roleLinks)
-        .values({
-          userId: newUser.id,
-          roleId: flagFirstUser ? "HOST" : "MEMBER",
-        })
-        .run();
+      QueryRoleLink.insertLinkInTx(tx, {
+        userId: newUser.id,
+        roleId: flagFirstUser ? "HOST" : "MEMBER",
+      });
 
       return { success: true as const, newUser };
     });
@@ -101,8 +100,7 @@ export namespace ServiceUser {
     const createdUser = result.newUser;
 
     //デフォルトで参加するチャンネルに参加させる
-    const channelJoinOnDefault =
-      await db.query.channelJoinOnDefaults.findMany();
+    const channelJoinOnDefault = await QueryChannelJoinOnDefault.getList();
     const joiningData: { userId: string; channelId: string }[] = [];
     for (const channelIdJson of channelJoinOnDefault) {
       joiningData.push({
@@ -111,9 +109,7 @@ export namespace ServiceUser {
       });
     }
     //DBへ挿入
-    if (joiningData.length > 0) {
-      await db.insert(channelJoins).values(joiningData);
-    }
+    await QueryChannelJoin.insertMany({ items: joiningData });
 
     return { createdUser };
   };
@@ -163,13 +159,10 @@ export namespace ServiceUser {
     }
 
     //トークンを生成
-    const [tokenGenerated] = await db
-      .insert(tokens)
-      .values({
-        token: crypto.randomBytes(16).toString("hex"),
-        userId: user.id,
-      })
-      .returning();
+    const tokenGenerated = await QueryToken.insertToken({
+      token: crypto.randomBytes(16).toString("hex"),
+      userId: user.id,
+    });
 
     return tokenGenerated;
   };
@@ -373,22 +366,16 @@ export namespace ServiceUser {
     }
 
     //新しいパスワードをハッシュ化してDBに保存
-    await db
-      .update(passwords)
-      .set({
-        password: await Bun.password.hash(newPassword + userdata.password.salt),
-      })
-      .where(eq(passwords.userId, userdata.id));
+    await QueryPassword.updatePassword({
+      userId: userdata.id,
+      password: await Bun.password.hash(newPassword + userdata.password.salt),
+    });
 
     //パスワード変更時に他のセッションを無効化する(現在のセッションは維持)
-    await db
-      .delete(tokens)
-      .where(
-        and(
-          eq(tokens.userId, userdata.id),
-          not(eq(tokens.token, currentToken)),
-        ),
-      );
+    await QueryToken.removeByUserExceptToken({
+      userId: userdata.id,
+      exceptToken: currentToken,
+    });
 
     //トークンキャッシュを全件無効化(現在のセッション含めDB再検証させる)
     invalidateUserCache(userdata.id);
@@ -404,12 +391,13 @@ export namespace ServiceUser {
     const passwordHashed = await Bun.password.hash(newPassword + salt);
 
     db.transaction((tx) => {
-      tx.update(passwords)
-        .set({ password: passwordHashed, salt })
-        .where(eq(passwords.userId, targetUserId))
-        .run();
+      QueryPassword.updateInTx(tx, {
+        userId: targetUserId,
+        password: passwordHashed,
+        salt,
+      });
 
-      tx.delete(tokens).where(eq(tokens.userId, targetUserId)).run();
+      QueryToken.removeByUserInTx(tx, { userId: targetUserId });
     });
 
     // 5分トークンキャッシュに残った旧トークンを即時無効化
@@ -446,8 +434,8 @@ export namespace ServiceUser {
     cursor: number = 1,
   ) => {
     const skipAmount = (cursor - 1) * 30;
-    const sessions = await db.query.tokens.findMany({
-      where: eq(tokens.userId, userId),
+    const sessions = await QueryToken.getListByUser({
+      userId,
       limit: 30,
       offset: skipAmount,
     });
@@ -464,14 +452,13 @@ export namespace ServiceUser {
     sessionId: number,
     newName: string,
   ) => {
-    const [newSession] = await db
-      .update(tokens)
-      .set({ name: newName })
-      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, userId)))
-      .returning()
-      .catch(() => {
-        throw status(500, "Something went wrong");
-      });
+    const newSession = await QueryToken.updateName({
+      sessionId,
+      userId,
+      name: newName,
+    }).catch(() => {
+      throw status(500, "Something went wrong");
+    });
 
     //対象0件 = セッションが存在しないか自分のセッションではない
     if (newSession === undefined) {
@@ -486,20 +473,21 @@ export namespace ServiceUser {
     sessionId: number,
     activeToken: string,
   ) => {
-    const targetToken = await db.query.tokens.findFirst({
-      where: and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)),
+    const targetToken = await QueryToken.getSingleByIdAndUser({
+      sessionId,
+      userId: _userId,
     });
 
     if (targetToken === undefined) throw status(404, "Session not found");
     if (targetToken.token === activeToken)
       throw status(400, "You cannot delete your active session");
 
-    await db
-      .delete(tokens)
-      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)))
-      .catch(() => {
-        throw status(500, "Something went wrong");
-      });
+    await QueryToken.removeByIdAndUser({
+      sessionId,
+      userId: _userId,
+    }).catch(() => {
+      throw status(500, "Something went wrong");
+    });
 
     //削除したセッションのトークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateTokenCache(targetToken.token);
@@ -509,7 +497,7 @@ export namespace ServiceUser {
 
   export const SignOut = async (token: string) => {
     //トークン削除
-    await db.delete(tokens).where(eq(tokens.token, token));
+    await QueryToken.removeByToken({ token });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateTokenCache(token);
@@ -589,16 +577,13 @@ export namespace ServiceUser {
     }
 
     //キャッシュ無効化用に既存トークン一覧を取得
-    const userTokens = await db
-      .select({ token: tokens.token })
-      .from(tokens)
-      .where(eq(tokens.userId, userId));
+    const userTokens = await QueryToken.getTokensByUser({ userId });
 
     //論理削除（メッセージ・絵文字・チャンネル等のデータは全て残る）
     await QueryUser.setDeleted({ userId });
 
     //全セッションを無効化
-    await db.delete(tokens).where(eq(tokens.userId, userId));
+    await QueryToken.removeByUser({ userId });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateUserCache(userId);

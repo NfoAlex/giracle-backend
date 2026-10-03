@@ -1,16 +1,13 @@
 import fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import * as path from "node:path";
-import { and, desc, eq, gte, lt, lte, or, type SQL, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import {
-  channelJoinOnDefaults,
-  customEmojis,
-  requestLog,
-} from "../../db/schema";
+import { GIRACLE_SERVER_CONFIG } from "../..";
+import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
+import { QueryCustomEmoji } from "../../queries/customEmoji.query";
 import { QueryInvite } from "../../queries/invite.query";
+import { QueryRequestLog } from "../../queries/requestLog.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
 import { QueryUser } from "../../queries/user.query";
 
@@ -22,13 +19,8 @@ export namespace ServiceServer {
     const secondUser = QueryUser.getSecondUser();
     const isFirstUser = secondUser === undefined;
     //デフォルトで参加するチャンネル
-    //TODO: channelJoinOnDefault用のQuery層を作ったときに置き換える
     const defaultJoinChannelFetched =
-      await db.query.channelJoinOnDefaults.findMany({
-        with: {
-          channel: true,
-        },
-      });
+      await QueryChannelJoinOnDefault.getListWithChannel();
     const defaultJoinChannel = defaultJoinChannelFetched.map((c) => c.channel);
 
     return {
@@ -129,17 +121,8 @@ export namespace ServiceServer {
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
       //デフォルト参加チャンネル全部削除して渡されたチャンネルIdを挿入(1トランザクションで)
-      const defaultChannelIdsPushing = DefaultJoinChannel.map((channelId) => ({
-        channelId,
-      }));
-      db.transaction((tx) => {
-        //TODO: channelJoinOnDefault用のQuery層を作ったときに置き換える
-        tx.delete(channelJoinOnDefaults).run();
-        if (defaultChannelIdsPushing.length > 0) {
-          tx.insert(channelJoinOnDefaults)
-            .values(defaultChannelIdsPushing)
-            .run();
-        }
+      QueryChannelJoinOnDefault.replaceAll({
+        channelIds: DefaultJoinChannel,
       });
     }
 
@@ -174,10 +157,7 @@ export namespace ServiceServer {
 
   export const GetCustomEmoji = async (code: string) => {
     //絵文字データを取得、無ければエラー
-    //TODO: customEmoji用のQuery層を作ったときに置き換える
-    const emoji = await db.query.customEmojis.findFirst({
-      where: eq(customEmojis.code, code),
-    });
+    const emoji = await QueryCustomEmoji.getSingle({ code });
     if (emoji === undefined) throw status(404, "Custom emoji not found");
 
     //アイコン読み取り、存在確認して返す
@@ -192,8 +172,7 @@ export namespace ServiceServer {
   };
 
   export const GetCustomEmojis = async () => {
-    //TODO: customEmoji用のQuery層を作ったときに置き換える
-    const emojis = await db.query.customEmojis.findMany();
+    const emojis = await QueryCustomEmoji.getList();
     return emojis;
   };
 
@@ -220,22 +199,15 @@ export namespace ServiceServer {
       throw status(400, "Emoji code cannot contain full-width characters");
 
     //絵文字コードが既に存在するか確認
-    //TODO: customEmoji用のQuery層を作ったときに置き換える
-    const emojiExist = await db.query.customEmojis.findFirst({
-      where: eq(customEmojis.code, emojiCode),
-    });
+    const emojiExist = await QueryCustomEmoji.getSingle({ code: emojiCode });
     if (emojiExist !== undefined)
       throw status(400, "Emoji code already exists");
 
     //DBに登録
-    //TODO: customEmoji用のQuery層を作ったときに置き換える
-    const [emojiUploaded] = await db
-      .insert(customEmojis)
-      .values({
-        code: emojiCode,
-        uploadedUserId: _userId,
-      })
-      .returning();
+    const emojiUploaded = await QueryCustomEmoji.insertEmoji({
+      code: emojiCode,
+      uploadedUserId: _userId,
+    });
 
     //拡張子取得
     const ext = emoji.type.split("/")[1];
@@ -262,11 +234,9 @@ export namespace ServiceServer {
 
   export const DeleteCustomEmoji = async (emojiCode: string) => {
     //絵文字を削除しデータ取得
-    //TODO: customEmoji用のQuery層を作ったときに置き換える
-    const [emojiDeleted] = await db
-      .delete(customEmojis)
-      .where(eq(customEmojis.code, emojiCode))
-      .returning();
+    const emojiDeleted = await QueryCustomEmoji.removeEmoji({
+      code: emojiCode,
+    });
 
     //絵文字の画像ファイルを削除
     await unlink(`./STORAGE/custom-emoji/${emojiDeleted.id}.png`).catch(
@@ -313,12 +283,7 @@ export namespace ServiceServer {
     const dayEnd = new Date(`${dashedDateString}T23:59:59.999+09:00`);
 
     const cursorRequestLog = cursorLogId
-      ? //TODO: requestLog用のQuery層を作ったときに置き換える
-        db
-          .select({ id: requestLog.id, createdAt: requestLog.createdAt })
-          .from(requestLog)
-          .where(eq(requestLog.id, cursorLogId))
-          .get()
+      ? QueryRequestLog.getCursorLog({ logId: cursorLogId })
       : undefined;
 
     if (cursorLogId && !cursorRequestLog)
@@ -331,27 +296,11 @@ export namespace ServiceServer {
     )
       throw status(400, "cursorLogId is out of the target date range");
 
-    //TODO: requestLog用のQuery層を作ったときに置き換える
-    const logs = await db
-      .select()
-      .from(requestLog)
-      .where(
-        and(
-          gte(requestLog.createdAt, dayStart),
-          lte(requestLog.createdAt, dayEnd),
-          cursorRequestLog
-            ? or(
-                lt(requestLog.createdAt, cursorRequestLog.createdAt),
-                and(
-                  eq(requestLog.createdAt, cursorRequestLog.createdAt),
-                  lt(requestLog.id, cursorRequestLog.id),
-                ),
-              )
-            : undefined,
-        ),
-      )
-      .orderBy(desc(requestLog.createdAt), desc(requestLog.id))
-      .limit(50);
+    const logs = await QueryRequestLog.getByDateRange({
+      dayStart,
+      dayEnd,
+      cursor: cursorRequestLog,
+    });
 
     return logs;
   };
@@ -377,46 +326,12 @@ export namespace ServiceServer {
     // 半開区間 [weekStart, weekEnd) にしカーソル連番時の重複を防ぐ
     const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    // 日付バケットは JST(UTC+9) 固定。サーバーTZ依存にせず決定的にする
-    // SQLite: createdAt は ms なので /1000 で unixepoch(秒) 化 → +9時間 → YYYY-MM-DD
-    const day = sql<string>`strftime(
-      '%Y-%m-%d',
-      ${requestLog.createdAt} / 1000,
-      'unixepoch',
-      '+9 hours'
-    )`;
-
-    const cnt = (cond: SQL) =>
-      sql<number>`cast(sum(case when ${cond} then 1 else 0 end) as int)`;
-
-    //TODO: requestLog用のQuery層を作ったときに置き換える
-    const logByGroup = await db
-      .select({
-        date: day,
-        successCount: cnt(sql`${requestLog.status} = 200`),
-        errorCount: cnt(sql`${requestLog.status} >= 500`),
-        otherCount: cnt(
-          sql`${requestLog.status} != 200 and ${requestLog.status} < 500`,
-        ),
-      })
-      .from(requestLog)
-      .where(
-        and(
-          gte(requestLog.createdAt, weekStart),
-          lt(requestLog.createdAt, weekEnd),
-          filters.type
-            ? (
-                {
-                  success: eq(requestLog.status, 200),
-                  error: gte(requestLog.status, 500),
-                } as const
-              )[filters.type]
-            : undefined,
-          filters.userId ? eq(requestLog.userId, filters.userId) : undefined,
-        ),
-      )
-      .groupBy(day)
-      .orderBy(day);
+    const logByGroup = await QueryRequestLog.getGroupByDay({
+      weekStart,
+      weekEnd,
+      type: filters.type,
+      userId: filters.userId,
+    });
 
     return {
       group: logByGroup,
