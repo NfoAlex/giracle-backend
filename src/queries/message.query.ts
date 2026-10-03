@@ -18,10 +18,6 @@ import {
   messageUrlPreviews,
 } from "../db/schema";
 import { Util } from "../Util";
-import { QueryInbox } from "./inbox.query";
-import { QueryMessageFileAttached } from "./messageFileAttached.query";
-import { QueryMessageReaction } from "./messageReaction.query";
-import { QueryMessageUrlPreview } from "./messageUrlPreview.query";
 
 export namespace QueryMessage {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
@@ -286,21 +282,9 @@ export namespace QueryMessage {
     return row;
   };
 
-  //メッセージに紐づく子データ(inboxのrestrict FKを含む)を子→親の順に1トランザクションで削除
-  export const deleteMessage = (query: { messageId: string }) => {
-    db.transaction((tx) => {
-      QueryMessageUrlPreview.removeByMessageInTx(tx, {
-        messageId: query.messageId,
-      });
-      QueryMessageReaction.removeByMessageInTx(tx, {
-        messageId: query.messageId,
-      });
-      QueryMessageFileAttached.removeByMessageInTx(tx, {
-        messageId: query.messageId,
-      });
-      QueryInbox.removeByMessageInTx(tx, { messageId: query.messageId });
-      tx.delete(messages).where(eq(messages.id, query.messageId)).run();
-    });
+  //呼び出し側のトランザクション内でメッセージ本体を削除する
+  export const removeInTx = (tx: Tx, query: { messageId: string }) => {
+    tx.delete(messages).where(eq(messages.id, query.messageId)).run();
   };
 
   //呼び出し側のトランザクション内でチャンネル配下のメッセージを削除する

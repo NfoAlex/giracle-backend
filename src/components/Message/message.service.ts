@@ -2,7 +2,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { status } from "elysia";
 import sharp from "sharp";
-import { GIRACLE_SERVER_CONFIG } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import type { Message } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryChannelJoin } from "../../queries/channelJoin.query";
@@ -11,6 +11,7 @@ import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { QueryMessageReaction } from "../../queries/messageReaction.query";
 import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
+import { QueryMessageUrlPreview } from "../../queries/messageUrlPreview.query";
 import { QueryMessageUrlPreviewThumbnail } from "../../queries/messageUrlPreviewThumbnail.query";
 import { QueryRoleLink } from "../../queries/roleLink.query";
 import { Util } from "../../Util";
@@ -392,8 +393,14 @@ export namespace ServiceMessage {
       }
     }
 
-    //DB上の関連データをまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
-    QueryMessage.deleteMessage({ messageId });
+    //DB上の関連データを子→親の順にまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
+    db.transaction((tx) => {
+      QueryMessageUrlPreview.removeByMessageInTx(tx, { messageId });
+      QueryMessageReaction.removeByMessageInTx(tx, { messageId });
+      QueryMessageFileAttached.removeByMessageInTx(tx, { messageId });
+      QueryInbox.removeByMessageInTx(tx, { messageId });
+      QueryMessage.removeInTx(tx, { messageId });
+    });
 
     return messageData;
   };
