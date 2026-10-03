@@ -1,16 +1,11 @@
-import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { messageUrlPreviewThumbnails } from "../db/schema";
+import { QueryMessageUrlPreviewThumbnail } from "../queries/messageUrlPreviewThumbnail.query";
 
 export default function GetUrlPreviewThumbnailFileName(
   url: string,
 ): string | undefined {
-  //TODO: サムネイル用のQuery層を作ったときに置き換える
-  const previewFileName = db
-    .select({ fileName: messageUrlPreviewThumbnails.fileName })
-    .from(messageUrlPreviewThumbnails)
-    .where(eq(messageUrlPreviewThumbnails.url, url))
-    .get();
+  const previewFileName = QueryMessageUrlPreviewThumbnail.getFileNameByUrl({
+    url,
+  });
 
   return previewFileName?.fileName;
 }

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { WebPushKeys } from "../components/Notification/types";
 import { db } from "../db";
 import {
@@ -108,6 +108,34 @@ export namespace QueryNotification {
       where: eq(channelMutes.userId, query.requestSender),
       columns: { channelId: true, mutedAt: true },
     });
+  };
+
+  //ユーザー・チャンネル単位のミュート(プッシュ通知の抑止判定用)
+  export const getMute = (query: {
+    requestSender: string;
+    channelId: string;
+  }) => {
+    return db.query.channelMutes.findFirst({
+      where: and(
+        eq(channelMutes.userId, query.requestSender),
+        eq(channelMutes.channelId, query.channelId),
+      ),
+    });
+  };
+
+  //ユーザーの登録端末一覧(プッシュ通知配信用)
+  export const getDevicesByUser = (query: { requestSender: string }) => {
+    return db.query.notificationDevices.findMany({
+      where: eq(notificationDevices.userId, query.requestSender),
+    });
+  };
+
+  //無効になった端末をまとめて削除(プッシュ通知の404/410応答後)
+  export const removeDevicesByTokens = async (query: { tokens: string[] }) => {
+    if (query.tokens.length === 0) return;
+    await db
+      .delete(notificationDevices)
+      .where(inArray(notificationDevices.token, query.tokens));
   };
 
   export const insertMuteChannel = async (query: {
