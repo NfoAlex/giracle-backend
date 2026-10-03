@@ -9,19 +9,18 @@ import {
   channelJoinOnDefaults,
   customEmojis,
   requestLog,
-  users,
 } from "../../db/schema";
 import { QueryInvite } from "../../queries/invite.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
+import { QueryUser } from "../../queries/user.query";
 
 export namespace ServiceServer {
   export const Config = async () => {
     //サーバーの情報取得
     const config = await QueryServerConfig.getSingle();
     //最初のユーザーになるかどうか
-    //TODO: user用のQuery層を作ったときに置き換える
-    const firstUser = db.select().from(users).offset(1).limit(1).get();
-    const isFirstUser = firstUser === undefined;
+    const secondUser = QueryUser.getSecondUser();
+    const isFirstUser = secondUser === undefined;
     //デフォルトで参加するチャンネル
     //TODO: channelJoinOnDefault用のQuery層を作ったときに置き換える
     const defaultJoinChannelFetched =

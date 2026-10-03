@@ -11,10 +11,10 @@ import {
   channelViewableRoles,
   messageFileAttached,
   messageReadTimes,
-  users,
 } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryMessage } from "../../queries/message.query";
+import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
 export namespace ServiceChannel {
@@ -308,18 +308,10 @@ export namespace ServiceChannel {
       throw status(403, "You are not joined this channel or channel not found");
     }
 
-    //TODO: QueryUserを作ったときに置き換える
     //対象ユーザーの存在を参加情報とともに確認
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, targetUserId),
-      with: {
-        ChannelJoin: {
-          where: eq(channelJoins.channelId, channelId),
-          columns: {
-            userId: true,
-          },
-        },
-      },
+    const user = await QueryUser.getSingleWithChannelJoin({
+      userId: targetUserId,
+      channelId,
     });
     if (!user) {
       throw status(404, "User not found");

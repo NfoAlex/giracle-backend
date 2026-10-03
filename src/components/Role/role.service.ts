@@ -1,8 +1,6 @@
-import { eq } from "drizzle-orm";
 import { status } from "elysia";
-import { db } from "../..";
-import { roleLinks, users } from "../../db/schema";
 import { QueryRole } from "../../queries/role.query";
+import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
 export namespace ServiceRole {
@@ -95,15 +93,10 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    //TODO: QueryUserを作ったときに置き換える
     //ユーザー存在とロールリンクの確認
-    const userWithRoleLink = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      with: {
-        RoleLink: {
-          where: eq(roleLinks.roleId, roleId),
-        },
-      },
+    const userWithRoleLink = await QueryUser.getSingleWithRoleLink({
+      userId,
+      roleId,
     });
     if (!userWithRoleLink) {
       throw status(404, "User not found");
@@ -130,15 +123,10 @@ export namespace ServiceRole {
       throw status(400, "You cannot unlink default role");
     }
 
-    //TODO: QueryUserを作ったときに置き換える
     //ユーザー存在とロールリンクの確認
-    const targetUserWithRole = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      with: {
-        RoleLink: {
-          where: eq(roleLinks.roleId, roleId),
-        },
-      },
+    const targetUserWithRole = await QueryUser.getSingleWithRoleLink({
+      userId,
+      roleId,
     });
     if (!targetUserWithRole) {
       throw status(404, "User not found");
