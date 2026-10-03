@@ -1,17 +1,12 @@
-import { and, eq, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
-import { db } from ".";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
-import {
-  blockedIPAddresses,
-  messageUrlPreviews,
-  requestLog,
-  roleInfos,
-  roleLinks,
-  tokens,
-} from "./db/schema";
+import { QueryBlockedIPAddress } from "./queries/blockedIPAddress.query";
 import { QueryMessage } from "./queries/message.query";
+import { QueryMessageUrlPreview } from "./queries/messageUrlPreview.query";
+import { QueryRequestLog } from "./queries/requestLog.query";
+import { QueryRoleLink } from "./queries/roleLink.query";
+import { QueryToken } from "./queries/token.query";
 import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
@@ -108,19 +103,8 @@ export namespace Middleware {
       }
 
       //トークンがDBにあるか確認
-      const tokenData = await db.query.tokens.findFirst({
-        where: eq(tokens.token, tokenValue),
-        columns: {
-          userId: true,
-          expiresAt: true,
-        },
-        with: {
-          user: {
-            columns: {
-              isBanned: true,
-            },
-          },
-        },
+      const tokenData = await QueryToken.getSingleWithUser({
+        token: tokenValue,
       });
 
       //トークンが無効ならエラー
@@ -161,21 +145,11 @@ export namespace Middleware {
             if (CheckToken === undefined) return status(401, "Unauthorized");
             const _userId = CheckToken._userId;
 
-            // biome-ignore lint/suspicious/noExplicitAny: roleTermはルート定義から渡される動的なカラム名のため
-            const roleTermColumn = (roleInfos as any)[roleTerm];
-
             //該当権限を持つロール付与情報あるいはサーバー管理権限を検索
-            const roleLink = await db
-              .select({ userId: roleLinks.userId })
-              .from(roleLinks)
-              .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
-              .where(
-                and(
-                  eq(roleLinks.userId, _userId),
-                  sql`(${roleTermColumn} = 1 OR ${roleInfos.manageServer} = 1)`,
-                ),
-              )
-              .get();
+            const roleLink = QueryRoleLink.getLinkByRoleTerm({
+              userId: _userId,
+              roleTerm,
+            });
 
             //該当権限を持つロール付与情報が無いなら停止
             if (roleLink === undefined) {
@@ -203,9 +177,8 @@ export namespace Middleware {
         const cachedToken = tokenCache.get(tokenValue);
         let tokenValid = cachedToken !== undefined;
         if (!tokenValid) {
-          const tokenExists = await db.query.tokens.findFirst({
-            where: eq(tokens.token, tokenValue),
-            columns: { userId: true },
+          const tokenExists = await QueryToken.getSingleWithUserId({
+            token: tokenValue,
           });
           tokenValid = tokenExists !== undefined;
         }
@@ -223,18 +196,12 @@ export namespace Middleware {
         key = socketAddress.address;
 
         //IPアドレスが既にブロックされているか確認
-        const blockedIP = await db.query.blockedIPAddresses.findFirst({
-          where: eq(blockedIPAddresses.address, key),
+        const blockedIP = await QueryBlockedIPAddress.getSingle({
+          address: key,
         });
         if (blockedIP) {
           //ブロックされている場合はカウントを増加させて429を返す
-          await db
-            .update(blockedIPAddresses)
-            .set({
-              blockedCount: blockedIP.blockedCount + 1,
-              latestAccess: new Date(),
-            })
-            .where(eq(blockedIPAddresses.address, key));
+          await QueryBlockedIPAddress.incrementByAddress({ address: key });
           return status(429, "Too Many Requests");
         }
       }
@@ -260,23 +227,14 @@ export namespace Middleware {
 
         //認証済みで制限を超えたならトークンを無効化
         if (!isAnonymous) {
-          await db.delete(tokens).where(eq(tokens.token, key));
+          await QueryToken.removeByToken({ token: key });
           //キャッシュにも残っていると最大5分間有効なままになるため合わせて無効化
           invalidateTokenCache(key);
         } else {
           //匿名の場合の処理
           //カウントがプラス10を超過している場合はIPアドレスでブロック
           if (bucket.count > configUsing.limit + 10) {
-            await db
-              .insert(blockedIPAddresses)
-              .values({ address: key, blockedCount: 1 })
-              .onConflictDoUpdate({
-                target: blockedIPAddresses.address,
-                set: {
-                  blockedCount: sql`${blockedIPAddresses.blockedCount} + 1`,
-                  latestAccess: new Date(),
-                },
-              });
+            await QueryBlockedIPAddress.upsertByAddress({ address: key });
           }
         }
 
@@ -342,10 +300,7 @@ export namespace Middleware {
             });
 
             // 編集された時用に現在のURLプレビュー情報を削除
-            //TODO: URLプレビュー用のQuery層を作ったときに置き換える
-            await db
-              .delete(messageUrlPreviews)
-              .where(eq(messageUrlPreviews.messageId, messageId));
+            await QueryMessageUrlPreview.removeByMessage({ messageId });
 
             // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
             const validUrls: string[] = [];
@@ -397,12 +352,12 @@ export namespace Middleware {
             // OGPデータが存在する場合、または編集によってURLがすべて消えた場合のみ更新・通知
             if (creatingPreviewDataArr.length > 0 || messageData.isEdited) {
               if (creatingPreviewDataArr.length > 0) {
-                //TODO: URLプレビュー用のQuery層を作ったときに置き換える
-                await db
-                  .insert(messageUrlPreviews)
-                  .values(
-                    creatingPreviewDataArr.map((p) => ({ ...p, messageId })),
-                  );
+                await QueryMessageUrlPreview.insertMany({
+                  items: creatingPreviewDataArr.map((p) => ({
+                    ...p,
+                    messageId,
+                  })),
+                });
               }
 
               const messageUpdated = await QueryMessage.getSingleWithPreviews({
@@ -442,7 +397,7 @@ export namespace Middleware {
       }
 
       try {
-        await db.insert(requestLog).values({
+        await QueryRequestLog.insertLog({
           userId: CheckToken?._userId ?? null,
           method: request.method,
           path,
