@@ -1,10 +1,15 @@
 import { status } from "elysia";
-import { QueryNotification } from "../../queries/notification.query";
+import {
+  NOTIFICATION_MODES,
+  QueryNotification,
+  type TNotificationMode,
+} from "../../queries/notification.query";
 import { Util } from "../../Util";
 import type { WebPushKeys } from "./types";
 
-export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
-export type TNotificationMode = (typeof NOTIFICATION_MODES)[number];
+export type { TNotificationMode };
+//moduleが参照するためserviceから再exportする
+export { NOTIFICATION_MODES };
 
 const isValidMode = (v: string): v is TNotificationMode =>
   (NOTIFICATION_MODES as readonly string[]).includes(v);

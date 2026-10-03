@@ -1,12 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { db } from "..";
 import type { WebPushKeys } from "../components/Notification/types";
-import { db } from "../db";
 import {
   channelMutes,
   notificationConfigs,
   notificationDevices,
 } from "../db/schema";
 
+//通知モードの許容値(DBのmode列に格納する値。service/moduleから参照)
 export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
 export type TNotificationMode = (typeof NOTIFICATION_MODES)[number];
 
