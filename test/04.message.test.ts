@@ -987,6 +987,76 @@ describe("/message/send", async () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("正常 :: 返信先がチャンネル未参加なら返信通知を作成しない", async () => {
+    //返信先となるユーザー(TESTUSER2)をTESTCHANNEL1へ一時参加させてメッセージを投稿
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" });
+
+    let sentId: string | undefined;
+    let repliedId: string | undefined;
+    try {
+      const sent = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        useSecondaryUser: true,
+        body: { channelId: "TESTCHANNEL1", message: "unjoined target" },
+      });
+      expect(sent.ok).toBeTrue();
+      sentId = (await sent.json()).data.id;
+
+      //投稿後に返信先ユーザーをチャンネルから外す
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+
+      const replied = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "reply to unjoined",
+          replyingMessageId: sentId,
+        },
+      });
+      expect(replied.ok).toBeTrue();
+      const repliedIdValue: string = (await replied.json()).data.id;
+      repliedId = repliedIdValue;
+
+      //未参加のユーザーへ返信通知は作られない
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(
+            eq(inboxes.userId, "TESTUSER2"),
+            eq(inboxes.messageId, repliedIdValue),
+          ),
+        );
+      expect(rows.length).toBe(0);
+    } finally {
+      //後始末(通知→メッセージの順でFKを満たす)
+      if (repliedId)
+        await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
+      if (repliedId)
+        await db.delete(messages).where(eq(messages.id, repliedId));
+      if (sentId) await db.delete(messages).where(eq(messages.id, sentId));
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+    }
+  });
+
   it("正常 :: 返信は返信先の送信者へ返信通知を作成する", async () => {
     //返信者(TESTUSER2)はTESTCHANNEL1未参加のため一時的に参加させる
     await db

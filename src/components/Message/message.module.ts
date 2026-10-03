@@ -532,12 +532,13 @@ export const message = new Elysia({ prefix: "/message" })
             : null;
 
         if (replyTargetUserId) {
-          //チャンネル参加していることを確認
-          const channelJoin = await QueryChannelJoin.getJoinByUserId({
+          //返信先の送信者がこのチャンネルに参加していることを確認(メンション通知と同じ条件)
+          const channelJoin = await QueryChannelJoin.getJoin({
+            channelId,
             userId: replyTargetUserId,
           });
 
-          if (channelJoin.length !== 0) {
+          if (channelJoin !== undefined) {
             await QueryInbox.insertOne({
               userId: replyTargetUserId,
               messageId: messageSaved.id,

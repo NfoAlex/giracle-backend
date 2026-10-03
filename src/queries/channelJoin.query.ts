@@ -47,14 +47,6 @@ export namespace QueryChannelJoin {
     });
   };
 
-  //ユーザーがチャンネルに参加しているか(返信通知の参加確認用。ユーザーIdのみ)
-  export const getJoinByUserId = (query: { userId: string }) => {
-    return db
-      .select({ userId: channelJoins.userId })
-      .from(channelJoins)
-      .where(eq(channelJoins.userId, query.userId));
-  };
-
   //ユーザーの参加チャンネル一覧(新着判定用)
   export const getJoinsByUser = (query: { userId: string }) => {
     return db.query.channelJoins.findMany({
