@@ -16,7 +16,6 @@ import {
   messageReadTimes,
 } from "../db/schema";
 import { Util } from "../Util";
-import { QueryRoleLink } from "./roleLink.query";
 
 export namespace QueryChannel {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
@@ -125,22 +124,15 @@ export namespace QueryChannel {
   };
 
   //ユーザーが閲覧できるチャンネル一覧(可視判定の合成。EXISTSサブクエリは検索内部条件のためここに置く)
-  export const getViewable = async (query: { userId: string }) => {
-    //ユーザーのロールを取得
-    const userRolesLinks = await QueryRoleLink.getLinksByUser({
-      userId: query.userId,
-    });
-    //ユーザーのロールIdを配列化
-    const userRoleIds = userRolesLinks.map((role) => role.roleId);
+  export const getViewable = async (query: {
+    userId: string;
+    userRoleIds: string[];
+    hasManageServer: boolean;
+  }) => {
+    const userRoleIds = query.userRoleIds;
 
     //manageServer権限を持つなら全チャンネルが見れる(CheckChannelVisibilityの判定と揃える)
-    if (userRoleIds.length > 0) {
-      const hasManageServer = QueryRoleLink.getManageServerLink({
-        userId: query.userId,
-      });
-      if (hasManageServer !== undefined)
-        return await db.select().from(channels);
-    }
+    if (query.hasManageServer) return await db.select().from(channels);
 
     //閲覧ロールが設定されているもので自分のロールがあるなら見れる
     const hasViewableRoleCondition =
