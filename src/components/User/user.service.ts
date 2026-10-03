@@ -1,18 +1,18 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, asc, eq, gt, inArray, lt, not, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, not, or, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import {
   channelJoins,
-  invitations,
   passwords,
   roleLinks,
   tokens,
   users,
 } from "../../db/schema";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
+import { QueryInvite } from "../../queries/invite.query";
 import { Util } from "../../Util";
 
 export namespace ServiceUser {
@@ -38,10 +38,7 @@ export namespace ServiceUser {
       }
 
       //招待コードが存在するか確認(上限判定はユーザー作成と同一トランザクション内で行う)
-      const Invite = await db.query.invitations.findFirst({
-        where: eq(invitations.inviteCode, inviteCode),
-        columns: { id: true },
-      });
+      const Invite = await QueryInvite.getSingle({ inviteCode });
 
       //招待コードが無効な場合
       if (Invite === undefined) {
@@ -71,22 +68,7 @@ export namespace ServiceUser {
         GIRACLE_SERVER_CONFIG.RegisterInviteOnly &&
         inviteCode
       ) {
-        const inviteUpdated = tx
-          .update(invitations)
-          .set({
-            usedCount: sql`${invitations.usedCount} + 1`,
-          })
-          .where(
-            and(
-              eq(invitations.inviteCode, inviteCode),
-              or(
-                eq(invitations.maxUsage, -1),
-                lt(invitations.usedCount, invitations.maxUsage),
-              ),
-            ),
-          )
-          .returning()
-          .get();
+        const inviteUpdated = QueryInvite.consumeInTx(tx, { inviteCode });
 
         //上限到達のためユーザーは作成しない(トランザクションごとロールバック)
         if (inviteUpdated === undefined) {
