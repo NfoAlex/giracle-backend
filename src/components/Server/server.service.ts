@@ -10,14 +10,14 @@ import {
   customEmojis,
   invitations,
   requestLog,
-  serverConfigs,
   users,
 } from "../../db/schema";
+import { QueryServerConfig } from "../../queries/serverConfig.query";
 
 export namespace ServiceServer {
   export const Config = async () => {
     //サーバーの情報取得
-    const config = await db.query.serverConfigs.findFirst();
+    const config = await QueryServerConfig.getSingle();
     //最初のユーザーになるかどうか
     const firstUser = db.select().from(users).offset(1).limit(1).get();
     const isFirstUser = firstUser === undefined;
@@ -84,13 +84,10 @@ export namespace ServiceServer {
   };
 
   export const ChangeInfo = async (name: string, introduction: string) => {
-    const [serverinfo] = await db
-      .update(serverConfigs)
-      .set({
-        name,
-        introduction,
-      })
-      .returning();
+    const serverinfo = await QueryServerConfig.updateInfo({
+      name,
+      introduction,
+    });
 
     //ここでデータ取得失敗したら500エラー
     if (serverinfo === undefined) throw status(500, "Server config not found");
@@ -109,16 +106,13 @@ export namespace ServiceServer {
     MessageMaxFileSize?: number,
     DefaultJoinChannel?: string[],
   ) => {
-    const [serverinfo] = await db
-      .update(serverConfigs)
-      .set({
-        RegisterAvailable,
-        RegisterInviteOnly,
-        RegisterAnnounceChannelId,
-        MessageMaxLength,
-        MessageMaxFileSize,
-      })
-      .returning();
+    const serverinfo = await QueryServerConfig.updateConfig({
+      RegisterAvailable,
+      RegisterInviteOnly,
+      RegisterAnnounceChannelId,
+      MessageMaxLength,
+      MessageMaxFileSize,
+    });
 
     if (serverinfo === undefined) throw status(500, "Server config not found");
 
