@@ -1,4 +1,5 @@
 import { status } from "elysia";
+import { db } from "../..";
 import { QueryRole } from "../../queries/role.query";
 import { QueryRoleLink } from "../../queries/roleLink.query";
 import { QueryUser } from "../../queries/user.query";
@@ -157,7 +158,11 @@ export namespace ServiceRole {
       throw status(400, "Role level not enough or role not found");
     }
 
-    await QueryRole.removeRole({ roleId });
+    //ロール付与情報→ロール本体の順に1トランザクションで削除(FKがrestrictのため)
+    db.transaction((tx) => {
+      QueryRoleLink.removeByRoleInTx(tx, { roleId });
+      QueryRole.removeInTx(tx, { roleId });
+    });
 
     return;
   };

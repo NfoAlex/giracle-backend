@@ -2,9 +2,11 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "..";
 import { roleInfos } from "../db/schema";
 import { Util } from "../Util";
-import { QueryRoleLink } from "./roleLink.query";
 
 export namespace QueryRole {
+  //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
   export const getList = async (opt?: { name: string }) => {
     const roles = await db
       .select()
@@ -61,12 +63,9 @@ export namespace QueryRole {
     return newRole;
   };
 
-  export const removeRole = async (query: { roleId: string }) => {
-    //ロール付与情報→ロール本体の順に削除(FKがrestrictのため)。bun-sqlite は同期トランザクションなのでコールバックに await を入れない
-    db.transaction((tx) => {
-      QueryRoleLink.removeByRoleInTx(tx, { roleId: query.roleId });
-      tx.delete(roleInfos).where(eq(roleInfos.id, query.roleId)).run();
-    });
+  //呼び出し側のトランザクション内でロール本体を削除する
+  export const removeInTx = (tx: Tx, query: { roleId: string }) => {
+    tx.delete(roleInfos).where(eq(roleInfos.id, query.roleId)).run();
   };
 
   export const update = async (query: {
