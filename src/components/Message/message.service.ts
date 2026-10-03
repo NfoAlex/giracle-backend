@@ -154,6 +154,11 @@ export namespace ServiceMessage {
     file: File,
     _userId: string,
   ) => {
+    //channelIdにパス要素が混入していないか検証(パストラバーサル対策)。DB参照より先に、無効入力でDBを叩かない
+    if (!/^[a-zA-Z0-9_-]+$/.test(channelId)) {
+      throw status(400, "Invalid channelId");
+    }
+
     const joinedChannel = await QueryChannelJoin.getJoin({
       userId: _userId,
       channelId,
@@ -169,19 +174,14 @@ export namespace ServiceMessage {
       throw status(400, "File size is too large");
     }
 
-    //channelIdにパス要素が混入していないか検証(パストラバーサル対策)
-    if (!/^[a-zA-Z0-9_-]+$/.test(channelId)) {
-      throw status(400, "Invalid channelId");
-    }
-
     //表示用ファイル名はパストラバーサル対策としてサニタイズして保持
     const safeFileName = path.basename(file.name).replace(/[/\\]/g, "_");
     //保存ファイル名はサーバー生成のIDのみを使用(オリジナル拡張子を使わせない)
     const fileId = crypto.randomUUID();
+    //保存先ディレクトリ
+    const dir = `./STORAGE/file/${channelId}`;
     //チャンネルIdのディレクトリを作成
-    await mkdir(`./STORAGE/file/${channelId}`, { recursive: true }).catch(
-      () => {},
-    );
+    await mkdir(dir, { recursive: true }).catch(() => {});
 
     //MIMEタイプを正規化する(クライアント指定値は大文字や `;charset=...` を含み得るため)
     const mimeType = file.type.split(";")[0].trim().toLowerCase();
@@ -201,7 +201,7 @@ export namespace ServiceMessage {
               dither: 0, // ディザリングを無効化
               effort: 7, // パレット生成の計算量を設定
             })
-            .toFile(`./STORAGE/file/${channelId}/${fileId}.gif`);
+            .toFile(`${dir}/${fileId}.gif`);
           savedFileName = `${fileId}.gif`;
           type = "image/gif";
         } else {
@@ -209,7 +209,7 @@ export namespace ServiceMessage {
           await sharp(buffer)
             .rotate()
             .webp({ quality: 95 })
-            .toFile(`./STORAGE/file/${channelId}/${fileId}.webp`);
+            .toFile(`${dir}/${fileId}.webp`);
           savedFileName = `${fileId}.webp`;
           type = "image/webp";
         }
@@ -224,7 +224,7 @@ export namespace ServiceMessage {
         throw status(400, "File type is invalid");
       }
       //画像以外はそのまま保存する(ブラウザ上での実行は配信時のattachment/nosniffで防止)
-      await Bun.write(`./STORAGE/file/${channelId}/${fileId}.${safeExt}`, file);
+      await Bun.write(`${dir}/${fileId}.${safeExt}`, file);
       savedFileName = `${fileId}.${safeExt}`;
       type = mimeType;
     }
