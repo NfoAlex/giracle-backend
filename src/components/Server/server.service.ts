@@ -19,9 +19,11 @@ export namespace ServiceServer {
     //サーバーの情報取得
     const config = await QueryServerConfig.getSingle();
     //最初のユーザーになるかどうか
+    //TODO: user用のQuery層を作ったときに置き換える
     const firstUser = db.select().from(users).offset(1).limit(1).get();
     const isFirstUser = firstUser === undefined;
     //デフォルトで参加するチャンネル
+    //TODO: channelJoinOnDefault用のQuery層を作ったときに置き換える
     const defaultJoinChannelFetched =
       await db.query.channelJoinOnDefaults.findMany({
         with: {
@@ -56,6 +58,7 @@ export namespace ServiceServer {
   };
 
   export const GetInvite = async () => {
+    //TODO: invitation用のQuery層を作ったときに置き換える
     const invites = await db.query.invitations.findMany();
     return invites;
   };
@@ -65,6 +68,7 @@ export namespace ServiceServer {
     maxUsage: number = 5,
     _userId: string,
   ) => {
+    //TODO: invitation用のQuery層を作ったときに置き換える
     const [newInvite] = await db
       .insert(invitations)
       .values({
@@ -78,6 +82,7 @@ export namespace ServiceServer {
   };
 
   export const DeleteInvite = async (inviteId: number) => {
+    //TODO: invitation用のQuery層を作ったときに置き換える
     await db.delete(invitations).where(eq(invitations.id, inviteId));
 
     return;
@@ -135,6 +140,7 @@ export namespace ServiceServer {
         channelId,
       }));
       db.transaction((tx) => {
+        //TODO: channelJoinOnDefault用のQuery層を作ったときに置き換える
         tx.delete(channelJoinOnDefaults).run();
         if (defaultChannelIdsPushing.length > 0) {
           tx.insert(channelJoinOnDefaults)
@@ -175,6 +181,7 @@ export namespace ServiceServer {
 
   export const GetCustomEmoji = async (code: string) => {
     //絵文字データを取得、無ければエラー
+    //TODO: customEmoji用のQuery層を作ったときに置き換える
     const emoji = await db.query.customEmojis.findFirst({
       where: eq(customEmojis.code, code),
     });
@@ -192,6 +199,7 @@ export namespace ServiceServer {
   };
 
   export const GetCustomEmojis = async () => {
+    //TODO: customEmoji用のQuery層を作ったときに置き換える
     const emojis = await db.query.customEmojis.findMany();
     return emojis;
   };
@@ -219,6 +227,7 @@ export namespace ServiceServer {
       throw status(400, "Emoji code cannot contain full-width characters");
 
     //絵文字コードが既に存在するか確認
+    //TODO: customEmoji用のQuery層を作ったときに置き換える
     const emojiExist = await db.query.customEmojis.findFirst({
       where: eq(customEmojis.code, emojiCode),
     });
@@ -226,6 +235,7 @@ export namespace ServiceServer {
       throw status(400, "Emoji code already exists");
 
     //DBに登録
+    //TODO: customEmoji用のQuery層を作ったときに置き換える
     const [emojiUploaded] = await db
       .insert(customEmojis)
       .values({
@@ -259,6 +269,7 @@ export namespace ServiceServer {
 
   export const DeleteCustomEmoji = async (emojiCode: string) => {
     //絵文字を削除しデータ取得
+    //TODO: customEmoji用のQuery層を作ったときに置き換える
     const [emojiDeleted] = await db
       .delete(customEmojis)
       .where(eq(customEmojis.code, emojiCode))
@@ -309,7 +320,8 @@ export namespace ServiceServer {
     const dayEnd = new Date(`${dashedDateString}T23:59:59.999+09:00`);
 
     const cursorRequestLog = cursorLogId
-      ? db
+      ? //TODO: requestLog用のQuery層を作ったときに置き換える
+        db
           .select({ id: requestLog.id, createdAt: requestLog.createdAt })
           .from(requestLog)
           .where(eq(requestLog.id, cursorLogId))
@@ -326,6 +338,7 @@ export namespace ServiceServer {
     )
       throw status(400, "cursorLogId is out of the target date range");
 
+    //TODO: requestLog用のQuery層を作ったときに置き換える
     const logs = await db
       .select()
       .from(requestLog)
@@ -383,6 +396,7 @@ export namespace ServiceServer {
     const cnt = (cond: SQL) =>
       sql<number>`cast(sum(case when ${cond} then 1 else 0 end) as int)`;
 
+    //TODO: requestLog用のQuery層を作ったときに置き換える
     const logByGroup = await db
       .select({
         date: day,
