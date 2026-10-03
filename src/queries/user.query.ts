@@ -28,7 +28,7 @@ export namespace QueryUser {
   export const getSingleWithMinimum = (query: { userId: string }) => {
     return db.query.users.findFirst({
       where: eq(users.id, query.userId),
-      columns: { id: true, isDeleted: true },
+      columns: { id: true, isDeleted: true, isBanned: true, },
     });
   };
 
@@ -42,10 +42,16 @@ export namespace QueryUser {
     });
   };
 
-  //ユーザー名基準の取得(重複確認用)
-  export const getSingleByName = (query: { name: string }) => {
+  //ユーザー名基準の取得
+  export const getSingleWithMinimumByName = (query: { name: string }) => {
     return db.query.users.findFirst({
       where: eq(users.name, query.name),
+      columns: {
+        id: true,
+        name: true,
+        isBanned: true,
+        isDeleted: true
+      }
     });
   };
 

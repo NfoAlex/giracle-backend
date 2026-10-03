@@ -43,7 +43,7 @@ export namespace ServiceUser {
       }
     }
 
-    const user = await QueryUser.getSingleByName({ name: username });
+    const user = await QueryUser.getSingleWithMinimumByName({ name: username });
     if (user) {
       throw status(400, {
         message: "User already exists",
