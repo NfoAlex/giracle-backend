@@ -1,22 +1,18 @@
 import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import { and, eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db, GIRACLE_SERVER_CONFIG } from "../..";
+import { GIRACLE_SERVER_CONFIG } from "../..";
 import type { Message } from "../../db/schema";
-import {
-  channelJoins,
-  channels,
-  messageReactions,
-  messageReadTimes,
-  messageUrlPreviewThumbnails,
-  roleInfos,
-  roleLinks,
-} from "../../db/schema";
+import { QueryChannel } from "../../queries/channel.query";
+import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryInbox } from "../../queries/inbox.query";
 import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
+import { QueryMessageReaction } from "../../queries/messageReaction.query";
+import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
+import { QueryMessageUrlPreviewThumbnail } from "../../queries/messageUrlPreviewThumbnail.query";
+import { QueryRoleLink } from "../../queries/roleLink.query";
 import { Util } from "../../Util";
 
 export namespace ServiceMessage {
@@ -40,16 +36,8 @@ export namespace ServiceMessage {
   export const GetNew = async (_userId: string) => {
     // 参加チャンネルと既読時間を並列取得
     const [userChannelJoined, messageReadTime] = await Promise.all([
-      //TODO: channel用のQuery層を作ったときに置き換える
-      db.query.channelJoins.findMany({
-        where: eq(channelJoins.userId, _userId),
-        columns: { channelId: true },
-      }),
-      //TODO: 既読時間用のQuery層を作ったときに置き換える
-      db.query.messageReadTimes.findMany({
-        where: eq(messageReadTimes.userId, _userId),
-        columns: { channelId: true, readTime: true },
-      }),
+      QueryChannelJoin.getJoinsByUser({ userId: _userId }),
+      QueryMessageReadTime.getByUser({ userId: _userId }),
     ]);
 
     const channelIds = userChannelJoined.map((c) => c.channelId);
@@ -81,9 +69,8 @@ export namespace ServiceMessage {
   };
 
   export const GetReadTime = async (_userId: string) => {
-    //TODO: 既読時間用のQuery層を作ったときに置き換える
-    const readTime = await db.query.messageReadTimes.findMany({
-      where: eq(messageReadTimes.userId, _userId),
+    const readTime = await QueryMessageReadTime.getByUserAll({
+      userId: _userId,
     });
     //既読時間がない場合はエラー
     if (readTime === null) {
@@ -98,17 +85,9 @@ export namespace ServiceMessage {
     readTime: Date,
     _userId: string,
   ) => {
-    const channelWithReadtime = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-      with: {
-        //TODO: 既読時間用のQuery層を作ったときに置き換える
-        MessageReadTime: {
-          where: and(
-            eq(messageReadTimes.channelId, channelId),
-            eq(messageReadTimes.userId, _userId),
-          ),
-        },
-      },
+    const channelWithReadtime = await QueryChannel.getSingleWithReadTime({
+      channelId,
+      userId: _userId,
     });
     //チャンネルの存在確認
     if (channelWithReadtime === undefined) {
@@ -124,18 +103,11 @@ export namespace ServiceMessage {
       }
     }
 
-    const [readTimeUpdated] = await db
-      .insert(messageReadTimes)
-      .values({
-        readTime,
-        channelId,
-        userId: _userId,
-      })
-      .onConflictDoUpdate({
-        target: [messageReadTimes.channelId, messageReadTimes.userId],
-        set: { readTime },
-      })
-      .returning();
+    const readTimeUpdated = await QueryMessageReadTime.upsert({
+      channelId,
+      userId: _userId,
+      readTime,
+    });
 
     return readTimeUpdated;
   };
@@ -181,12 +153,9 @@ export namespace ServiceMessage {
     file: File,
     _userId: string,
   ) => {
-    //TODO: channelJoins.query.tsができたら持ってくる
-    const joinedChannel = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
+    const joinedChannel = await QueryChannelJoin.getJoin({
+      userId: _userId,
+      channelId,
     });
     if (joinedChannel === undefined)
       throw status(400, "You are not joined to this channel");
@@ -295,11 +264,9 @@ export namespace ServiceMessage {
     const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024; // 5MB
     const MAX_THUMBNAIL_PIXELS = 4096 * 4096; // 約16.7MP
 
-    const thumbnail = db
-      .select({ fileName: messageUrlPreviewThumbnails.fileName })
-      .from(messageUrlPreviewThumbnails)
-      .where(eq(messageUrlPreviewThumbnails.url, targetUrl))
-      .get();
+    const thumbnail = QueryMessageUrlPreviewThumbnail.getFileNameByUrl({
+      url: targetUrl,
+    });
 
     // キャッシュ済みサムネイルがあれば返す
     const cachedFile = thumbnail
@@ -389,16 +356,10 @@ export namespace ServiceMessage {
     }
 
     // DBへ保存
-    await db
-      .insert(messageUrlPreviewThumbnails)
-      .values({
-        url: targetUrl,
-        fileName,
-      })
-      .onConflictDoUpdate({
-        target: messageUrlPreviewThumbnails.url,
-        set: { fileName, createdAt: new Date() },
-      });
+    await QueryMessageUrlPreviewThumbnail.upsert({
+      url: targetUrl,
+      fileName,
+    });
 
     return Bun.file(filePath);
   };
@@ -411,14 +372,9 @@ export namespace ServiceMessage {
     }
     if (messageData.userId !== _userId) {
       //メッセージの送信者でないならサーバー管理権限を確認する
-      const canManageServer = db
-        .select({ userId: roleLinks.userId })
-        .from(roleLinks)
-        .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
-        .where(
-          and(eq(roleLinks.userId, _userId), eq(roleInfos.manageServer, true)),
-        )
-        .get();
+      const canManageServer = QueryRoleLink.getManageServerLink({
+        userId: _userId,
+      });
 
       if (!canManageServer)
         throw status(403, "You are not owner of this message");
@@ -502,16 +458,12 @@ export namespace ServiceMessage {
     }
 
     //リアクションを格納
-    //TODO: リアクション用のQuery層を作ったときに置き換える
-    const [reaction] = await db
-      .insert(messageReactions)
-      .values({
-        messageId,
-        userId: _userId,
-        channelId,
-        emojiCode,
-      })
-      .returning();
+    const reaction = await QueryMessageReaction.insertReaction({
+      messageId,
+      userId: _userId,
+      channelId,
+      emojiCode,
+    });
 
     return reaction;
   };
@@ -541,18 +493,11 @@ export namespace ServiceMessage {
     }
 
     //ネストリレーションにoffset不可のため直接ページネーション取得
-    //TODO: リアクション用のQuery層を作ったときに置き換える
-    const reactions = await db.query.messageReactions.findMany({
-      where: and(
-        eq(messageReactions.messageId, messageId),
-        eq(messageReactions.emojiCode, emojiCode),
-      ),
-      columns: {
-        userId: true,
-      },
-      orderBy: (t, { asc }) => asc(t.reactedAt),
-      limit: length,
-      offset: skip,
+    const reactions = await QueryMessageReaction.getByMessageAndEmoji({
+      messageId,
+      emojiCode,
+      fetchLength: length,
+      skip,
     });
 
     return { ...message, MessageReaction: reactions };
@@ -579,11 +524,9 @@ export namespace ServiceMessage {
     }
 
     //リアクションを削除
-    //TODO: リアクション用のQuery層を作ったときに置き換える
-    const [reactionDeleted] = await db
-      .delete(messageReactions)
-      .where(eq(messageReactions.id, messageWithReaction.MessageReaction[0].id))
-      .returning();
+    const reactionDeleted = await QueryMessageReaction.removeById({
+      reactionId: messageWithReaction.MessageReaction[0].id,
+    });
 
     return reactionDeleted;
   };
@@ -604,11 +547,9 @@ export namespace ServiceMessage {
       throw status(400, "Message is empty");
 
     //チャンネル参加情報を取得
-    const channelJoined = await db.query.channelJoins.findFirst({
-      where: and(
-        eq(channelJoins.userId, _userId),
-        eq(channelJoins.channelId, channelId),
-      ),
+    const channelJoined = await QueryChannelJoin.getJoin({
+      userId: _userId,
+      channelId,
     });
     //チャンネルに参加していない
     if (channelJoined === undefined) {
@@ -685,12 +626,9 @@ export namespace ServiceMessage {
     //チャンネル参加者限定
     const existingMentionedUsers =
       mentionedUserIdsMerged.length > 0
-        ? await db.query.channelJoins.findMany({
-            where: and(
-              inArray(channelJoins.userId, mentionedUserIdsMerged),
-              eq(channelJoins.channelId, channelId),
-            ),
-            columns: { userId: true },
+        ? await QueryChannelJoin.getJoinsByUsersInChannel({
+            userIds: mentionedUserIdsMerged,
+            channelId,
           })
         : [];
     const existingMentionedUserIds = new Set(

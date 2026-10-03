@@ -20,6 +20,8 @@ import {
 import { Util } from "../Util";
 import { QueryInbox } from "./inbox.query";
 import { QueryMessageFileAttached } from "./messageFileAttached.query";
+import { QueryMessageReaction } from "./messageReaction.query";
+import { QueryMessageUrlPreview } from "./messageUrlPreview.query";
 
 export namespace QueryMessage {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
@@ -287,12 +289,12 @@ export namespace QueryMessage {
   //メッセージに紐づく子データ(inboxのrestrict FKを含む)を子→親の順に1トランザクションで削除
   export const deleteMessage = (query: { messageId: string }) => {
     db.transaction((tx) => {
-      tx.delete(messageUrlPreviews)
-        .where(eq(messageUrlPreviews.messageId, query.messageId))
-        .run();
-      tx.delete(messageReactions)
-        .where(eq(messageReactions.messageId, query.messageId))
-        .run();
+      QueryMessageUrlPreview.removeByMessageInTx(tx, {
+        messageId: query.messageId,
+      });
+      QueryMessageReaction.removeByMessageInTx(tx, {
+        messageId: query.messageId,
+      });
       QueryMessageFileAttached.removeByMessageInTx(tx, {
         messageId: query.messageId,
       });

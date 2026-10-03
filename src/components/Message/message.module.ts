@@ -1,8 +1,7 @@
-import { eq } from "drizzle-orm";
 import Elysia, { file, status, t } from "elysia";
-import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { channelJoins } from "../../db/schema";
+import { GIRACLE_SERVER_CONFIG } from "../..";
 import { Middleware } from "../../Middlewares";
+import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryInbox } from "../../queries/inbox.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
@@ -534,10 +533,9 @@ export const message = new Elysia({ prefix: "/message" })
 
         if (replyTargetUserId) {
           //チャンネル参加していることを確認
-          const channelJoin = await db
-            .select({ userId: channelJoins.userId })
-            .from(channelJoins)
-            .where(eq(channelJoins.userId, replyTargetUserId));
+          const channelJoin = await QueryChannelJoin.getJoinByUserId({
+            userId: replyTargetUserId,
+          });
 
           if (channelJoin.length !== 0) {
             await QueryInbox.insertOne({
@@ -577,9 +575,8 @@ export const message = new Elysia({ prefix: "/message" })
 
         //「全通知」モードのユーザー向け: チャンネル参加者へ配信
         //  除外対象: 送信者本人 / mention 済 / reply 対象 (二重通知防止)
-        const channelMembers = await db.query.channelJoins.findMany({
-          where: eq(channelJoins.channelId, channelId),
-          columns: { userId: true },
+        const channelMembers = await QueryChannelJoin.getUserIdsByChannel({
+          channelId,
         });
         const excluded = new Set<string>([_userId, ...mentionedSet]);
         if (replyTargetUserId) excluded.add(replyTargetUserId);
