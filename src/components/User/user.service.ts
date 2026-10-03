@@ -19,16 +19,12 @@ export namespace ServiceUser {
     password: string,
     inviteCode?: string,
   ) => {
-    //初めてのユーザーかどうか
-    let flagFirstUser = false;
-    //ユーザー数を取得して最初ならtrue
-    const num = await QueryUser.countAll();
-    if (num === 1) {
-      flagFirstUser = true;
-    }
+    //SYSTEMのみ存在する状態=最初のユーザー。最初のユーザーは招待条件を確認しない
+    const isFirstUser = (await QueryUser.countAll()) === 1;
+    const needsInvite =
+      !isFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly;
 
-    //最初のユーザーなら招待条件を確認しない
-    if (!flagFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly) {
+    if (needsInvite) {
       if (inviteCode === undefined) {
         throw status(400, {
           message: "Invite code is invalid",
@@ -59,11 +55,7 @@ export namespace ServiceUser {
     //DBへユーザー情報を登録(ユーザー・パスワード・ロール付与)
     const result = db.transaction((tx) => {
       //招待コードの使用回数を条件付きで原子的に加算(-1は無限)。上限到達なら1件も更新されない
-      if (
-        !flagFirstUser &&
-        GIRACLE_SERVER_CONFIG.RegisterInviteOnly &&
-        inviteCode
-      ) {
+      if (needsInvite && inviteCode) {
         const inviteUpdated = QueryInvite.consumeInTx(tx, { inviteCode });
 
         //上限到達のためユーザーは作成しない(トランザクションごとロールバック)
@@ -85,7 +77,7 @@ export namespace ServiceUser {
 
       QueryRoleLink.insertLinkInTx(tx, {
         userId: newUser.id,
-        roleId: flagFirstUser ? "HOST" : "MEMBER",
+        roleId: isFirstUser ? "HOST" : "MEMBER",
       });
 
       return { success: true as const, newUser };
@@ -101,15 +93,13 @@ export namespace ServiceUser {
 
     //デフォルトで参加するチャンネルに参加させる
     const channelJoinOnDefault = await QueryChannelJoinOnDefault.getList();
-    const joiningData: { userId: string; channelId: string }[] = [];
-    for (const channelIdJson of channelJoinOnDefault) {
-      joiningData.push({
-        userId: createdUser.id,
-        channelId: channelIdJson.channelId,
-      });
-    }
     //DBへ挿入
-    await QueryChannelJoin.insertMany({ items: joiningData });
+    await QueryChannelJoin.insertMany({
+      items: channelJoinOnDefault.map((c) => ({
+        userId: createdUser.id,
+        channelId: c.channelId,
+      })),
+    });
 
     return { createdUser };
   };
