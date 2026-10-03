@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import Elysia, { file, status, t } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { channelJoins, inboxes, users } from "../../db/schema";
+import { channelJoins, inboxes } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
+import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 import { ServiceMessage } from "./message.service";
 
@@ -479,10 +480,7 @@ export const message = new Elysia({ prefix: "/message" })
       );
 
       //プッシュ通知用のメタ情報 (送信者名 / 本文プレビュー)
-      const senderInfo = await db.query.users.findFirst({
-        where: eq(users.id, _userId),
-        columns: { name: true },
-      });
+      const senderInfo = await QueryUser.getSingleName({ userId: _userId });
       const senderName = senderInfo?.name ?? "誰か";
       //通知内容
       const bodyPreview =
@@ -541,6 +539,7 @@ export const message = new Elysia({ prefix: "/message" })
             .where(eq(channelJoins.userId, replyTargetUserId));
 
           if (channelJoin.length !== 0) {
+            //TODO: Inbox用のQuery層を作ったときに置き換える
             await db.insert(inboxes).values({
               userId: replyTargetUserId,
               messageId: messageSaved.id,

@@ -1,18 +1,9 @@
 import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import {
-  and,
-  eq,
-  exists,
-  inArray,
-  max,
-  notExists,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
-import { db } from "../..";
+import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import type { Message } from "../../db/schema";
 import {
   channelJoins,
@@ -21,22 +12,17 @@ import {
   messageFileAttached,
   messageReactions,
   messageReadTimes,
-  messages,
-  messageUrlPreviews,
   messageUrlPreviewThumbnails,
   roleInfos,
   roleLinks,
 } from "../../db/schema";
+import { QueryMessage } from "../../queries/message.query";
 import { Util } from "../../Util";
 
 export namespace ServiceMessage {
   export const Get = async (messageId: string, _userId: string) => {
-    const messageData = await db.query.messages.findFirst({
-      where: eq(messages.id, messageId),
-      with: {
-        MessageUrlPreview: true,
-        MessageFileAttached: true,
-      },
+    const messageData = await QueryMessage.getSingleWithRelations({
+      messageId,
     });
     //メッセージが見つからなければエラー
     if (messageData === undefined) {
@@ -54,10 +40,12 @@ export namespace ServiceMessage {
   export const GetNew = async (_userId: string) => {
     // 参加チャンネルと既読時間を並列取得
     const [userChannelJoined, messageReadTime] = await Promise.all([
+      //TODO: channel用のQuery層を作ったときに置き換える
       db.query.channelJoins.findMany({
         where: eq(channelJoins.userId, _userId),
         columns: { channelId: true },
       }),
+      //TODO: 既読時間用のQuery層を作ったときに置き換える
       db.query.messageReadTimes.findMany({
         where: eq(messageReadTimes.userId, _userId),
         columns: { channelId: true, readTime: true },
@@ -68,14 +56,9 @@ export namespace ServiceMessage {
     if (channelIds.length === 0) return {};
 
     // チャンネルごとの最新createdAtをDB側で集約（groupByはDB集約なので軽い）
-    const latestTimes = await db
-      .select({
-        channelId: messages.channelId,
-        maxCreatedAt: max(messages.createdAt),
-      })
-      .from(messages)
-      .where(inArray(messages.channelId, channelIds))
-      .groupBy(messages.channelId);
+    const latestTimes = await QueryMessage.getLatestCreatedAtByChannel({
+      channelIds,
+    });
 
     // 既読時間をMapに変換して参照
     const readTimeMap = new Map(
@@ -98,6 +81,7 @@ export namespace ServiceMessage {
   };
 
   export const GetReadTime = async (_userId: string) => {
+    //TODO: 既読時間用のQuery層を作ったときに置き換える
     const readTime = await db.query.messageReadTimes.findMany({
       where: eq(messageReadTimes.userId, _userId),
     });
@@ -117,6 +101,7 @@ export namespace ServiceMessage {
     const channelWithReadtime = await db.query.channels.findFirst({
       where: eq(channels.id, channelId),
       with: {
+        //TODO: 既読時間用のQuery層を作ったときに置き換える
         MessageReadTime: {
           where: and(
             eq(messageReadTimes.channelId, channelId),
@@ -165,10 +150,6 @@ export namespace ServiceMessage {
     _userId: string,
     sort: "asc" | "desc" | undefined = "desc",
   ) => {
-    const SEARCH_PAGE_SIZE = 30;
-    //読み込みインデックス指定があるならスキップするメッセ数を計算
-    const messageSkipping = loadIndex ? (loadIndex - 1) * SEARCH_PAGE_SIZE : 0;
-
     //チャンネル指定が無かった時用のユーザーが閲覧できるチャンネルId配列
     let viewableChannelIds: string[] = [];
     //チャンネル指定があるなら閲覧制限を確認する、無いならユーザーが閲覧できるチャンネルを取得
@@ -182,62 +163,17 @@ export namespace ServiceMessage {
       viewableChannelIds = viewableChannels.map((channel) => channel.id);
     }
 
-    //URLプレビュー/ファイル添付があるかどうかの条件を変換
-    const relationOptionGetter = (
-      _opt: boolean | undefined,
-      relTable: typeof messageUrlPreviews | typeof messageFileAttached,
-    ) => {
-      switch (_opt) {
-        case undefined:
-          return undefined;
-        case true:
-          return exists(
-            db
-              .select()
-              .from(relTable)
-              .where(eq(relTable.messageId, messages.id)),
-          );
-        case false:
-          return notExists(
-            db
-              .select()
-              .from(relTable)
-              .where(eq(relTable.messageId, messages.id)),
-          );
-      }
-    };
-
-    //チャンネル条件(指定が無い場合は閲覧可能チャンネルに限定、0件なら結果無し)
-    const channelCondition = channelId
-      ? eq(messages.channelId, channelId)
-      : viewableChannelIds.length > 0
-        ? inArray(messages.channelId, viewableChannelIds)
-        : sql`false`;
-
-    const conditions: (SQL | undefined)[] = [
-      content !== undefined
-        ? sql`${messages.content} LIKE ${`%${Util.escapeLikePattern(content)}%`} ESCAPE '\\'`
-        : undefined,
-      channelCondition,
-      userId !== undefined ? eq(messages.userId, userId) : undefined,
-      relationOptionGetter(hasUrlPreview, messageUrlPreviews),
-      relationOptionGetter(hasFileAttachment, messageFileAttached),
-    ];
-
     //メッセージを検索する
-    const foundMessages = await db.query.messages.findMany({
-      where: and(...conditions.filter((c): c is SQL => c !== undefined)),
-      with: {
-        MessageUrlPreview: true,
-        MessageFileAttached: true,
-      },
-      limit: SEARCH_PAGE_SIZE,
-      offset: messageSkipping,
-      orderBy: (t, { asc, desc }) =>
-        sort === "asc" ? asc(t.createdAt) : desc(t.createdAt),
+    return await QueryMessage.search({
+      content,
+      channelId,
+      viewableChannelIds,
+      userId,
+      hasUrlPreview,
+      hasFileAttachment,
+      loadIndex,
+      sort,
     });
-
-    return foundMessages;
   };
 
   export const UploadFile = async (
@@ -245,6 +181,7 @@ export namespace ServiceMessage {
     file: File,
     _userId: string,
   ) => {
+    //TODO: channelJoins.query.tsができたら持ってくる
     const joinedChannel = await db.query.channelJoins.findFirst({
       where: and(
         eq(channelJoins.userId, _userId),
@@ -255,8 +192,8 @@ export namespace ServiceMessage {
       throw status(400, "You are not joined to this channel");
 
     //サーバー設定からメッセージの最大ファイルサイズを取得
-    const serverConfig = await db.query.serverConfigs.findFirst();
-    const maxFileSize = serverConfig?.MessageMaxFileSize ?? 1024 * 1024 * 100;
+    const maxFileSize =
+      GIRACLE_SERVER_CONFIG.MessageMaxFileSize ?? 1024 * 1024 * 100;
     //ファイルサイズが最大ファイルサイズを超える場合はエラー
     if (file.size > maxFileSize) {
       throw status(400, "File size is too large");
@@ -323,6 +260,7 @@ export namespace ServiceMessage {
     }
 
     //ファイル情報を作成、保存する
+    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
     const [fileData] = await db
       .insert(messageFileAttached)
       .values({
@@ -339,6 +277,7 @@ export namespace ServiceMessage {
   };
 
   export const GetFile = async (fileId: string, _userId: string) => {
+    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
     const fileData = await db.query.messageFileAttached.findFirst({
       where: eq(messageFileAttached.id, fileId),
     });
@@ -475,20 +414,13 @@ export namespace ServiceMessage {
 
   export const Delete = async (messageId: string, _userId: string) => {
     //取得
-    const messageData = await db.query.messages.findFirst({
-      columns: {
-        id: true,
-        userId: true,
-        channelId: true,
-      },
-      where: eq(messages.id, messageId),
-    });
+    const messageData = await QueryMessage.getSingleWithMinimum({ messageId });
     if (messageData === undefined) {
       throw status(404, "Message not found");
     }
     if (messageData.userId !== _userId) {
       //メッセージの送信者でないならサーバー管理権限を確認する
-      const canManageServer = await db
+      const canManageServer = db
         .select({ userId: roleLinks.userId })
         .from(roleLinks)
         .innerJoin(roleInfos, eq(roleLinks.roleId, roleInfos.id))
@@ -502,6 +434,7 @@ export namespace ServiceMessage {
     }
 
     //ファイル情報を取得(実体ファイルの削除はトランザクション外で先に実施)
+    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
     const fileData = await db.query.messageFileAttached.findMany({
       where: eq(messageFileAttached.messageId, messageId),
     });
@@ -514,25 +447,14 @@ export namespace ServiceMessage {
     }
 
     //DB上の関連データをまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
-    db.transaction((tx) => {
-      tx.delete(messageUrlPreviews)
-        .where(eq(messageUrlPreviews.messageId, messageId))
-        .run();
-      tx.delete(messageReactions)
-        .where(eq(messageReactions.messageId, messageId))
-        .run();
-      tx.delete(messageFileAttached)
-        .where(eq(messageFileAttached.messageId, messageId))
-        .run();
-      tx.delete(inboxes).where(eq(inboxes.messageId, messageId)).run();
-      tx.delete(messages).where(eq(messages.id, messageId)).run();
-    });
+    QueryMessage.deleteMessage({ messageId });
 
     return messageData;
   };
 
   export const GetInbox = async (_userId: string) => {
     //通知を取得する
+    //TODO: Inbox用のQuery層を作ったときに置き換える
     const inboxAll = await db.query.inboxes.findMany({
       where: eq(inboxes.userId, _userId),
       with: {
@@ -545,6 +467,7 @@ export namespace ServiceMessage {
 
   export const ReadInbox = async (messageId: string, _userId: string) => {
     //通知を削除
+    //TODO: Inbox用のQuery層を作ったときに置き換える
     const deleted = await db
       .delete(inboxes)
       .where(and(eq(inboxes.messageId, messageId), eq(inboxes.userId, _userId)))
@@ -566,6 +489,7 @@ export namespace ServiceMessage {
 
   export const ClearInbox = async (_userId: string) => {
     //通知を全部削除
+    //TODO: Inbox用のQuery層を作ったときに置き換える
     await db.delete(inboxes).where(eq(inboxes.userId, _userId));
 
     return;
@@ -583,17 +507,10 @@ export namespace ServiceMessage {
     }
 
     //自分のリアクションデータを取得して条件確認する
-    const targetMessage = await db.query.messages.findFirst({
-      where: and(eq(messages.id, messageId), eq(messages.channelId, channelId)),
-      with: {
-        MessageReaction: {
-          columns: {
-            id: true,
-            emojiCode: true,
-          },
-          where: eq(messageReactions.userId, _userId),
-        },
-      },
+    const targetMessage = await QueryMessage.getSingleWithOwnReaction({
+      messageId,
+      channelId,
+      userId: _userId,
     });
     //メッセージが存在しなければエラー
     if (targetMessage === undefined) {
@@ -609,6 +526,7 @@ export namespace ServiceMessage {
     }
 
     //リアクションを格納
+    //TODO: リアクション用のQuery層を作ったときに置き換える
     const [reaction] = await db
       .insert(messageReactions)
       .values({
@@ -632,13 +550,7 @@ export namespace ServiceMessage {
     const skip = (cursor - 1) * 30;
     const length = 30;
     //メッセージが存在するか確認 (チャンネル可視性判定にchannelIdだけ必要)
-    const message = await db.query.messages.findFirst({
-      where: eq(messages.id, messageId),
-      columns: {
-        id: true,
-        channelId: true,
-      },
-    });
+    const message = await QueryMessage.getSingleWithMinimum({ messageId });
     if (message === undefined) {
       throw status(400, "Message not found or is private");
     }
@@ -653,6 +565,7 @@ export namespace ServiceMessage {
     }
 
     //ネストリレーションにoffset不可のため直接ページネーション取得
+    //TODO: リアクション用のQuery層を作ったときに置き換える
     const reactions = await db.query.messageReactions.findMany({
       where: and(
         eq(messageReactions.messageId, messageId),
@@ -674,17 +587,12 @@ export namespace ServiceMessage {
     emojiCode: string,
     _userId: string,
   ) => {
-    const messageWithReaction = await db.query.messages.findFirst({
-      where: eq(messages.id, messageId),
-      with: {
-        MessageReaction: {
-          where: and(
-            eq(messageReactions.userId, _userId),
-            eq(messageReactions.emojiCode, emojiCode),
-          ),
-        },
-      },
-    });
+    const messageWithReaction =
+      await QueryMessage.getSingleWithOwnReactionByEmoji({
+        messageId,
+        userId: _userId,
+        emojiCode,
+      });
     //メッセージの存在確認
     if (messageWithReaction === undefined) {
       throw status(404, "Message not found");
@@ -695,6 +603,7 @@ export namespace ServiceMessage {
     }
 
     //リアクションを削除
+    //TODO: リアクション用のQuery層を作ったときに置き換える
     const [reactionDeleted] = await db
       .delete(messageReactions)
       .where(eq(messageReactions.id, messageWithReaction.MessageReaction[0].id))
@@ -734,8 +643,8 @@ export namespace ServiceMessage {
     let messageReplyingTo: Message | undefined;
     //返信先メッセージがあるなら存在するか確認
     if (replyingMessageId) {
-      messageReplyingTo = await db.query.messages.findFirst({
-        where: eq(messages.id, replyingMessageId),
+      messageReplyingTo = await QueryMessage.getSingle({
+        messageId: replyingMessageId,
       });
       //返信先メッセージが存在しないならエラー
       if (messageReplyingTo === undefined) {
@@ -748,6 +657,7 @@ export namespace ServiceMessage {
     }
 
     //アップロードしているファイルId配列があるならファイル情報を取得
+    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
     const fileData =
       fileIds.length > 0
         ? await db.query.messageFileAttached.findMany({
@@ -771,18 +681,16 @@ export namespace ServiceMessage {
     }
 
     //メッセージを保存
-    const [messageSavedRow] = await db
-      .insert(messages)
-      .values({
-        channelId,
-        userId: _userId,
-        content: message,
-        replyingMessageId: replyingMessageId ?? undefined,
-      })
-      .returning();
+    const messageSavedRow = await QueryMessage.insertMessage({
+      channelId,
+      userId: _userId,
+      content: message,
+      replyingMessageId: replyingMessageId ?? undefined,
+    });
 
     //アップロード済みファイルをこのメッセージに紐付ける(Prismaのconnect相当)
     if (fileData.length > 0) {
+      //TODO: 添付ファイル用のQuery層を作ったときに置き換える
       await db
         .update(messageFileAttached)
         .set({ messageId: messageSavedRow.id })
@@ -794,11 +702,8 @@ export namespace ServiceMessage {
         );
     }
 
-    const messageSaved = await db.query.messages.findFirst({
-      where: eq(messages.id, messageSavedRow.id),
-      with: {
-        MessageFileAttached: true,
-      },
+    const messageSaved = await QueryMessage.getSingleWithFiles({
+      messageId: messageSavedRow.id,
     });
     if (messageSaved === undefined) {
       throw status(500, "Internal Server Error");
@@ -837,6 +742,7 @@ export namespace ServiceMessage {
     }
     //inboxに保存
     if (savingInboxData.length > 0) {
+      //TODO: Inbox用のQuery層を作ったときに置き換える
       await db.insert(inboxes).values(savingInboxData);
     }
 
@@ -848,9 +754,7 @@ export namespace ServiceMessage {
     message: string,
     _userId: string,
   ) => {
-    const messageEditing = await db.query.messages.findFirst({
-      where: eq(messages.id, messageId),
-    });
+    const messageEditing = await QueryMessage.getSingle({ messageId });
     //メッセージが無かった時エラー
     if (messageEditing === undefined) {
       throw status(404, "Message not found");
@@ -865,20 +769,10 @@ export namespace ServiceMessage {
     }
 
     //メッセージデータを更新する
-    const [msgUpdated] = await db
-      .update(messages)
-      .set({
-        content: message,
-        isEdited: true,
-      })
-      .where(eq(messages.id, messageId))
-      .returning({
-        id: messages.id,
-        channelId: messages.channelId,
-        content: messages.content,
-        isEdited: messages.isEdited,
-        userId: messages.userId,
-      });
+    const msgUpdated = await QueryMessage.updateMessage({
+      messageId,
+      content: message,
+    });
 
     return msgUpdated;
   };

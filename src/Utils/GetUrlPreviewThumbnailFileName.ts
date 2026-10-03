@@ -5,6 +5,7 @@ import { messageUrlPreviewThumbnails } from "../db/schema";
 export default function GetUrlPreviewThumbnailFileName(
   url: string,
 ): string | undefined {
+  //TODO: サムネイル用のQuery層を作ったときに置き換える
   const previewFileName = db
     .select({ fileName: messageUrlPreviewThumbnails.fileName })
     .from(messageUrlPreviewThumbnails)

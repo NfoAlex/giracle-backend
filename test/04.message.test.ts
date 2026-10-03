@@ -8,7 +8,12 @@ import {
   channelJoins,
   inboxes,
   messageFileAttached,
+  messageReactions,
+  messages,
+  messageUrlPreviews,
   messageUrlPreviewThumbnails,
+  roleInfos,
+  roleLinks,
 } from "../src/db/schema";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
@@ -1509,5 +1514,180 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
+  });
+});
+
+describe("/message/delete", async () => {
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    const t = await res.text();
+    expect(t).toBe("Message not found");
+    expect(res.status).toBe(404);
+    expect(res.ok).toBeFalse();
+  });
+
+  it("正常 :: 自分のメッセージを削除", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "delete me",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message deleted");
+    expect(j.data).toBe(target.id);
+    expect(res.ok).toBeTrue();
+
+    const remain = await db.query.messages.findFirst({
+      where: eq(messages.id, target.id),
+    });
+    expect(remain).toBeUndefined();
+  });
+
+  it("他人のメッセージ(manageServer無し)は403", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER2",
+        content: "not yours",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    const t = await res.text();
+    expect(t).toBe("You are not owner of this message");
+    expect(res.status).toBe(403);
+    expect(res.ok).toBeFalse();
+
+    //削除されず残っている
+    const remain = await db.query.messages.findFirst({
+      where: eq(messages.id, target.id),
+    });
+    expect(remain).toBeDefined();
+  });
+
+  it("正常 :: manageServer持ちは他人のメッセージも削除できる", async () => {
+    //TESTUSER2にmanageServerロールを付与
+    await db.insert(roleInfos).values({
+      id: "TempManageServer",
+      name: "Temp Manage Server",
+      createdUserId: "SYSTEM",
+      manageServer: true,
+    });
+    await db
+      .insert(roleLinks)
+      .values({ userId: "TESTUSER2", roleId: "TempManageServer" });
+
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "deleted by admin",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message deleted");
+    expect(j.data).toBe(target.id);
+    expect(res.ok).toBeTrue();
+
+    //後始末
+    await db.delete(roleLinks).where(eq(roleLinks.roleId, "TempManageServer"));
+    await db.delete(roleInfos).where(eq(roleInfos.id, "TempManageServer"));
+  });
+
+  it("正常 :: 関連データ(inbox/リアクション/プレビュー/添付)も一緒に消える", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "cascade target",
+      })
+      .returning();
+
+    await db.insert(inboxes).values({
+      type: "mention",
+      messageId: target.id,
+      userId: "TESTUSER",
+    });
+    await db.insert(messageReactions).values({
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER2",
+      emojiCode: "robot",
+      messageId: target.id,
+    });
+    await db.insert(messageUrlPreviews).values({
+      url: "https://example.com/cascade",
+      type: "website",
+      title: "cascade",
+      messageId: target.id,
+    });
+    await db.insert(messageFileAttached).values({
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER",
+      actualFileName: "cascade.png",
+      savedFileName: "cascade.png",
+      size: 1,
+      type: "image/png",
+      messageId: target.id,
+    });
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    expect(res.ok).toBeTrue();
+
+    expect(
+      await db.query.messages.findFirst({
+        where: eq(messages.id, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.inboxes.findFirst({
+        where: eq(inboxes.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageReactions.findFirst({
+        where: eq(messageReactions.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageUrlPreviews.findFirst({
+        where: eq(messageUrlPreviews.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageFileAttached.findFirst({
+        where: eq(messageFileAttached.messageId, target.id),
+      }),
+    ).toBeUndefined();
   });
 });
