@@ -28,7 +28,7 @@ export namespace QueryUser {
   export const getSingleWithMinimum = (query: { userId: string }) => {
     return db.query.users.findFirst({
       where: eq(users.id, query.userId),
-      columns: { id: true, isDeleted: true, isBanned: true, },
+      columns: { id: true, isDeleted: true, isBanned: true },
     });
   };
 
@@ -50,8 +50,8 @@ export namespace QueryUser {
         id: true,
         name: true,
         isBanned: true,
-        isDeleted: true
-      }
+        isDeleted: true,
+      },
     });
   };
 
