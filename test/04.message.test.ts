@@ -987,6 +987,61 @@ describe("/message/send", async () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("正常 :: 返信は返信先の送信者へ返信通知を作成する", async () => {
+    //返信者(TESTUSER2)はTESTCHANNEL1未参加のため一時的に参加させる
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" });
+
+    try {
+      //返信先となるメッセージを作成
+      const sent = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: { channelId: "TESTCHANNEL1", message: "reply target" },
+      });
+      const sentId = (await sent.json()).data.id;
+
+      //別ユーザーで返信
+      const replied = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        useSecondaryUser: true,
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "reply body",
+          replyingMessageId: sentId,
+        },
+      });
+      expect(replied.status).toBe(200);
+      const repliedId = (await replied.json()).data.id;
+
+      //返信先の送信者(TESTUSER)へtype=replyの通知が1件作られているはず
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(eq(inboxes.userId, "TESTUSER"), eq(inboxes.messageId, repliedId)),
+        );
+      expect(rows.length).toBe(1);
+      expect(rows[0].type).toBe("reply");
+
+      //後続テストへ影響しないよう後始末(通知→メッセージの順でFKを満たす)
+      await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
+      await db.delete(messages).where(eq(messages.id, repliedId));
+      await db.delete(messages).where(eq(messages.id, sentId));
+    } finally {
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+    }
+  });
+
   it("制限を超える長さのメッセージ", async () => {
     //一時的
     const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;

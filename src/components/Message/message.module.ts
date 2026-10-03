@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import Elysia, { file, status, t } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { channelJoins, inboxes } from "../../db/schema";
+import { channelJoins } from "../../db/schema";
 import { Middleware } from "../../Middlewares";
+import { QueryInbox } from "../../queries/inbox.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 import { ServiceMessage } from "./message.service";
@@ -539,8 +540,7 @@ export const message = new Elysia({ prefix: "/message" })
             .where(eq(channelJoins.userId, replyTargetUserId));
 
           if (channelJoin.length !== 0) {
-            //TODO: Inbox用のQuery層を作ったときに置き換える
-            await db.insert(inboxes).values({
+            await QueryInbox.insertOne({
               userId: replyTargetUserId,
               messageId: messageSaved.id,
               type: "reply",

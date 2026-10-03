@@ -9,11 +9,11 @@ import {
   channelJoins,
   channels,
   channelViewableRoles,
-  messageFileAttached,
   messageReadTimes,
 } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryMessage } from "../../queries/message.query";
+import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
@@ -486,10 +486,7 @@ export namespace ServiceChannel {
       tx.delete(channelViewableRoles)
         .where(eq(channelViewableRoles.channelId, channelId))
         .run();
-      //TODO: 添付ファイル用のQuery層を作ったときに置き換える
-      tx.delete(messageFileAttached)
-        .where(eq(messageFileAttached.channelId, channelId))
-        .run();
+      QueryMessageFileAttached.removeByChannelInTx(tx, { channelId });
       QueryMessage.removeByChannelInTx(tx, { channelId });
       tx.delete(channelJoins)
         .where(eq(channelJoins.channelId, channelId))

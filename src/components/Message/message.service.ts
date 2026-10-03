@@ -8,15 +8,15 @@ import type { Message } from "../../db/schema";
 import {
   channelJoins,
   channels,
-  inboxes,
-  messageFileAttached,
   messageReactions,
   messageReadTimes,
   messageUrlPreviewThumbnails,
   roleInfos,
   roleLinks,
 } from "../../db/schema";
+import { QueryInbox } from "../../queries/inbox.query";
 import { QueryMessage } from "../../queries/message.query";
+import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { Util } from "../../Util";
 
 export namespace ServiceMessage {
@@ -260,27 +260,18 @@ export namespace ServiceMessage {
     }
 
     //ファイル情報を作成、保存する
-    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
-    const [fileData] = await db
-      .insert(messageFileAttached)
-      .values({
-        channelId,
-        userId: _userId,
-        size: file.size,
-        actualFileName: safeFileName,
-        savedFileName,
-        type,
-      })
-      .returning({ id: messageFileAttached.id });
-
-    return fileData;
+    return QueryMessageFileAttached.insertFile({
+      channelId,
+      userId: _userId,
+      size: file.size,
+      actualFileName: safeFileName,
+      savedFileName,
+      type,
+    });
   };
 
   export const GetFile = async (fileId: string, _userId: string) => {
-    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
-    const fileData = await db.query.messageFileAttached.findFirst({
-      where: eq(messageFileAttached.id, fileId),
-    });
+    const fileData = await QueryMessageFileAttached.getSingle({ fileId });
     if (fileData === undefined) {
       throw status(404, "File not found");
     }
@@ -434,9 +425,8 @@ export namespace ServiceMessage {
     }
 
     //ファイル情報を取得(実体ファイルの削除はトランザクション外で先に実施)
-    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
-    const fileData = await db.query.messageFileAttached.findMany({
-      where: eq(messageFileAttached.messageId, messageId),
+    const fileData = await QueryMessageFileAttached.getByMessage({
+      messageId,
     });
     for (const file of fileData) {
       try {
@@ -454,31 +444,18 @@ export namespace ServiceMessage {
 
   export const GetInbox = async (_userId: string) => {
     //通知を取得する
-    //TODO: Inbox用のQuery層を作ったときに置き換える
-    const inboxAll = await db.query.inboxes.findMany({
-      where: eq(inboxes.userId, _userId),
-      with: {
-        Message: true,
-      },
-    });
-
-    return inboxAll;
+    return QueryInbox.getByUserWithMessage({ userId: _userId });
   };
 
   export const ReadInbox = async (messageId: string, _userId: string) => {
     //通知を削除
-    //TODO: Inbox用のQuery層を作ったときに置き換える
-    const deleted = await db
-      .delete(inboxes)
-      .where(and(eq(inboxes.messageId, messageId), eq(inboxes.userId, _userId)))
-      .returning()
-      .catch((e) => {
-        console.error(
-          "message.module :: /message/inbox/read : 削除エラー->",
-          e,
-        );
-        throw status(404, "Inbox not found");
-      });
+    const deleted = await QueryInbox.removeSingle({
+      messageId,
+      userId: _userId,
+    }).catch((e) => {
+      console.error("message.module :: /message/inbox/read : 削除エラー->", e);
+      throw status(404, "Inbox not found");
+    });
 
     if (deleted.length === 0) {
       throw status(404, "Inbox not found");
@@ -489,8 +466,7 @@ export namespace ServiceMessage {
 
   export const ClearInbox = async (_userId: string) => {
     //通知を全部削除
-    //TODO: Inbox用のQuery層を作ったときに置き換える
-    await db.delete(inboxes).where(eq(inboxes.userId, _userId));
+    await QueryInbox.removeAllByUser({ userId: _userId });
 
     return;
   };
@@ -657,12 +633,9 @@ export namespace ServiceMessage {
     }
 
     //アップロードしているファイルId配列があるならファイル情報を取得
-    //TODO: 添付ファイル用のQuery層を作ったときに置き換える
     const fileData =
       fileIds.length > 0
-        ? await db.query.messageFileAttached.findMany({
-            where: inArray(messageFileAttached.id, fileIds),
-          })
+        ? await QueryMessageFileAttached.getByIds({ fileIds })
         : [];
 
     //渡されたfileIdsが全て取得できているか、かつ自分がこのチャンネルへアップロードした未添付ファイルであるかを検証
@@ -690,16 +663,10 @@ export namespace ServiceMessage {
 
     //アップロード済みファイルをこのメッセージに紐付ける(Prismaのconnect相当)
     if (fileData.length > 0) {
-      //TODO: 添付ファイル用のQuery層を作ったときに置き換える
-      await db
-        .update(messageFileAttached)
-        .set({ messageId: messageSavedRow.id })
-        .where(
-          inArray(
-            messageFileAttached.id,
-            fileData.map((f) => f.id),
-          ),
-        );
+      await QueryMessageFileAttached.attachToMessage({
+        fileIds: fileData.map((f) => f.id),
+        messageId: messageSavedRow.id,
+      });
     }
 
     const messageSaved = await QueryMessage.getSingleWithFiles({
@@ -742,8 +709,7 @@ export namespace ServiceMessage {
     }
     //inboxに保存
     if (savingInboxData.length > 0) {
-      //TODO: Inbox用のQuery層を作ったときに置き換える
-      await db.insert(inboxes).values(savingInboxData);
+      await QueryInbox.insertMany({ items: savingInboxData });
     }
 
     return { messageSaved, messageReplyingTo, mentionedUserIds };

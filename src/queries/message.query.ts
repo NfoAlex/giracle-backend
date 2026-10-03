@@ -12,13 +12,14 @@ import {
 } from "drizzle-orm";
 import { db } from "..";
 import {
-  inboxes,
   messageFileAttached,
   messageReactions,
   messages,
   messageUrlPreviews,
 } from "../db/schema";
 import { Util } from "../Util";
+import { QueryInbox } from "./inbox.query";
+import { QueryMessageFileAttached } from "./messageFileAttached.query";
 
 export namespace QueryMessage {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
@@ -292,10 +293,10 @@ export namespace QueryMessage {
       tx.delete(messageReactions)
         .where(eq(messageReactions.messageId, query.messageId))
         .run();
-      tx.delete(messageFileAttached)
-        .where(eq(messageFileAttached.messageId, query.messageId))
-        .run();
-      tx.delete(inboxes).where(eq(inboxes.messageId, query.messageId)).run();
+      QueryMessageFileAttached.removeByMessageInTx(tx, {
+        messageId: query.messageId,
+      });
+      QueryInbox.removeByMessageInTx(tx, { messageId: query.messageId });
       tx.delete(messages).where(eq(messages.id, query.messageId)).run();
     });
   };
