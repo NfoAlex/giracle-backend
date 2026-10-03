@@ -55,8 +55,9 @@ bunx biome check --write . # リント＋フォーマット（CI 相当のチェ
 - ファイル名 `<table>.query.ts`、`export namespace Query<TablePascal> { ... }`（例: [user.query.ts](src/queries/user.query.ts) の `QueryUser`）。
 - 引数は単一の `query` オブジェクト（`QueryUser.getSingle({ userId })`）。`db` は `import { db } from ".."`、操作するテーブルの schema も同ファイルで import する。
 - 単体取得は `getSingle`。列を絞る場合は用途名で分ける（`getSingleWithMinimum` = 存在確認・状態判定用の最小列、`getSingleName`、`getCursorUser`）。
-- トランザクション内で使う処理は `fnInTx(tx, query)` 形式（`tx` が第1引数）。ファイル内に `type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];` をローカル定義し、受け取った `tx` だけを操作する（自分では `db.transaction` を張らない）。単一テーブルで完結する複数操作は Query 層内で `db.transaction` を張ってよい（[role.query.ts](src/queries/role.query.ts) の `removeRole`、[message.query.ts](src/queries/message.query.ts) の `deleteMessage`）。
-- 複数テーブルにまたがる合成は service 側で `db.transaction` を張り、各テーブルの `*InTx` を呼ぶ形にする（現状 `user.service.ts` の `SignUp` / `ResetPassword` がこの形の未移行）。
+- **Query 層の関数は同じ Query 層の別関数を参照しない。** 1関数=1テーブル操作に保ち、複数テーブルにまたがる合成は service / Util 層で行う（例: 可視判定は [GetUserViewableChannel.ts](src/Utils/GetUserViewableChannel.ts) がロール取得を担い、`QueryChannel.getViewable` へ材料を渡す）。
+- トランザクション内で使う処理は `fnInTx(tx, query)` 形式（`tx` が第1引数）。ファイル内に `type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];` をローカル定義し、受け取った `tx` だけを操作する（自分では `db.transaction` を張らない）。単一テーブルで完結する複数操作は Query 層内で `db.transaction` を張ってよい（[channelJoinOnDefault.query.ts](src/queries/channelJoinOnDefault.query.ts) の `replaceAll`、[channelViewableRole.query.ts](src/queries/channelViewableRole.query.ts) の `replaceByChannel`）。
+- 複数テーブルにまたがる合成は service / Util 側で `db.transaction` を張り、各テーブルの `*InTx` を呼ぶ形にする（[channel.service.ts](src/components/Channel/channel.service.ts) の `Delete`、[message.service.ts](src/components/Message/message.service.ts) の `Delete`、[role.service.ts](src/components/Role/role.service.ts) の `Delete`）。
 - 行為者が絡む挿入は引数名を `requestSender` にする（`createdUserId` 等へ詰める）。
 
 ### 認証・権限
