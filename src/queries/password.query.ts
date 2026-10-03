@@ -17,18 +17,6 @@ export namespace QueryPassword {
       .where(eq(passwords.userId, query.userId));
   };
 
-  //ユーザーのパスワードとソルトを更新(管理者リセット用)
-  export const updatePasswordWithSalt = async (query: {
-    userId: string;
-    password: string;
-    salt: string;
-  }) => {
-    await db
-      .update(passwords)
-      .set({ password: query.password, salt: query.salt })
-      .where(eq(passwords.userId, query.userId));
-  };
-
   //トランザクション内でユーザーのパスワードとソルトを更新する
   export const updateInTx = (
     tx: Tx,

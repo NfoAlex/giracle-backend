@@ -21,16 +21,6 @@ export namespace QueryMessageReadTime {
     });
   };
 
-  //チャンネル・ユーザー単位の既読時間(更新時の比較用)
-  export const getSingle = (query: { channelId: string; userId: string }) => {
-    return db.query.messageReadTimes.findFirst({
-      where: and(
-        eq(messageReadTimes.channelId, query.channelId),
-        eq(messageReadTimes.userId, query.userId),
-      ),
-    });
-  };
-
   //既読時間を保存(存在すれば更新)
   export const upsert = async (query: {
     channelId: string;
