@@ -636,7 +636,7 @@ export namespace ServiceMessage {
     const mentionedUserIds =
       content.match(/@<([\w-]+)>/g)?.map((mention) => mention.slice(2, -1)) ||
       [];
-    const mentionedUserIdsMerged = [...new Set(mentionedUserIds)];
+    const mentionedUserIdsMerged = Array.from(new Set(mentionedUserIds));
 
     //チャンネル参加者限定
     const existingMentionedUsers =
@@ -652,8 +652,7 @@ export namespace ServiceMessage {
 
     //DBに保存するInbox用データを作成
     const savingInboxData = [];
-    for (const mentionedUserId of mentionedUserIdsMerged) {
-      if (!existingMentionedUserIds.has(mentionedUserId)) continue;
+    for (const mentionedUserId of Array.from(existingMentionedUserIds)) {
       savingInboxData.push({
         userId: mentionedUserId,
         messageId: sourceMessageId,
