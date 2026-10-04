@@ -1,6 +1,4 @@
-import { inArray } from "drizzle-orm";
-import { db } from "..";
-import { messageReactions } from "../db/schema";
+import { QueryMessageReaction } from "../queries/messageReaction.query";
 
 export type ReactionSummary = {
   emojiCode: string;
@@ -22,9 +20,8 @@ export async function CalculateReactionTotalBulk(
   if (messageIds.length === 0) return result;
 
   //対象メッセージの全リアクションを一括取得
-  const allReactions = await db.query.messageReactions.findMany({
-    where: inArray(messageReactions.messageId, messageIds),
-    orderBy: (t, { asc }) => asc(t.reactedAt),
+  const allReactions = await QueryMessageReaction.getByMessageIds({
+    messageIds,
   });
 
   //messageIdごと、emojiCodeごとにカウントと自分のリアクション有無をまとめる

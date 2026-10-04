@@ -165,7 +165,7 @@ export const notification = new Elysia({ prefix: "/notification" })
       );
       return {
         message: "Channel unmuted",
-        data: { channelId: result },
+        data: { channelId: result?.channelId ?? channelId },
       };
     },
     {

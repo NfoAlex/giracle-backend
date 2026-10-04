@@ -1,16 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
 import webpush from "web-push";
-import { ConstWebPush, db } from "..";
+import { ConstWebPush } from "..";
 import type {
   NotificationPlatform,
   PushPayload,
   WebPushKeys,
 } from "../components/Notification/types";
-import {
-  channelMutes,
-  notificationConfigs,
-  notificationDevices,
-} from "../db/schema";
+import { QueryNotification } from "../queries/notification.query";
 
 export type NotifyEventType = "mention" | "reply" | "message";
 
@@ -71,8 +66,8 @@ export default async function SendPushNotification(input: {
   const { userId, channelId, eventType, payload } = input;
 
   //ユーザー通知設定を確認
-  const config = await db.query.notificationConfigs.findFirst({
-    where: eq(notificationConfigs.userId, userId),
+  const config = QueryNotification.getSingle({
+    requestSender: userId,
   });
   const enabled = config?.enabled ?? true;
   const mode = config?.mode ?? "mention";
@@ -85,17 +80,15 @@ export default async function SendPushNotification(input: {
   }
 
   //チャンネルミュートを確認
-  const muted = await db.query.channelMutes.findFirst({
-    where: and(
-      eq(channelMutes.userId, userId),
-      eq(channelMutes.channelId, channelId),
-    ),
+  const muted = await QueryNotification.getMute({
+    requestSender: userId,
+    channelId,
   });
   if (muted !== undefined) return;
 
   //登録済み端末を取得
-  const devices = await db.query.notificationDevices.findMany({
-    where: eq(notificationDevices.userId, userId),
+  const devices = await QueryNotification.getDevicesByUser({
+    requestSender: userId,
   });
   if (devices.length === 0) return;
 
@@ -121,8 +114,6 @@ export default async function SendPushNotification(input: {
 
   //無効になったトークンをDBから削除
   if (invalidTokens.length > 0) {
-    await db
-      .delete(notificationDevices)
-      .where(inArray(notificationDevices.token, invalidTokens));
+    await QueryNotification.removeDevicesByTokens({ tokens: invalidTokens });
   }
 }

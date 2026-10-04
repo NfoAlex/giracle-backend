@@ -1,6 +1,5 @@
 import type { Server } from "bun";
-import { db } from "..";
-import { messages } from "../db/schema";
+import { QueryMessage } from "../queries/message.query";
 
 /**
  * システムメッセージを記録、送信する
@@ -22,15 +21,12 @@ export default async function SendSystemMessage(
       messageTerm: _messageTerm,
     };
     //DBに記録、JSONは文字列化して保存
-    const [msg] = await db
-      .insert(messages)
-      .values({
-        channelId: _channelId,
-        userId: "SYSTEM",
-        isSystemMessage: true,
-        content: JSON.stringify(contentJson),
-      })
-      .returning();
+    const msg = await QueryMessage.insertMessage({
+      channelId: _channelId,
+      userId: "SYSTEM",
+      content: JSON.stringify(contentJson),
+      isSystemMessage: true,
+    });
 
     //Serverインスタンスが渡されて有効ならWSで通知
     if (_server) {

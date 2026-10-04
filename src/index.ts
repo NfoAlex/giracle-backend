@@ -49,8 +49,8 @@ export const ConstWebPush = {
   getVapidPublicKey: VAPID_PUBLIC_KEY,
 };
 
-import { db } from "./db";
-import { serverConfigs } from "./db/schema";
+import type { serverConfigs } from "./db/schema";
+import { QueryServerConfig } from "./queries/serverConfig.query";
 //グローバルに使えるGiracleサーバーの設定
 //ServerConfigが引けないときはスキーマ既定値で埋める(未設定で招待制チェックや文字数上限が素通りするのを防ぐ)
 export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
@@ -65,7 +65,7 @@ export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
 };
 
 export async function reloadServerConfig() {
-  const [config] = await db.select().from(serverConfigs);
+  const config = await QueryServerConfig.getSingle();
   if (!config) {
     throw new Error("Server config not found");
   }

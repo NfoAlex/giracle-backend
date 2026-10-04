@@ -148,6 +148,30 @@ describe("/notification/device", () => {
     expect(j1.data.id).toBe(j2.data.id);
   });
 
+  it("register :: 他人の token は 403 (所有権を乗っ取らせない)", async () => {
+    const hijackToken = "hijack-target-token";
+    await FETCH({
+      path: "/notification/device/register",
+      method: "POST",
+      body: { token: hijackToken, platform: "android" },
+    });
+
+    const res = await FETCH({
+      path: "/notification/device/register",
+      method: "POST",
+      body: { token: hijackToken, platform: "android" },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(403);
+
+    // 所有者は TESTUSER のまま
+    const row = await db.query.notificationDevices.findFirst({
+      where: eq(notificationDevices.token, hijackToken),
+    });
+    expect(row?.userId).toBe("TESTUSER");
+  });
+
   it("unregister :: 他人の token は 403", async () => {
     const res = await FETCH({
       path: "/notification/device/unregister",
@@ -159,15 +183,14 @@ describe("/notification/device", () => {
     expect(res.status).toBe(403);
   });
 
-  it("unregister :: 存在しない token は null 返却で成功扱い", async () => {
+  it("unregister :: 存在しない token は 400", async () => {
     const res = await FETCH({
       path: "/notification/device/unregister",
       method: "POST",
       body: { token: "definitely-not-registered" },
     });
-    const j = await res.json();
-    expect(res.ok).toBe(true);
-    expect(j.data.token).toBeNull();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
   });
 
   it("unregister :: 自分の端末を解除", async () => {
@@ -206,6 +229,18 @@ describe("/notification/mute", () => {
     expect(res.ok).toBe(true);
     expect(j.data.channelId).toBe("TESTCHANNEL1");
     expect(j.data.userId).toBe("TESTUSER");
+  });
+
+  it("mute-channel :: 閲覧不可チャンネルは 404 (存在列挙防止)", async () => {
+    // TESTCHANNEL4 は CompletePrivate ロール限定で TESTUSER2 は閲覧不可
+    const res = await FETCH({
+      path: "/notification/mute-channel",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL4" },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
   });
 
   it("muted-channels :: 追加後リストに現れる", async () => {

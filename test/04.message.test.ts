@@ -8,7 +8,12 @@ import {
   channelJoins,
   inboxes,
   messageFileAttached,
+  messageReactions,
+  messages,
+  messageUrlPreviews,
   messageUrlPreviewThumbnails,
+  roleInfos,
+  roleLinks,
 } from "../src/db/schema";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
@@ -982,6 +987,131 @@ describe("/message/send", async () => {
     expect(res.ok).toBeFalse();
   });
 
+  it("正常 :: 返信先がチャンネル未参加なら返信通知を作成しない", async () => {
+    //返信先となるユーザー(TESTUSER2)をTESTCHANNEL1へ一時参加させてメッセージを投稿
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" });
+
+    let sentId: string | undefined;
+    let repliedId: string | undefined;
+    try {
+      const sent = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        useSecondaryUser: true,
+        body: { channelId: "TESTCHANNEL1", message: "unjoined target" },
+      });
+      expect(sent.ok).toBeTrue();
+      sentId = (await sent.json()).data.id;
+
+      //投稿後に返信先ユーザーをチャンネルから外す
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+
+      const replied = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "reply to unjoined",
+          replyingMessageId: sentId,
+        },
+      });
+      expect(replied.ok).toBeTrue();
+      const repliedIdValue: string = (await replied.json()).data.id;
+      repliedId = repliedIdValue;
+
+      //未参加のユーザーへ返信通知は作られない
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(
+            eq(inboxes.userId, "TESTUSER2"),
+            eq(inboxes.messageId, repliedIdValue),
+          ),
+        );
+      expect(rows.length).toBe(0);
+    } finally {
+      //後始末(通知→メッセージの順でFKを満たす)
+      if (repliedId)
+        await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
+      if (repliedId)
+        await db.delete(messages).where(eq(messages.id, repliedId));
+      if (sentId) await db.delete(messages).where(eq(messages.id, sentId));
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+    }
+  });
+
+  it("正常 :: 返信は返信先の送信者へ返信通知を作成する", async () => {
+    //返信者(TESTUSER2)はTESTCHANNEL1未参加のため一時的に参加させる
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" });
+
+    try {
+      //返信先となるメッセージを作成
+      const sent = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: { channelId: "TESTCHANNEL1", message: "reply target" },
+      });
+      const sentId = (await sent.json()).data.id;
+
+      //別ユーザーで返信
+      const replied = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        useSecondaryUser: true,
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "reply body",
+          replyingMessageId: sentId,
+        },
+      });
+      expect(replied.status).toBe(200);
+      const repliedId = (await replied.json()).data.id;
+
+      //返信先の送信者(TESTUSER)へtype=replyの通知が1件作られているはず
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(eq(inboxes.userId, "TESTUSER"), eq(inboxes.messageId, repliedId)),
+        );
+      expect(rows.length).toBe(1);
+      expect(rows[0].type).toBe("reply");
+
+      //後続テストへ影響しないよう後始末(通知→メッセージの順でFKを満たす)
+      await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
+      await db.delete(messages).where(eq(messages.id, repliedId));
+      await db.delete(messages).where(eq(messages.id, sentId));
+    } finally {
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+    }
+  });
+
   it("制限を超える長さのメッセージ", async () => {
     //一時的
     const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;
@@ -1076,6 +1206,32 @@ describe("/message/send", async () => {
       .from(inboxes)
       .where(eq(inboxes.userId, "TESTUSER2"));
     expect(secondaryInbox.length).toBe(0);
+  });
+
+  it("チャンネル未参加ユーザーはメンション通知対象から除外される", async () => {
+    //参加者(TESTUSER)と未参加者(TESTUSER2)の両方にメンションしたメッセージを保存
+    const saved = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "@<TESTUSER> @<TESTUSER2> hi",
+      })
+      .returning();
+    const messageSaved = saved[0];
+
+    try {
+      //通知対象(戻り値)は参加者のみで、未参加のTESTUSER2は含まれない
+      const targets = await ServiceMessage.addToInbox(
+        messageSaved.id,
+        messageSaved.content,
+        messageSaved.channelId,
+      );
+      expect(targets).toEqual(["TESTUSER"]);
+    } finally {
+      await db.delete(inboxes).where(eq(inboxes.messageId, messageSaved.id));
+      await db.delete(messages).where(eq(messages.id, messageSaved.id));
+    }
   });
 
   it("正常 :: URL含むメッセージ送信", async () => {
@@ -1509,5 +1665,180 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
+  });
+});
+
+describe("/message/delete", async () => {
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    const t = await res.text();
+    expect(t).toBe("Message not found");
+    expect(res.status).toBe(404);
+    expect(res.ok).toBeFalse();
+  });
+
+  it("正常 :: 自分のメッセージを削除", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "delete me",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message deleted");
+    expect(j.data).toBe(target.id);
+    expect(res.ok).toBeTrue();
+
+    const remain = await db.query.messages.findFirst({
+      where: eq(messages.id, target.id),
+    });
+    expect(remain).toBeUndefined();
+  });
+
+  it("他人のメッセージ(manageServer無し)は403", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER2",
+        content: "not yours",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    const t = await res.text();
+    expect(t).toBe("You are not owner of this message");
+    expect(res.status).toBe(403);
+    expect(res.ok).toBeFalse();
+
+    //削除されず残っている
+    const remain = await db.query.messages.findFirst({
+      where: eq(messages.id, target.id),
+    });
+    expect(remain).toBeDefined();
+  });
+
+  it("正常 :: manageServer持ちは他人のメッセージも削除できる", async () => {
+    //TESTUSER2にmanageServerロールを付与
+    await db.insert(roleInfos).values({
+      id: "TempManageServer",
+      name: "Temp Manage Server",
+      createdUserId: "SYSTEM",
+      manageServer: true,
+    });
+    await db
+      .insert(roleLinks)
+      .values({ userId: "TESTUSER2", roleId: "TempManageServer" });
+
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "deleted by admin",
+      })
+      .returning();
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message deleted");
+    expect(j.data).toBe(target.id);
+    expect(res.ok).toBeTrue();
+
+    //後始末
+    await db.delete(roleLinks).where(eq(roleLinks.roleId, "TempManageServer"));
+    await db.delete(roleInfos).where(eq(roleInfos.id, "TempManageServer"));
+  });
+
+  it("正常 :: 関連データ(inbox/リアクション/プレビュー/添付)も一緒に消える", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "cascade target",
+      })
+      .returning();
+
+    await db.insert(inboxes).values({
+      type: "mention",
+      messageId: target.id,
+      userId: "TESTUSER",
+    });
+    await db.insert(messageReactions).values({
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER2",
+      emojiCode: "robot",
+      messageId: target.id,
+    });
+    await db.insert(messageUrlPreviews).values({
+      url: "https://example.com/cascade",
+      type: "website",
+      title: "cascade",
+      messageId: target.id,
+    });
+    await db.insert(messageFileAttached).values({
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER",
+      actualFileName: "cascade.png",
+      savedFileName: "cascade.png",
+      size: 1,
+      type: "image/png",
+      messageId: target.id,
+    });
+
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/message/delete",
+      body: { messageId: target.id },
+    });
+    expect(res.ok).toBeTrue();
+
+    expect(
+      await db.query.messages.findFirst({
+        where: eq(messages.id, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.inboxes.findFirst({
+        where: eq(inboxes.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageReactions.findFirst({
+        where: eq(messageReactions.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageUrlPreviews.findFirst({
+        where: eq(messageUrlPreviews.messageId, target.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.messageFileAttached.findFirst({
+        where: eq(messageFileAttached.messageId, target.id),
+      }),
+    ).toBeUndefined();
   });
 });

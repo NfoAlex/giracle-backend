@@ -1,25 +1,22 @@
-import { and, eq } from "drizzle-orm";
 import { status } from "elysia";
-import { db } from "../..";
 import {
-  channelMutes,
-  channels,
-  notificationConfigs,
-  notificationDevices,
-} from "../../db/schema";
+  NOTIFICATION_MODES,
+  QueryNotification,
+  type TNotificationMode,
+} from "../../queries/notification.query";
+import { Util } from "../../Util";
 import type { WebPushKeys } from "./types";
 
-export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
-export type TNotificationMode = (typeof NOTIFICATION_MODES)[number];
+export type { TNotificationMode };
+//moduleが参照するためserviceから再exportする
+export { NOTIFICATION_MODES };
 
 const isValidMode = (v: string): v is TNotificationMode =>
   (NOTIFICATION_MODES as readonly string[]).includes(v);
 
 export namespace ServiceNotification {
   export const GetConfig = async (_userId: string) => {
-    const config = await db.query.notificationConfigs.findFirst({
-      where: eq(notificationConfigs.userId, _userId),
-    });
+    const config = QueryNotification.getSingle({ requestSender: _userId });
     return (
       config ?? {
         userId: _userId,
@@ -36,21 +33,11 @@ export namespace ServiceNotification {
     if (input.mode !== undefined && !isValidMode(input.mode)) {
       throw status(400, "Invalid mode");
     }
-    const [config] = await db
-      .insert(notificationConfigs)
-      .values({
-        userId: _userId,
-        enabled: input.enabled ?? true,
-        mode: (input.mode as TNotificationMode | undefined) ?? "mention",
-      })
-      .onConflictDoUpdate({
-        target: notificationConfigs.userId,
-        set: {
-          ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
-          ...(input.mode !== undefined ? { mode: input.mode } : {}),
-        },
-      })
-      .returning();
+    const config = await QueryNotification.updateConfig({
+      enabled: input.enabled,
+      mode: input.mode,
+      requestSender: _userId,
+    });
     return config;
   };
 
@@ -72,85 +59,72 @@ export namespace ServiceNotification {
     if (input.platform === "web" && !input.keys) {
       throw status(400, "Missing keys for web platform");
     }
-    const keysJson = input.keys ? JSON.stringify(input.keys) : null;
-    const [device] = await db
-      .insert(notificationDevices)
-      .values({
-        token: input.token,
-        platform: input.platform,
-        keys: keysJson,
-        deviceName: input.deviceName,
-        userId: input.userId,
-      })
-      .onConflictDoUpdate({
-        target: notificationDevices.token,
-        set: {
-          platform: input.platform,
-          keys: keysJson,
-          deviceName: input.deviceName,
-          userId: input.userId,
-          lastUsedAt: new Date(),
-        },
-      })
-      .returning();
-    return device;
+
+    // 既存トークンの所有者が別人なら拒否（upsert での userId 上書きで乗っ取られるのを防ぐ）
+    const device = await QueryNotification.getDevice({ token: input.token });
+    if (device !== undefined && device.userId !== input.userId) {
+      throw status(403, "Cannot register another user's device");
+    }
+
+    const deviceRegistered = await QueryNotification.insertDevice({
+      token: input.token,
+      platform: input.platform,
+      keys: input.keys,
+      deviceName: input.deviceName,
+      requestSender: input.userId,
+    });
+
+    return deviceRegistered;
   };
 
   export const UnregisterDevice = async (token: string, _userId: string) => {
-    const device = await db.query.notificationDevices.findFirst({
-      where: eq(notificationDevices.token, token),
+    const deviceDeleted = await QueryNotification.removeDevice({
+      token,
+      requestSender: _userId,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Device not found") {
+        throw status(400, "Device not found");
+      }
+      if (E.message === "Cannot unregister another user's device") {
+        throw status(403, "Cannot unregister another user's device");
+      }
+      throw e;
     });
-    if (device === undefined) return null;
-    if (device.userId !== _userId) {
-      throw status(403, "Cannot unregister another user's device");
-    }
-    await db
-      .delete(notificationDevices)
-      .where(eq(notificationDevices.token, token));
-    return token;
+
+    return deviceDeleted.token;
   };
 
   export const GetMutedChannels = async (_userId: string) => {
-    const rows = await db.query.channelMutes.findMany({
-      where: eq(channelMutes.userId, _userId),
-      columns: { channelId: true, mutedAt: true },
+    const channels = await QueryNotification.getMutedChannels({
+      requestSender: _userId,
     });
-    return rows;
+    return channels;
   };
 
   export const MuteChannel = async (channelId: string, _userId: string) => {
-    // チャンネル存在確認
-    const channel = await db.query.channels.findFirst({
-      where: eq(channels.id, channelId),
-    });
-    if (channel === undefined) throw status(404, "Channel not found");
+    // 閲覧不可チャンネルは存在しないものと同じ扱い（存在列挙を防ぐ）
+    const visible = await Util.checkChannelVisibility(channelId, _userId);
+    if (!visible) throw status(404, "Channel not found");
 
-    //既にミュート済みならそのまま返す(Prismaのupsert update:{}相当)
-    const existing = await db.query.channelMutes.findFirst({
-      where: and(
-        eq(channelMutes.userId, _userId),
-        eq(channelMutes.channelId, channelId),
-      ),
+    const channelMuted = await QueryNotification.insertMuteChannel({
+      channelId,
+      requestSender: _userId,
+    }).catch((e) => {
+      const E = e as Error;
+      if (E.message === "Channel not found") {
+        throw status(404, "Channel not found");
+      }
+      throw e;
     });
-    if (existing !== undefined) return existing;
-
-    const [muted] = await db
-      .insert(channelMutes)
-      .values({ userId: _userId, channelId })
-      .returning();
-    return muted;
+    return channelMuted;
   };
 
   export const UnmuteChannel = async (channelId: string, _userId: string) => {
-    await db
-      .delete(channelMutes)
-      .where(
-        and(
-          eq(channelMutes.userId, _userId),
-          eq(channelMutes.channelId, channelId),
-        ),
-      )
-      .catch(() => null);
-    return channelId;
+    const channelUnmuted = await QueryNotification.removeMutedChannel({
+      channelId,
+      requestSender: _userId,
+    });
+    return channelUnmuted;
   };
 }

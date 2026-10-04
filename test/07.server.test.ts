@@ -1,13 +1,14 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
-import { db } from "../src/db";
+import { db, sqlite } from "../src/db";
 import {
   channelJoinOnDefaults,
   invitations,
   roleInfos,
   roleLinks,
   serverConfigs,
+  users,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -74,6 +75,91 @@ describe("PUT /server/create-invite", () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("GET /server/get-invite", () => {
+  it("正常 :: 招待一覧を返す", async () => {
+    const res = await FETCH({ path: "/server/get-invite", method: "GET" });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Server invites fetched");
+    // シードのtestinviteに加え、create-inviteのテストで作った分も含む
+    expect(j.data.length).toBeGreaterThanOrEqual(1);
+    expect(
+      j.data.some((i: { inviteCode: string }) => i.inviteCode === "testinvite"),
+    ).toBeTrue();
+  });
+
+  it("権限無", async () => {
+    const res = await FETCH({
+      path: "/server/get-invite",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe("DELETE /server/delete-invite", () => {
+  it("正常 :: 指定した招待を削除", async () => {
+    const [invite] = await db
+      .insert(invitations)
+      .values({ inviteCode: "testinvite-delete", createdUserId: "TESTUSER" })
+      .returning();
+
+    const res = await FETCH({
+      path: "/server/delete-invite",
+      method: "DELETE",
+      body: { inviteId: invite.id },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe(invite.id);
+
+    const deleted = await db.query.invitations.findFirst({
+      where: eq(invitations.id, invite.id),
+    });
+    expect(deleted).toBeUndefined();
+  });
+
+  it("権限無", async () => {
+    const res = await FETCH({
+      path: "/server/delete-invite",
+      method: "DELETE",
+      body: { inviteId: 1 },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe("GET /server/config", () => {
+  it("isFirstUser :: ユーザーが1人だけならtrue", async () => {
+    // 他ユーザーの行だけを退避して1人にする(子テーブルを巻き込まないようFKを切る)
+    const others = await db
+      .select()
+      .from(users)
+      .where(ne(users.id, "TESTUSER"));
+    sqlite.run("PRAGMA foreign_keys = OFF;");
+    try {
+      await db.delete(users).where(ne(users.id, "TESTUSER"));
+
+      const res = await FETCH({ path: "/server/config", method: "GET" });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.isFirstUser).toBeTrue();
+    } finally {
+      if (others.length > 0) await db.insert(users).values(others);
+      sqlite.run("PRAGMA foreign_keys = ON;");
+    }
+  });
+
+  it("isFirstUser :: 複数ユーザーがいればfalse", async () => {
+    const res = await FETCH({ path: "/server/config", method: "GET" });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.isFirstUser).toBeFalse();
   });
 });
 

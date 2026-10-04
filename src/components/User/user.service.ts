@@ -1,18 +1,16 @@
 import crypto from "node:crypto";
 import { unlink } from "node:fs/promises";
-import { and, asc, eq, gt, inArray, lt, not, or, sql } from "drizzle-orm";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import {
-  channelJoins,
-  invitations,
-  passwords,
-  roleLinks,
-  tokens,
-  users,
-} from "../../db/schema";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
+import { QueryChannelJoin } from "../../queries/channelJoin.query";
+import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
+import { QueryInvite } from "../../queries/invite.query";
+import { QueryPassword } from "../../queries/password.query";
+import { QueryRoleLink } from "../../queries/roleLink.query";
+import { QueryToken } from "../../queries/token.query";
+import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
 export namespace ServiceUser {
@@ -21,16 +19,12 @@ export namespace ServiceUser {
     password: string,
     inviteCode?: string,
   ) => {
-    //初めてのユーザーかどうか
-    let flagFirstUser = false;
-    //ユーザー数を取得して最初ならtrue
-    const num = await db.$count(users);
-    if (num === 1) {
-      flagFirstUser = true;
-    }
+    //SYSTEMのみ存在する状態=最初のユーザー。最初のユーザーは招待条件を確認しない
+    const isFirstUser = (await QueryUser.countAll()) === 1;
+    const needsInvite =
+      !isFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly;
 
-    //最初のユーザーなら招待条件を確認しない
-    if (!flagFirstUser && GIRACLE_SERVER_CONFIG.RegisterInviteOnly) {
+    if (needsInvite) {
       if (inviteCode === undefined) {
         throw status(400, {
           message: "Invite code is invalid",
@@ -38,10 +32,7 @@ export namespace ServiceUser {
       }
 
       //招待コードが存在するか確認(上限判定はユーザー作成と同一トランザクション内で行う)
-      const Invite = await db.query.invitations.findFirst({
-        where: eq(invitations.inviteCode, inviteCode),
-        columns: { id: true },
-      });
+      const Invite = await QueryInvite.getSingle({ inviteCode });
 
       //招待コードが無効な場合
       if (Invite === undefined) {
@@ -51,9 +42,7 @@ export namespace ServiceUser {
       }
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.name, username),
-    });
+    const user = await QueryUser.getSingleWithMinimumByName({ name: username });
     if (user) {
       throw status(400, {
         message: "User already exists",
@@ -66,27 +55,8 @@ export namespace ServiceUser {
     //DBへユーザー情報を登録(ユーザー・パスワード・ロール付与)
     const result = db.transaction((tx) => {
       //招待コードの使用回数を条件付きで原子的に加算(-1は無限)。上限到達なら1件も更新されない
-      if (
-        !flagFirstUser &&
-        GIRACLE_SERVER_CONFIG.RegisterInviteOnly &&
-        inviteCode
-      ) {
-        const inviteUpdated = tx
-          .update(invitations)
-          .set({
-            usedCount: sql`${invitations.usedCount} + 1`,
-          })
-          .where(
-            and(
-              eq(invitations.inviteCode, inviteCode),
-              or(
-                eq(invitations.maxUsage, -1),
-                lt(invitations.usedCount, invitations.maxUsage),
-              ),
-            ),
-          )
-          .returning()
-          .get();
+      if (needsInvite && inviteCode) {
+        const inviteUpdated = QueryInvite.consumeInTx(tx, { inviteCode });
 
         //上限到達のためユーザーは作成しない(トランザクションごとロールバック)
         if (inviteUpdated === undefined) {
@@ -94,29 +64,21 @@ export namespace ServiceUser {
         }
       }
 
-      const newUser = tx
-        .insert(users)
-        .values({
-          name: username,
-          selfIntroduction: `こんにちは、${username}です。`,
-        })
-        .returning()
-        .get();
+      const newUser = QueryUser.insertInTx(tx, {
+        name: username,
+        selfIntroduction: `こんにちは、${username}です。`,
+      });
 
-      tx.insert(passwords)
-        .values({
-          userId: newUser.id,
-          password: passwordHashed,
-          salt: salt,
-        })
-        .run();
+      QueryPassword.insertInTx(tx, {
+        userId: newUser.id,
+        password: passwordHashed,
+        salt: salt,
+      });
 
-      tx.insert(roleLinks)
-        .values({
-          userId: newUser.id,
-          roleId: flagFirstUser ? "HOST" : "MEMBER",
-        })
-        .run();
+      QueryRoleLink.insertLinkInTx(tx, {
+        userId: newUser.id,
+        roleId: isFirstUser ? "HOST" : "MEMBER",
+      });
 
       return { success: true as const, newUser };
     });
@@ -130,30 +92,22 @@ export namespace ServiceUser {
     const createdUser = result.newUser;
 
     //デフォルトで参加するチャンネルに参加させる
-    const channelJoinOnDefault =
-      await db.query.channelJoinOnDefaults.findMany();
-    const joiningData: { userId: string; channelId: string }[] = [];
-    for (const channelIdJson of channelJoinOnDefault) {
-      joiningData.push({
-        userId: createdUser.id,
-        channelId: channelIdJson.channelId,
-      });
-    }
+    const channelJoinOnDefault = await QueryChannelJoinOnDefault.getList();
     //DBへ挿入
-    if (joiningData.length > 0) {
-      await db.insert(channelJoins).values(joiningData);
-    }
+    await QueryChannelJoin.insertMany({
+      items: channelJoinOnDefault.map((c) => ({
+        userId: createdUser.id,
+        channelId: c.channelId,
+      })),
+    });
 
     return { createdUser };
   };
 
   export const SignIn = async (username: string, password: string) => {
     //ユーザー情報取得
-    const user = await db.query.users.findFirst({
-      where: eq(users.name, username),
-      with: {
-        password: true,
-      },
+    const user = await QueryUser.getSingleByNameWithPassword({
+      name: username,
     });
 
     //ユーザーが存在しない場合
@@ -195,13 +149,10 @@ export namespace ServiceUser {
     }
 
     //トークンを生成
-    const [tokenGenerated] = await db
-      .insert(tokens)
-      .values({
-        token: crypto.randomBytes(16).toString("hex"),
-        userId: user.id,
-      })
-      .returning();
+    const tokenGenerated = await QueryToken.insertToken({
+      token: crypto.randomBytes(16).toString("hex"),
+      userId: user.id,
+    });
 
     return tokenGenerated;
   };
@@ -238,80 +189,20 @@ export namespace ServiceUser {
     }
     let cursorUser: { createdAt: Date; id: string } | undefined;
     if (cursorUserId) {
-      cursorUser = await db.query.users.findFirst({
-        columns: { createdAt: true, id: true },
-        where: eq(users.id, cursorUserId),
-      });
+      cursorUser = await QueryUser.getCursorUser({ userId: cursorUserId });
       if (cursorUser === undefined) {
         throw status(404, "Cursor user not found");
       }
     }
 
-    //検索条件を組み立て
-    const conditions = [];
-    if (username !== undefined) {
-      //ワイルドカード(%,_)を無効化してLIKE検索(前方一致)
-      const escapedQuery = Util.escapeLikePattern(username);
-      conditions.push(
-        sql`${users.name} LIKE ${`${escapedQuery}%`} ESCAPE '\\'`,
-      );
-    }
-    if (joinedChannel !== undefined) {
-      //指定チャンネルへ参加しているユーザーIdをサブクエリで絞る(空文字ならいずれかのチャンネルへ参加しているユーザー)
-      conditions.push(
-        inArray(
-          users.id,
-          db
-            .select({ userId: channelJoins.userId })
-            .from(channelJoins)
-            .where(
-              joinedChannel !== ""
-                ? eq(channelJoins.channelId, joinedChannel)
-                : undefined,
-            ),
-        ),
-      );
-    }
-
     const viewableChannels = await Util.getUserViewableChannel(_userId);
 
-    const usersFound = await db.query.users.findMany({
-      where: and(
-        not(eq(users.id, "SYSTEM")),
-        //削除済みユーザーは除外
-        eq(users.isDeleted, false),
-        // 日付とユーザーId基準で取得
-        cursorUser
-          ? or(
-              gt(users.createdAt, cursorUser.createdAt),
-              // 同じ秒で作成されたとき用考慮
-              and(
-                eq(users.createdAt, cursorUser.createdAt),
-                gt(users.id, cursorUser.id),
-              ),
-            )
-          : undefined,
-        // ユーザー名・参加チャンネルによる絞り込み
-        conditions.length > 0 ? and(...conditions) : undefined,
-      ),
-      orderBy: [asc(users.createdAt), asc(users.id)],
-      with: {
-        ChannelJoin: {
-          columns: {
-            channelId: true,
-          },
-          where: inArray(
-            channelJoins.channelId,
-            viewableChannels.map((vc) => vc.id),
-          ),
-        },
-        RoleLink: {
-          columns: {
-            roleId: true,
-          },
-        },
-      },
-      limit: length,
+    const usersFound = await QueryUser.getList({
+      viewableChannelIds: viewableChannels.map((vc) => vc.id),
+      length,
+      cursorUser,
+      username,
+      joinedChannel,
     });
 
     return usersFound;
@@ -446,12 +337,7 @@ export namespace ServiceUser {
     currentToken: string,
   ) => {
     //ユーザー情報取得
-    const userdata = await db.query.users.findFirst({
-      where: eq(users.id, _userId),
-      with: {
-        password: true,
-      },
-    });
+    const userdata = await QueryUser.getSingleWithPassword({ userId: _userId });
     //ユーザー情報、またはその中のパスワードが取得できない場合
     if (userdata === undefined || userdata.password === null) {
       throw status(500, "Internal Server Error");
@@ -470,22 +356,16 @@ export namespace ServiceUser {
     }
 
     //新しいパスワードをハッシュ化してDBに保存
-    await db
-      .update(passwords)
-      .set({
-        password: await Bun.password.hash(newPassword + userdata.password.salt),
-      })
-      .where(eq(passwords.userId, userdata.id));
+    await QueryPassword.updatePassword({
+      userId: userdata.id,
+      password: await Bun.password.hash(newPassword + userdata.password.salt),
+    });
 
     //パスワード変更時に他のセッションを無効化する(現在のセッションは維持)
-    await db
-      .delete(tokens)
-      .where(
-        and(
-          eq(tokens.userId, userdata.id),
-          not(eq(tokens.token, currentToken)),
-        ),
-      );
+    await QueryToken.removeByUserExceptToken({
+      userId: userdata.id,
+      exceptToken: currentToken,
+    });
 
     //トークンキャッシュを全件無効化(現在のセッション含めDB再検証させる)
     invalidateUserCache(userdata.id);
@@ -501,12 +381,13 @@ export namespace ServiceUser {
     const passwordHashed = await Bun.password.hash(newPassword + salt);
 
     db.transaction((tx) => {
-      tx.update(passwords)
-        .set({ password: passwordHashed, salt })
-        .where(eq(passwords.userId, targetUserId))
-        .run();
+      QueryPassword.updateInTx(tx, {
+        userId: targetUserId,
+        password: passwordHashed,
+        salt,
+      });
 
-      tx.delete(tokens).where(eq(tokens.userId, targetUserId)).run();
+      QueryToken.removeByUserInTx(tx, { userId: targetUserId });
     });
 
     // 5分トークンキャッシュに残った旧トークンを即時無効化
@@ -521,29 +402,18 @@ export namespace ServiceUser {
     selfIntroduction?: string,
   ) => {
     //ユーザー情報取得
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, _userId),
-    });
+    const user = await QueryUser.getSingle({ userId: _userId });
     //ユーザーが存在しない場合
     if (!user) {
       throw status(404, "User not found");
     }
 
-    // 更新データの準備
-    const updatingValue: { name?: string; selfIntroduction?: string } = {};
-    if (name !== undefined) {
-      updatingValue.name = name;
-    }
-    if (selfIntroduction !== undefined) {
-      updatingValue.selfIntroduction = selfIntroduction;
-    }
-
     //データ更新
-    const [userUpdated] = await db
-      .update(users)
-      .set(updatingValue)
-      .where(eq(users.id, user.id))
-      .returning();
+    const userUpdated = await QueryUser.updateProfile({
+      userId: user.id,
+      name,
+      selfIntroduction,
+    });
 
     return userUpdated;
   };
@@ -554,8 +424,8 @@ export namespace ServiceUser {
     cursor: number = 1,
   ) => {
     const skipAmount = (cursor - 1) * 30;
-    const sessions = await db.query.tokens.findMany({
-      where: eq(tokens.userId, userId),
+    const sessions = await QueryToken.getListByUser({
+      userId,
       limit: 30,
       offset: skipAmount,
     });
@@ -572,14 +442,13 @@ export namespace ServiceUser {
     sessionId: number,
     newName: string,
   ) => {
-    const [newSession] = await db
-      .update(tokens)
-      .set({ name: newName })
-      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, userId)))
-      .returning()
-      .catch(() => {
-        throw status(500, "Something went wrong");
-      });
+    const newSession = await QueryToken.updateName({
+      sessionId,
+      userId,
+      name: newName,
+    }).catch(() => {
+      throw status(500, "Something went wrong");
+    });
 
     //対象0件 = セッションが存在しないか自分のセッションではない
     if (newSession === undefined) {
@@ -594,20 +463,21 @@ export namespace ServiceUser {
     sessionId: number,
     activeToken: string,
   ) => {
-    const targetToken = await db.query.tokens.findFirst({
-      where: and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)),
+    const targetToken = await QueryToken.getSingleByIdAndUser({
+      sessionId,
+      userId: _userId,
     });
 
     if (targetToken === undefined) throw status(404, "Session not found");
     if (targetToken.token === activeToken)
       throw status(400, "You cannot delete your active session");
 
-    await db
-      .delete(tokens)
-      .where(and(eq(tokens.id, sessionId), eq(tokens.userId, _userId)))
-      .catch(() => {
-        throw status(500, "Something went wrong");
-      });
+    await QueryToken.removeByIdAndUser({
+      sessionId,
+      userId: _userId,
+    }).catch(() => {
+      throw status(500, "Something went wrong");
+    });
 
     //削除したセッションのトークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateTokenCache(targetToken.token);
@@ -617,7 +487,7 @@ export namespace ServiceUser {
 
   export const SignOut = async (token: string) => {
     //トークン削除
-    await db.delete(tokens).where(eq(tokens.token, token));
+    await QueryToken.removeByToken({ token });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateTokenCache(token);
@@ -629,24 +499,9 @@ export namespace ServiceUser {
     //リクエスト送信者の閲覧可能チャンネルから対象ユーザーの参加チャンネルをフィルターする
     const viewableChannels = await Util.getUserViewableChannel(sendersUserId);
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      with: {
-        ChannelJoin: {
-          columns: {
-            channelId: true,
-          },
-          where: inArray(
-            channelJoins.channelId,
-            viewableChannels.map((vc) => vc.id),
-          ),
-        },
-        RoleLink: {
-          columns: {
-            roleId: true,
-          },
-        },
-      },
+    const user = await QueryUser.getSingleWithChannelsAndRoles({
+      userId,
+      viewableChannelIds: viewableChannels.map((vc) => vc.id),
     });
     //ユーザーが存在しない場合
     if (!user) {
@@ -674,11 +529,7 @@ export namespace ServiceUser {
     }
 
     //BANする
-    const [userBanned] = await db
-      .update(users)
-      .set({ isBanned: true })
-      .where(eq(users.id, userId))
-      .returning();
+    const userBanned = await QueryUser.setBanned({ userId, isBanned: true });
 
     //トークンキャッシュを無効化(最大5分間BAN前の状態でアクセスできてしまうのを防ぐ)
     invalidateUserCache(userId);
@@ -699,10 +550,7 @@ export namespace ServiceUser {
       throw status(400, "You can't delete yourself");
     }
     //ユーザーが存在しない場合
-    const targetUser = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      columns: { id: true, isDeleted: true },
-    });
+    const targetUser = await QueryUser.getSingleWithMinimum({ userId });
     if (targetUser === undefined) {
       throw status(404, "User not found");
     }
@@ -719,16 +567,13 @@ export namespace ServiceUser {
     }
 
     //キャッシュ無効化用に既存トークン一覧を取得
-    const userTokens = await db
-      .select({ token: tokens.token })
-      .from(tokens)
-      .where(eq(tokens.userId, userId));
+    const userTokens = await QueryToken.getTokensByUser({ userId });
 
     //論理削除（メッセージ・絵文字・チャンネル等のデータは全て残る）
-    await db.update(users).set({ isDeleted: true }).where(eq(users.id, userId));
+    await QueryUser.setDeleted({ userId });
 
     //全セッションを無効化
-    await db.delete(tokens).where(eq(tokens.userId, userId));
+    await QueryToken.removeByUser({ userId });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateUserCache(userId);
@@ -756,11 +601,10 @@ export namespace ServiceUser {
     }
 
     //BANを解除
-    const [userUnbanned] = await db
-      .update(users)
-      .set({ isBanned: false })
-      .where(eq(users.id, userId))
-      .returning();
+    const userUnbanned = await QueryUser.setBanned({
+      userId,
+      isBanned: false,
+    });
 
     //BAN状態のキャッシュを無効化する
     invalidateUserCache(userId);

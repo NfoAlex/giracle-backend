@@ -1,6 +1,4 @@
-import { and, eq, lt, or } from "drizzle-orm";
-import { db } from "./db";
-import { messageUrlPreviewThumbnails } from "./db/schema";
+import { QueryMessageUrlPreviewThumbnail } from "./queries/messageUrlPreviewThumbnail.query";
 
 let isRunning = false;
 
@@ -16,17 +14,10 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
     const THUMBNAIL_DIR = "./STORAGE/thumbnail";
 
     for (let loop = 0; loop < MAX_LOOPS; loop++) {
-      const expiredRows = db
-        .select()
-        .from(messageUrlPreviewThumbnails)
-        .where(
-          lt(
-            messageUrlPreviewThumbnails.createdAt,
-            new Date(Date.now() - ONE_HOUR_MS),
-          ),
-        )
-        .limit(BATCH_SIZE)
-        .all();
+      const expiredRows = QueryMessageUrlPreviewThumbnail.getExpired({
+        before: new Date(Date.now() - ONE_HOUR_MS),
+        limit: BATCH_SIZE,
+      });
 
       if (expiredRows.length === 0) return true;
 
@@ -38,18 +29,9 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
       }
 
       // 選択後に再生成されてfileNameが変わっていた行は削除しない (孤児ファイル防止)
-      await db
-        .delete(messageUrlPreviewThumbnails)
-        .where(
-          or(
-            ...expiredRows.map((row) =>
-              and(
-                eq(messageUrlPreviewThumbnails.id, row.id),
-                eq(messageUrlPreviewThumbnails.fileName, row.fileName),
-              ),
-            ),
-          ),
-        );
+      await QueryMessageUrlPreviewThumbnail.removeByIdAndFileName({
+        rows: expiredRows,
+      });
     }
     return true;
   } finally {

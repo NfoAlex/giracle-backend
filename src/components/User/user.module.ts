@@ -1,6 +1,7 @@
 import Elysia, { file, status, t } from "elysia";
-import { db } from "../..";
 import { Middleware } from "../../Middlewares";
+import { QueryChannel } from "../../queries/channel.query";
+import { QueryServerConfig } from "../../queries/serverConfig.query";
 import { Util } from "../../Util";
 import { ServiceUser } from "./user.service";
 
@@ -15,12 +16,7 @@ export const user = new Elysia({ prefix: "/user" })
       );
 
       //新規登録を通知するチャンネルId
-      const serverConfigAnnounceChannelId =
-        await db.query.serverConfigs.findFirst({
-          columns: {
-            RegisterAnnounceChannelId: true,
-          },
-        });
+      const serverConfigAnnounceChannelId = await QueryServerConfig.getSingle();
       //登録通知用チャンネルIdが登録されているならそこへ通知、ないなら他を探して通知
       if (
         serverConfigAnnounceChannelId !== undefined &&
@@ -35,11 +31,7 @@ export const user = new Elysia({ prefix: "/user" })
       } else {
         //通知チャンネルが無いなら...
         //最初のチャンネルを探して通知
-        const firstChannel = await db.query.channels.findFirst({
-          columns: {
-            id: true,
-          },
-        });
+        const firstChannel = await QueryChannel.getFirstChannel();
         if (firstChannel) {
           Util.sendSystemMessage(
             firstChannel.id,

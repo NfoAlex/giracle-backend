@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
 import Elysia, { file, status, t } from "elysia";
-import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { channelJoins, inboxes, users } from "../../db/schema";
+import { GIRACLE_SERVER_CONFIG } from "../..";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceMessage } from "./message.service";
@@ -460,14 +458,20 @@ export const message = new Elysia({ prefix: "/message" })
       }
 
       //メッセージの保存処理
-      const { messageSaved, messageReplyingTo, mentionedUserIds } =
-        await ServiceMessage.Send(
-          channelId,
-          message,
-          fileIds,
-          replyingMessageId,
-          _userId,
-        );
+      const { messageSaved, messageReplyingTo } = await ServiceMessage.Send(
+        channelId,
+        message,
+        fileIds,
+        replyingMessageId,
+        _userId,
+      );
+
+      //メッセージ本文をもとに相手Inboxへ追加
+      const mentionedUserIds = await ServiceMessage.addToInbox(
+        messageSaved.id,
+        messageSaved.content,
+        messageSaved.channelId,
+      );
 
       //WSで通知
       server?.publish(
@@ -478,131 +482,15 @@ export const message = new Elysia({ prefix: "/message" })
         }),
       );
 
-      //プッシュ通知用のメタ情報 (送信者名 / 本文プレビュー)
-      const senderInfo = await db.query.users.findFirst({
-        where: eq(users.id, _userId),
-        columns: { name: true },
+      //メッセージ送信に伴う通知(メンション / 返信 / 全通知)
+      await Util.sendMessageNotifications({
+        channelId,
+        messageSaved,
+        mentionedUserIds,
+        messageReplyingTo,
+        senderId: _userId,
+        server,
       });
-      const senderName = senderInfo?.name ?? "誰か";
-      //通知内容
-      const bodyPreview =
-        messageSaved.content.length > 120
-          ? `${messageSaved.content.slice(0, 120)}…`
-          : messageSaved.content;
-      //メンションされたユーザーに通知
-      const mentionedSet = new Set(mentionedUserIds);
-      for (const mentionedUserId of mentionedSet) {
-        //メンションされたWSで通知
-        server?.publish(
-          `user::${mentionedUserId}`,
-          JSON.stringify({
-            signal: "inbox::Added",
-            data: {
-              message: messageSaved,
-              type: "mention",
-            },
-          }),
-        );
-
-        if (mentionedUserId !== _userId) {
-          Util.sendPushNotification({
-            userId: mentionedUserId,
-            channelId,
-            eventType: "mention",
-            payload: {
-              title: `${senderName} さんからのメンション`,
-              body: bodyPreview,
-              tag: `mention-${messageSaved.id}`,
-              data: {
-                type: "mention",
-                messageId: messageSaved.id,
-                channelId,
-              },
-            },
-          }).catch((e) => console.error("push mention error", e));
-        }
-      }
-
-      //返信用通知
-      {
-        //返信メッセージがあるなら返信先の送信者に通知(自分自身には通知しない)
-        const replyTargetUserId =
-          replyingMessageId &&
-          messageReplyingTo &&
-          messageReplyingTo.userId !== _userId
-            ? messageReplyingTo.userId
-            : null;
-
-        if (replyTargetUserId) {
-          //チャンネル参加していることを確認
-          const channelJoin = await db
-            .select({ userId: channelJoins.userId })
-            .from(channelJoins)
-            .where(eq(channelJoins.userId, replyTargetUserId));
-
-          if (channelJoin.length !== 0) {
-            await db.insert(inboxes).values({
-              userId: replyTargetUserId,
-              messageId: messageSaved.id,
-              type: "reply",
-            });
-            //WS通知
-            server?.publish(
-              `user::${replyTargetUserId}`,
-              JSON.stringify({
-                signal: "inbox::Added",
-                data: {
-                  message: messageSaved,
-                  type: "reply",
-                },
-              }),
-            );
-            //プッシュ通知
-            Util.sendPushNotification({
-              userId: replyTargetUserId,
-              channelId,
-              eventType: "reply",
-              payload: {
-                title: `${senderName} さんからの返信`,
-                body: bodyPreview,
-                tag: `reply-${messageSaved.id}`,
-                data: {
-                  type: "reply",
-                  messageId: messageSaved.id,
-                  channelId,
-                },
-              },
-            }).catch((e) => console.error("push reply error", e));
-          }
-        }
-
-        //「全通知」モードのユーザー向け: チャンネル参加者へ配信
-        //  除外対象: 送信者本人 / mention 済 / reply 対象 (二重通知防止)
-        const channelMembers = await db.query.channelJoins.findMany({
-          where: eq(channelJoins.channelId, channelId),
-          columns: { userId: true },
-        });
-        const excluded = new Set<string>([_userId, ...mentionedSet]);
-        if (replyTargetUserId) excluded.add(replyTargetUserId);
-        for (const { userId: memberId } of channelMembers) {
-          if (excluded.has(memberId)) continue;
-          Util.sendPushNotification({
-            userId: memberId,
-            channelId,
-            eventType: "message",
-            payload: {
-              title: `${senderName} さんからのメッセージ`,
-              body: bodyPreview,
-              tag: `message-${messageSaved.id}`,
-              data: {
-                type: "message",
-                messageId: messageSaved.id,
-                channelId,
-              },
-            },
-          }).catch((e) => console.error("push all-message error", e));
-        }
-      }
 
       return {
         message: "Message sent",

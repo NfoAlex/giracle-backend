@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
-import { db } from ".";
-import { tokens } from "./db/schema";
+import { QueryToken } from "./queries/token.query";
 import { Util } from "./Util";
 
 export const wsHandler = new Elysia().ws("/ws", {
@@ -33,30 +31,12 @@ export const wsHandler = new Elysia().ws("/ws", {
       return;
     }
 
-    const tokenWithUser = await db.query.tokens
-      .findFirst({
-        where: (tokens, { eq }) => eq(tokens.token, tokenFromCookie as string),
-        columns: { expiresAt: true },
-        with: {
-          user: {
-            with: {
-              ChannelJoin: {
-                columns: {
-                  channelId: true,
-                },
-              },
-            },
-            columns: {
-              id: true,
-              isBanned: true,
-            },
-          },
-        },
-      })
-      .catch((e) => {
-        console.error("ws :: open : e", { e });
-        throw new Error("ws :: 想定外のエラーが発生しました");
-      });
+    const tokenWithUser = await QueryToken.getSingleWithUserChannels({
+      token: tokenFromCookie as string,
+    }).catch((e) => {
+      console.error("ws :: open : e", { e });
+      throw new Error("ws :: 想定外のエラーが発生しました");
+    });
 
     if (!tokenWithUser?.user) {
       ws.send({
@@ -122,9 +102,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     //トークンが無い/引けないときは生WSの同一性からuserIdを引く
     const userToken =
       token !== undefined
-        ? await db.query.tokens.findFirst({
-            where: eq(tokens.token, token as string),
-          })
+        ? await QueryToken.getSingle({ token: token as string })
         : undefined;
 
     //このユーザーWSインスタンス削除
