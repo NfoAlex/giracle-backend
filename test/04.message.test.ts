@@ -1208,6 +1208,32 @@ describe("/message/send", async () => {
     expect(secondaryInbox.length).toBe(0);
   });
 
+  it("チャンネル未参加ユーザーはメンション通知対象から除外される", async () => {
+    //参加者(TESTUSER)と未参加者(TESTUSER2)の両方にメンションしたメッセージを保存
+    const saved = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "@<TESTUSER> @<TESTUSER2> hi",
+      })
+      .returning();
+    const messageSaved = saved[0];
+
+    try {
+      //通知対象(戻り値)は参加者のみで、未参加のTESTUSER2は含まれない
+      const targets = await ServiceMessage.addToInbox(
+        messageSaved.id,
+        messageSaved.content,
+        messageSaved.channelId,
+      );
+      expect(targets).toEqual(["TESTUSER"]);
+    } finally {
+      await db.delete(inboxes).where(eq(inboxes.messageId, messageSaved.id));
+      await db.delete(messages).where(eq(messages.id, messageSaved.id));
+    }
+  });
+
   it("正常 :: URL含むメッセージ送信", async () => {
     const res = await FETCH({
       path: "/message/send",

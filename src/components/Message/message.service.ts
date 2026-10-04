@@ -630,7 +630,7 @@ export namespace ServiceMessage {
   export const addToInbox = async (
     sourceMessageId: string,
     content: string,
-    channelId: string
+    channelId: string,
   ) => {
     //メッセージから "@<userId>" を検知
     const mentionedUserIds =
@@ -664,7 +664,8 @@ export namespace ServiceMessage {
       await QueryInbox.insertMany({ items: savingInboxData });
     }
 
-    return mentionedUserIdsMerged;
+    //通知側でも同じ集合を使うため、実際にInbox保存した(チャンネル参加者の)ユーザーIdのみ返す
+    return Array.from(existingMentionedUserIds);
   };
 
   export const Edit = async (
