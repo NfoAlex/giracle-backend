@@ -624,9 +624,17 @@ export namespace ServiceMessage {
       throw status(500, "Internal Server Error");
     }
 
+    return { messageSaved, messageReplyingTo };
+  };
+
+  export const addToInbox = async (
+    sourceMessageId: string,
+    content: string,
+    channelId: string
+  ) => {
     //メッセージから "@<userId>" を検知
     const mentionedUserIds =
-      message.match(/@<([\w-]+)>/g)?.map((mention) => mention.slice(2, -1)) ||
+      content.match(/@<([\w-]+)>/g)?.map((mention) => mention.slice(2, -1)) ||
       [];
     const mentionedUserIdsMerged = [...new Set(mentionedUserIds)];
 
@@ -648,7 +656,7 @@ export namespace ServiceMessage {
       if (!existingMentionedUserIds.has(mentionedUserId)) continue;
       savingInboxData.push({
         userId: mentionedUserId,
-        messageId: messageSaved.id,
+        messageId: sourceMessageId,
         type: "mention",
       });
     }
@@ -657,7 +665,7 @@ export namespace ServiceMessage {
       await QueryInbox.insertMany({ items: savingInboxData });
     }
 
-    return { messageSaved, messageReplyingTo, mentionedUserIds };
+    return mentionedUserIdsMerged;
   };
 
   export const Edit = async (

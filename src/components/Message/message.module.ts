@@ -461,7 +461,7 @@ export const message = new Elysia({ prefix: "/message" })
       }
 
       //メッセージの保存処理
-      const { messageSaved, messageReplyingTo, mentionedUserIds } =
+      const { messageSaved, messageReplyingTo } =
         await ServiceMessage.Send(
           channelId,
           message,
@@ -469,6 +469,13 @@ export const message = new Elysia({ prefix: "/message" })
           replyingMessageId,
           _userId,
         );
+
+      //メッセージ本文をもとに相手Inboxへ追加
+      const mentionedUserIds = await ServiceMessage.addToInbox(
+        messageSaved.id,
+        messageSaved.content,
+        messageSaved.channelId
+      );
 
       //WSで通知
       server?.publish(
