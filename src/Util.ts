@@ -10,6 +10,7 @@ import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileNa
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
+import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
 import { ValidateUrl } from "./Utils/ValidateUrl";
@@ -24,6 +25,7 @@ export namespace Util {
   export const escapeLikePattern = EscapeLikePattern;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
+  export const sendMessageNotifications = SendMessageNotifications;
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
   export const getUsersRoleLevel = GetUsersRoleLevel;
