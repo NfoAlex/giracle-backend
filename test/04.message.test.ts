@@ -1112,6 +1112,72 @@ describe("/message/send", async () => {
     }
   });
 
+  it("正常 :: メンション相手と返信先が同一ユーザーの場合は通知が1件だけ", async () => {
+    //返信者(TESTUSER2)はTESTCHANNEL1未参加のため一時的に参加させる
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" });
+
+    let sentId: string | undefined;
+    let repliedId: string | undefined;
+    try {
+      //返信先となるメッセージ(TESTUSER2が送信)
+      const sent = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        useSecondaryUser: true,
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "mention and reply target",
+        },
+      });
+      sentId = (await sent.json()).data.id;
+
+      //同一ユーザーへメンションしつつ返信する
+      //  InboxのPKは(messageId,userId)なのでmention行とreply行が衝突する
+      const replied = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "@<TESTUSER2> reply and mention",
+          replyingMessageId: sentId,
+        },
+      });
+      expect(replied.status).toBe(200);
+      const repliedIdValue: string = (await replied.json()).data.id;
+      repliedId = repliedIdValue;
+
+      //通知は1件。type=mentionが優先される
+      const rows = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(
+            eq(inboxes.userId, "TESTUSER2"),
+            eq(inboxes.messageId, repliedIdValue),
+          ),
+        );
+      expect(rows.length).toBe(1);
+      expect(rows[0].type).toBe("mention");
+    } finally {
+      //後始末(通知→メッセージの順でFKを満たす)
+      if (repliedId)
+        await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
+      if (repliedId)
+        await db.delete(messages).where(eq(messages.id, repliedId));
+      if (sentId) await db.delete(messages).where(eq(messages.id, sentId));
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+    }
+  });
+
   it("制限を超える長さのメッセージ", async () => {
     //一時的
     const backup = structuredClone(GIRACLE_SERVER_CONFIG).MessageMaxLength;

@@ -75,9 +75,11 @@ export default async function SendMessageNotifications(input: {
     }
   }
 
-  //返信メッセージがあるなら返信先の送信者に通知(自分自身には通知しない)
+  //返信先の送信者に通知(送信者本人・メンション済み除外: InboxのPKが(messageId,userId)のため重ねると一意制約で落ちる)
   const replyTargetUserId =
-    messageReplyingTo && messageReplyingTo.userId !== senderId
+    messageReplyingTo &&
+    messageReplyingTo.userId !== senderId &&
+    !mentionedSet.has(messageReplyingTo.userId)
       ? messageReplyingTo.userId
       : null;
 
