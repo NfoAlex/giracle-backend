@@ -313,9 +313,13 @@ export namespace Middleware {
             // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
             const fetchPromises = validUrls.map(async (url) => {
               // リダイレクト追従を無効化（外部URL→内部IPへのリダイレクトを防ぐ）
+              // SSRF対策: lookup差し替え済みAgentで検証済みIPにのみ接続
               const data = await ogs({
                 url,
-                fetchOptions: { redirect: "manual" },
+                fetchOptions: {
+                  redirect: "manual",
+                  dispatcher: Util.pinnedFetch.createPinnedDispatcher(),
+                } as import("undici").RequestInit,
               });
               if (data.error) {
                 throw new Error(`OGS Fetch Error for ${url}`);
