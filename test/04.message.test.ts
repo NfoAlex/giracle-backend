@@ -707,10 +707,16 @@ describe("/message/url-thumbnail", () => {
     // biome-ignore lint/suspicious/noExplicitAny: fetchスタブの引数検査用
     let fetchInit: any;
     const originalFetch = globalThis.fetch;
+    const originalLookup = Bun.dns.lookup;
+    Bun.dns.lookup = (async (hostname: string) =>
+      hostname === "example.com"
+        ? [{ address: "93.184.216.34", family: 4, ttl: 0 }] // 実通信なし (fetchスタブ済み)
+        : originalLookup(hostname)) as typeof Bun.dns.lookup;
     globalThis.fetch = (async (input: string | URL | Request, init?: any) => {
       fetched.push(input.toString());
       fetchInit = init;
-      if (input.toString() === testUrl) {
+      // fetchPinnedはIP直結URLに書き換えるためhost部分で判定する
+      if (input.toString().includes("93.184.216.34")) {
         return new Response(null, {
           status: 302,
           headers: { Location: evil },
@@ -727,6 +733,7 @@ describe("/message/url-thumbnail", () => {
       expect(fetchInit?.redirect).toBe("manual");
     } finally {
       globalThis.fetch = originalFetch;
+      Bun.dns.lookup = originalLookup;
     }
   });
 
