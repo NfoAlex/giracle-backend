@@ -305,12 +305,12 @@ describe("/message/file/upload", async () => {
       path: "/message/file/upload",
       method: "POST",
       body: {
-        file: undefined,
+        channelId: "TESTCHANNEL1",
       },
     });
     const t = await res.text();
-    expect(t).toContain("somethin went wrong :(");
-    expect(res.status).toBe(500);
+    expect(t).toBe("File is required");
+    expect(res.status).toBe(400);
     expect(res.ok).toBeFalse();
   });
 
@@ -1891,7 +1891,25 @@ describe("/message/edit", async () => {
         message: "",
       },
     });
-    expect(res.status).toBe(500);
+    const t = await res.text();
+    expect(t).toBe("Message is empty");
+    expect(res.status).toBe(400);
+    expect(res.ok).toBeFalse();
+  });
+
+  it("空白のみにしてみる", async () => {
+    const res = await FETCH({
+      path: "/message/edit",
+      method: "POST",
+      body: {
+        messageId: TEST__MESSAGE_ID,
+        channelId: "TESTCHANNEL1",
+        message: "   ",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("Message is empty");
+    expect(res.status).toBe(400);
     expect(res.ok).toBeFalse();
   });
 
