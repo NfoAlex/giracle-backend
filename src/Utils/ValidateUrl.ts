@@ -20,8 +20,8 @@ export namespace ValidateUrl {
     return blockedIpv4Pattern.test(v4) || blockedIpv6Pattern.test(lower);
   }
 
-  // リテラルIP (IPv4/IPv6) 判定
-  function isLiteralIp(hostname: string): boolean {
+  // リテラルIP (IPv4/IPv6) 判定。FetchSafeでも使うため公開
+  export function isLiteralIp(hostname: string): boolean {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
   }
 

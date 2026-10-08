@@ -5,16 +5,15 @@ import CalculateRoleLevel from "./Utils/CalculateRoleLevel";
 import CheckChannelVisibility from "./Utils/CheckChannelVisibility";
 import CompareRoleLevelToRole from "./Utils/CompareRoleLevelToRole";
 import EscapeLikePattern from "./Utils/EscapeLikePattern";
+import FetchSafe from "./Utils/FetchSafe";
 import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
-import { PinnedFetch } from "./Utils/PinnedFetch";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
-import { UndiciPinnedDispatcher } from "./Utils/UndiciPinnedDispatcher";
 import { ValidateUrl } from "./Utils/ValidateUrl";
 import { WSUserInstance } from "./Utils/WSUserInstance";
 
@@ -25,8 +24,7 @@ export namespace Util {
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
   export const escapeLikePattern = EscapeLikePattern;
-  export const pinnedFetch = PinnedFetch;
-  export const undiciPinnedDispatcher = UndiciPinnedDispatcher;
+  export const fetchSafe = FetchSafe;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendMessageNotifications = SendMessageNotifications;

@@ -263,13 +263,13 @@ export function mockFetchFor(
   status = 200,
 ) {
   // テスト用に example.com を解決する公開IP (ブロック対象外)
-  // fetchPinnedの公開IP検証を通す必要があるため公開IP形式。fetchはスタブ済みで実通信は発生しない
+  // FetchSafeの公開IP検証を通す必要があるため公開IP形式。fetchはスタブ済みで実通信は発生しない
   const MOCK_DNS_IP = "93.184.216.34";
   const originalFetch = globalThis.fetch;
   const originalLookup = Bun.dns.lookup;
   const target = new URL(testUrl);
 
-  // fetchPinned経由のURL書き換えを再現するため、DNS解決とpinned URLの両方をモックする
+  // FetchSafe経由のURL書き換えを再現するため、DNS解決とpinned URLの両方をモックする
   Bun.dns.lookup = (async (hostname: string) =>
     hostname === target.hostname
       ? [{ address: MOCK_DNS_IP, family: 4, ttl: 0 }]

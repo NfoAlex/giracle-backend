@@ -17,36 +17,71 @@ import {
 } from "../src/db/schema";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
-// open-graph-scraperをモック化（外部リクエスト不要）
-let lastOgsOptions:
-  | { url?: string; fetchOptions?: { redirect?: string } }
-  | undefined;
+// open-graph-scraperをモック化（外部リクエスト不要。FetchSafe取得のHTMLで分岐）
+// OGP用fetchスタブ（外部リクエスト不要）
+// FetchSafeはIP直結+Hostヘッダで取得するため、元URLを復元して突き合わせる
+// 未登録URLは空HTMLの200。Location付きが必要なテストはsafeFetchStubsに登録
+const safeFetchStubs = new Map<
+  string,
+  { status: number; location?: string; body?: string }
+>();
+// biome-ignore lint/suspicious/noExplicitAny: fetchスタブの引数検査用
+let lastSafeFetchInit: any;
+const __originalFetch = globalThis.fetch;
+const __originalLookup = Bun.dns.lookup;
+Bun.dns.lookup = (async (hostname: string) =>
+  hostname === "example.com" ||
+  hostname === "example.org" ||
+  hostname === "fxtwitter.com"
+    ? [{ address: "93.184.216.34", family: 4, ttl: 0 }] // 実通信なし (fetchスタブ済み)
+    : __originalLookup(hostname)) as typeof Bun.dns.lookup;
+globalThis.fetch = (async (input: string | URL | Request, init?: any) => {
+  lastSafeFetchInit = init;
+  const raw = input.toString();
+  // Hostヘッダから元URLを復元 (FetchSafeはIP直結で取得する)
+  let key = raw;
+  try {
+    const u = new URL(raw);
+    const hostHeader = new Headers(init?.headers).get("host");
+    if (hostHeader) {
+      key = `${u.protocol}//${hostHeader}${u.pathname}${u.search}`;
+    }
+  } catch {
+    // パース失敗時は生文字列で突き合わせる
+  }
+  const stub = safeFetchStubs.get(key) ?? safeFetchStubs.get(raw);
+  if (stub) {
+    return new Response(stub.body ?? null, {
+      status: stub.status,
+      headers: {
+        ...(stub.location ? { Location: stub.location } : {}),
+        "Content-Type": "text/html",
+      },
+    });
+  }
+  // FetchSafe経由以外は素通し (サムネイル用mockFetchFor等と共存)
+  if (!new Headers(init?.headers).get("host")) {
+    return __originalFetch(input as string);
+  }
+  return new Response("<html><head></head><body>stub</body></html>", {
+    status: 200,
+    headers: { "Content-Type": "text/html" },
+  });
+}) as typeof fetch;
+
 mock.module("open-graph-scraper", () => ({
-  default: async (options: {
-    url: string;
-    fetchOptions?: { redirect?: string };
-  }) => {
-    lastOgsOptions = options;
-    const { url } = options;
-    if (url === "http://1.2.3.4") {
+  default: async (options: { html?: string }) => {
+    const html = options.html ?? "";
+    if (html.includes("ogs-error-marker")) {
       return {
-        error: false,
-        result: {
-          requestUrl: url,
-          ogType: "website",
-          ogTitle: "You should not see this",
-          ogDescription: "Hidden Description",
-          favicon: "https://example.com/favicon.ico",
-          ogImage: [{ url: "https://example.com/image.png" }],
-          ogVideo: undefined,
-        },
+        error: true,
+        result: undefined,
       };
     }
-    if (url === "https://fxtwitter.com/TEST/status/00000000") {
+    if (html.includes("fxtwitter-marker")) {
       return {
         error: false,
         result: {
-          requestUrl: url,
           ogType: "website",
           ogTitle: "Test",
           ogDescription: "this is a tweet",
@@ -56,17 +91,10 @@ mock.module("open-graph-scraper", () => ({
         },
       };
     }
-    if (url === "https://example.com/ogs-error") {
-      return {
-        error: true,
-        result: undefined,
-      };
-    }
 
     return {
       error: false,
       result: {
-        requestUrl: url,
         ogType: "website",
         ogTitle: "Mock OG Title",
         ogDescription: "Mock OG Description",
@@ -615,8 +643,8 @@ describe("/message/url-thumbnail", () => {
       await cleanupThumbnail(normalUrl, normal);
       await cleanupThumbnail(faviconUrl, favicon);
     } finally {
-      restoreNormal();
       restoreFavicon();
+      restoreNormal();
     }
   });
 
@@ -695,8 +723,8 @@ describe("/message/url-thumbnail", () => {
       expect(res.status).toBe(400);
       expect(await res.text()).toBe("Failed to fetch thumbnail");
     } finally {
-      restoreHuge();
       restoreControl();
+      restoreHuge();
     }
   });
 
@@ -715,7 +743,7 @@ describe("/message/url-thumbnail", () => {
     globalThis.fetch = (async (input: string | URL | Request, init?: any) => {
       fetched.push(input.toString());
       fetchInit = init;
-      // fetchPinnedはIP直結URLに書き換えるためhost部分で判定する
+      // FetchSafeはIP直結URLに書き換えるためhost部分で判定する
       if (input.toString().includes("93.184.216.34")) {
         return new Response(null, {
           status: 302,
@@ -1426,24 +1454,33 @@ describe("/message/send", async () => {
   });
 
   it("ogsがエラーを返すURL含むメッセージ送信（プレビュー未挿入）", async () => {
-    const res = await FETCH({
-      path: "/message/send",
-      method: "POST",
-      body: {
-        channelId: "TESTCHANNEL1",
-        message: "Check this out https://example.com/ogs-error",
-      },
+    safeFetchStubs.set("https://example.com/ogs-error", {
+      status: 200,
+      body: "<html><head></head><body>ogs-error-marker</body></html>",
     });
-    const j = await res.json();
-    expect(j.message).toBe("Message sent");
-    await Bun.sleep(500);
 
-    const getRes = await FETCH({
-      path: `/message/${j.data.id}`,
-      method: "GET",
-    });
-    const getJ = await getRes.json();
-    expect(getJ.data.MessageUrlPreview.length).toBe(0);
+    try {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "Check this out https://example.com/ogs-error",
+        },
+      });
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getJ.data.MessageUrlPreview.length).toBe(0);
+    } finally {
+      safeFetchStubs.clear();
+    }
   });
 
   it("Twitter・IP・通常URL混在メッセージ送信（IPのみ除外・Twitterはfxtwitter変換）", async () => {
@@ -1520,7 +1557,141 @@ describe("/message/send", async () => {
 
     await Bun.sleep(500);
 
-    expect(lastOgsOptions?.fetchOptions?.redirect).toBe("manual");
+    expect(lastSafeFetchInit?.redirect).toBe("manual");
+  });
+
+  it("短縮URLは解決後の最終URLでプレビュー保存", async () => {
+    const nonce = crypto.randomUUID();
+    const shortUrl = `https://example.com/short-${nonce}`;
+    const finalUrl = `https://example.com/final-${nonce}`;
+    safeFetchStubs.set(shortUrl, { status: 302, location: finalUrl });
+
+    try {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: `Check this out ${shortUrl}`,
+        },
+      });
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getJ.data.MessageUrlPreview.length).toBe(1);
+      expect(getJ.data.MessageUrlPreview[0].url).toBe(finalUrl);
+      // 追跡側もmanual
+      expect(lastSafeFetchInit?.redirect).toBe("manual");
+    } finally {
+      safeFetchStubs.clear();
+    }
+  });
+
+  it("fxtwitter変換済みは追跡せずそのまま取得", async () => {
+    // fxtwitterは実在するとx.comへ302を返す。追跡除外の検証用に再現
+    const fxtwitterUrl = "https://fxtwitter.com/TEST/status/00000000";
+    // fxtwitterはOGP用HTMLを直接返す。追跡除外の検証用に200固定
+    safeFetchStubs.set(fxtwitterUrl, {
+      status: 200,
+      body: "<html><head></head><body>fxtwitter-marker</body></html>",
+    });
+
+    try {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: "Check this out https://twitter.com/TEST/status/00000000",
+        },
+      });
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getJ.data.MessageUrlPreview.length).toBe(1);
+      expect(getJ.data.MessageUrlPreview[0].url).toBe(fxtwitterUrl);
+    } finally {
+      safeFetchStubs.clear();
+    }
+  });
+
+  it("リダイレクト先が内部IPならスキップ", async () => {
+    const nonce = crypto.randomUUID();
+    const shortUrl = `https://example.com/evil-${nonce}`;
+    safeFetchStubs.set(shortUrl, {
+      status: 302,
+      location: "http://169.254.169.254/latest/meta-data/",
+    });
+
+    try {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: `Check this out ${shortUrl}`,
+        },
+      });
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getJ.data.MessageUrlPreview.length).toBe(0);
+    } finally {
+      safeFetchStubs.clear();
+    }
+  });
+
+  it("リダイレクト上限超過でスキップ", async () => {
+    const nonce = crypto.randomUUID();
+    const hops = [0, 1, 2, 3, 4].map(
+      (i) => `https://example.com/hop${i}-${nonce}`,
+    );
+    hops.forEach((hop, i) => {
+      if (i < hops.length - 1) {
+        safeFetchStubs.set(hop, { status: 302, location: hops[i + 1] });
+      }
+    });
+
+    try {
+      const res = await FETCH({
+        path: "/message/send",
+        method: "POST",
+        body: {
+          channelId: "TESTCHANNEL1",
+          message: `Check this out ${hops[0]}`,
+        },
+      });
+      const j = await res.json();
+      expect(j.message).toBe("Message sent");
+      await Bun.sleep(500);
+
+      const getRes = await FETCH({
+        path: `/message/${j.data.id}`,
+        method: "GET",
+      });
+      const getJ = await getRes.json();
+      expect(getJ.data.MessageUrlPreview.length).toBe(0);
+    } finally {
+      safeFetchStubs.clear();
+    }
   });
 });
 

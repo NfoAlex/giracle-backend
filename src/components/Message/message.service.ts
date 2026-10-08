@@ -277,31 +277,10 @@ export namespace ServiceMessage {
       return cachedFile;
     }
 
-    // リダイレクト先も検証しながら追跡 (自動追従は検証前の内部IPへ飛ぶためmanual)
-    const MAX_THUMBNAIL_REDIRECT = 3;
-    let url = targetUrl;
-    let response: Response | null = null;
-    for (let i = 0; i <= MAX_THUMBNAIL_REDIRECT; i++) {
-      // SSRF対策: 検証済みIPへ直接接続するfetchPinnedで取得
-      response = await Util.pinnedFetch.fetchPinned(url, {
-        signal: AbortSignal.timeout(5000),
-        redirect: "manual",
-      });
-      if (!response) return null;
-
-      // 304はリダイレクトではなく本体応答として扱う
-      if (![301, 302, 303, 307, 308].includes(response.status)) break;
-
-      const location = response.headers.get("location");
-      if (!location) return null;
-
-      try {
-        url = new URL(location, url).toString();
-      } catch {
-        return null;
-      }
-      if (i === MAX_THUMBNAIL_REDIRECT) return null;
-    }
+    // 安全fetchで取得 (検証・IP固定・各hop検証・timeout内蔵)
+    const fetched = await Util.fetchSafe(targetUrl);
+    if (!fetched) return null;
+    const response = fetched.response;
 
     if (!response?.ok) {
       return null;
