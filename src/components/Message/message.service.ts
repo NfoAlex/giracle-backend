@@ -520,11 +520,7 @@ export namespace ServiceMessage {
     _userId: string,
   ) => {
     //メッセージが空白か改行しか含まれていないならエラー(ファイル添付があるなら除外)
-    const spaceCount =
-      (message.match(/ /g) || "").length +
-      (message.match(/　/g) || "").length +
-      (message.match(/\n/g) || "").length;
-    if (spaceCount === message.length && fileIds.length === 0)
+    if (Util.isBlankString(message) && fileIds.length === 0)
       throw status(400, "Message is empty");
 
     //チャンネル参加情報を取得
@@ -647,6 +643,9 @@ export namespace ServiceMessage {
     message: string,
     _userId: string,
   ) => {
+    //空白のみは送信時と同じ基準で拒否する
+    if (Util.isBlankString(message)) throw status(400, "Message is empty");
+
     const messageEditing = await QueryMessage.getSingle({ messageId });
     //メッセージが無かった時エラー
     if (messageEditing === undefined) {

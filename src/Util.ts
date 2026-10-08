@@ -10,6 +10,7 @@ import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
+import IsBlankString from "./Utils/isBlankString";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
@@ -27,6 +28,7 @@ export namespace Util {
   export const fetchSafe = FetchSafe;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
+  export const isBlankString = IsBlankString;
   export const sendMessageNotifications = SendMessageNotifications;
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
