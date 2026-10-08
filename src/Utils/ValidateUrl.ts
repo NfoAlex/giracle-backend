@@ -11,7 +11,7 @@ export namespace ValidateUrl {
     /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/;
 
   // プレビュー取得禁止IP判定 (名前解決後アドレス用)
-  function isBlockedIp(ip: string): boolean {
+  export function isBlockedIp(ip: string): boolean {
     const lower = ip.toLowerCase();
 
     // IPv4-mapped IPv6は埋め込みIPv4部分で判定
@@ -20,8 +20,8 @@ export namespace ValidateUrl {
     return blockedIpv4Pattern.test(v4) || blockedIpv6Pattern.test(lower);
   }
 
-  // リテラルIP (IPv4/IPv6) 判定
-  function isLiteralIp(hostname: string): boolean {
+  // リテラルIP (IPv4/IPv6) 判定。FetchSafeでも使うため公開
+  export function isLiteralIp(hostname: string): boolean {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":");
   }
 

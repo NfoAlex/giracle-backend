@@ -277,36 +277,10 @@ export namespace ServiceMessage {
       return cachedFile;
     }
 
-    // 無効URL (内部IP・解決不能) は取得しない (SSRF対策)
-    if (!(await Util.validateUrl.isValid(targetUrl))) {
-      return null;
-    }
-
-    // リダイレクト先も検証しながら追跡 (自動追従は検証前の内部IPへ飛ぶためmanual)
-    const MAX_THUMBNAIL_REDIRECT = 3;
-    let url = targetUrl;
-    let response: Response | null = null;
-    for (let i = 0; i <= MAX_THUMBNAIL_REDIRECT; i++) {
-      response = await fetch(url, {
-        signal: AbortSignal.timeout(5000),
-        redirect: "manual",
-      }).catch(() => null);
-      if (!response) return null;
-
-      // 304はリダイレクトではなく本体応答として扱う
-      if (![301, 302, 303, 307, 308].includes(response.status)) break;
-
-      const location = response.headers.get("location");
-      if (!location) return null;
-
-      try {
-        url = new URL(location, url).toString();
-      } catch {
-        return null;
-      }
-      if (!(await Util.validateUrl.isValid(url))) return null;
-      if (i === MAX_THUMBNAIL_REDIRECT) return null;
-    }
+    // 安全fetchで取得 (検証・IP固定・各hop検証・timeout内蔵)
+    const fetched = await Util.fetchSafe(targetUrl);
+    if (!fetched) return null;
+    const response = fetched.response;
 
     if (!response?.ok) {
       return null;
@@ -546,11 +520,7 @@ export namespace ServiceMessage {
     _userId: string,
   ) => {
     //メッセージが空白か改行しか含まれていないならエラー(ファイル添付があるなら除外)
-    const spaceCount =
-      (message.match(/ /g) || "").length +
-      (message.match(/　/g) || "").length +
-      (message.match(/\n/g) || "").length;
-    if (spaceCount === message.length && fileIds.length === 0)
+    if (Util.isBlankString(message) && fileIds.length === 0)
       throw status(400, "Message is empty");
 
     //チャンネル参加情報を取得
@@ -673,6 +643,9 @@ export namespace ServiceMessage {
     message: string,
     _userId: string,
   ) => {
+    //空白のみは送信時と同じ基準で拒否する
+    if (Util.isBlankString(message)) throw status(400, "Message is empty");
+
     const messageEditing = await QueryMessage.getSingle({ messageId });
     //メッセージが無かった時エラー
     if (messageEditing === undefined) {

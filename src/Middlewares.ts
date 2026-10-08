@@ -280,6 +280,8 @@ export namespace Middleware {
             if (urlMatched.length === 0 && !messageData.isEdited) return;
 
             // Twitter/Xのリンクをfxtwitterに置換（URLオブジェクトを使って安全にパース）
+            // 変換済みURLは追跡除外用に記録 (追跡するとx.comに戻りOGPが取れない)
+            const convertedUrls = new Set<string>();
             urlMatched = urlMatched.map((urlStr) => {
               try {
                 const parsedUrl = new URL(urlStr);
@@ -291,7 +293,9 @@ export namespace Middleware {
 
                 if (isTwitterOrX && parsedUrl.pathname.includes("/status/")) {
                   parsedUrl.hostname = "fxtwitter.com";
-                  return parsedUrl.toString();
+                  const converted = parsedUrl.toString();
+                  convertedUrls.add(converted);
+                  return converted;
                 }
                 return urlStr;
               } catch {
@@ -302,25 +306,28 @@ export namespace Middleware {
             // 編集された時用に現在のURLプレビュー情報を削除
             await QueryMessageUrlPreview.removeByMessage({ messageId });
 
-            // URLリストから不正なもの（リテラルIP・内部ネットワーク）を除外
-            const validUrls: string[] = [];
-            for (const urlStr of urlMatched) {
-              if (await Util.validateUrl.isValid(urlStr)) {
-                validUrls.push(urlStr);
-              }
-            }
-
             // 並列でOGPデータを取得（Promise.allSettledで一部失敗しても他を活かす）
-            const fetchPromises = validUrls.map(async (url) => {
-              // リダイレクト追従を無効化（外部URL→内部IPへのリダイレクトを防ぐ）
-              const data = await ogs({
+            const fetchPromises = urlMatched.map(async (url) => {
+              // 安全fetchでHTML取得 (検証・IP固定・各hop検証・timeout内蔵)
+              // fxtwitter変換済みは追跡しない (追跡するとx.comに戻りOGPが取れない)
+              const fetched = await Util.fetchSafe(
                 url,
-                fetchOptions: { redirect: "manual" },
-              });
-              if (data.error) {
-                throw new Error(`OGS Fetch Error for ${url}`);
+                convertedUrls.has(url) ? { maxRedirects: 0 } : undefined,
+              );
+              if (!fetched) {
+                throw new Error(`Safe fetch failed for ${url}`);
               }
-              return data.result;
+
+              // 取得HTMLをオフライン解析 (ogs内蔵fetchは使わない)
+              const html = await fetched.response.text().catch(() => null);
+              if (html === null) {
+                throw new Error(`HTML read failed for ${url}`);
+              }
+              const data = await ogs({ html });
+              if (data.error) {
+                throw new Error(`OGS Parse Error for ${url}`);
+              }
+              return { result: data.result, finalUrl: fetched.finalUrl };
             });
 
             const results = await Promise.allSettled(fetchPromises);
@@ -336,9 +343,9 @@ export namespace Middleware {
                   result.status === "fulfilled",
               )
               .map((result) => {
-                const res = result.value;
+                const { result: res, finalUrl } = result.value;
                 return {
-                  url: res.requestUrl || "",
+                  url: finalUrl,
                   type: res.ogType || "UNKNOWN",
                   title: res.ogTitle || "",
                   description: res.ogDescription || "",

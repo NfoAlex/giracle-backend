@@ -146,7 +146,10 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/file/upload",
-    async ({ body: { channelId, file }, CheckToken: { _userId } }) => {
+    async ({ body: { channelId, file }, CheckToken: { _userId }, status }) => {
+      //ファイル無しはバリデーションエラー(500)にせず400で明示する
+      if (!file) throw status(400, "File is required");
+
       const fileId = await ServiceMessage.UploadFile(channelId, file, _userId);
 
       return {
@@ -159,7 +162,7 @@ export const message = new Elysia({ prefix: "/message" })
     {
       body: t.Object({
         channelId: t.String({ minLength: 1 }),
-        file: t.File(),
+        file: t.Optional(t.File()),
       }),
       detail: {
         description: "ファイルをアップロードします",
@@ -549,7 +552,8 @@ export const message = new Elysia({ prefix: "/message" })
     {
       body: t.Object({
         messageId: t.String({ minLength: 1 }),
-        message: t.String({ minLength: 1 }),
+        //空白チェックはService側で400にするためminLengthは付けない
+        message: t.String(),
       }),
       detail: {
         description: "メッセージを編集します",
