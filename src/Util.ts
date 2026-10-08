@@ -9,6 +9,7 @@ import GetSafeFileExtension from "./Utils/GetSafeFileExtension";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
+import { PinnedFetch } from "./Utils/PinnedFetch";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
@@ -23,6 +24,7 @@ export namespace Util {
   export const checkChannelVisibility = CheckChannelVisibility;
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
   export const escapeLikePattern = EscapeLikePattern;
+  export const pinnedFetch = PinnedFetch;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendMessageNotifications = SendMessageNotifications;

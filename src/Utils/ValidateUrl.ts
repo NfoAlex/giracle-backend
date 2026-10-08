@@ -11,7 +11,7 @@ export namespace ValidateUrl {
     /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/;
 
   // プレビュー取得禁止IP判定 (名前解決後アドレス用)
-  function isBlockedIp(ip: string): boolean {
+  export function isBlockedIp(ip: string): boolean {
     const lower = ip.toLowerCase();
 
     // IPv4-mapped IPv6は埋め込みIPv4部分で判定
