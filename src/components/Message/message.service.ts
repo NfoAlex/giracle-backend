@@ -277,20 +277,16 @@ export namespace ServiceMessage {
       return cachedFile;
     }
 
-    // 無効URL (内部IP・解決不能) は取得しない (SSRF対策)
-    if (!(await Util.validateUrl.isValid(targetUrl))) {
-      return null;
-    }
-
     // リダイレクト先も検証しながら追跡 (自動追従は検証前の内部IPへ飛ぶためmanual)
     const MAX_THUMBNAIL_REDIRECT = 3;
     let url = targetUrl;
     let response: Response | null = null;
     for (let i = 0; i <= MAX_THUMBNAIL_REDIRECT; i++) {
-      response = await fetch(url, {
+      // SSRF対策: 検証済みIPへ直接接続するfetchPinnedで取得
+      response = await Util.pinnedFetch.fetchPinned(url, {
         signal: AbortSignal.timeout(5000),
         redirect: "manual",
-      }).catch(() => null);
+      });
       if (!response) return null;
 
       // 304はリダイレクトではなく本体応答として扱う
@@ -304,7 +300,6 @@ export namespace ServiceMessage {
       } catch {
         return null;
       }
-      if (!(await Util.validateUrl.isValid(url))) return null;
       if (i === MAX_THUMBNAIL_REDIRECT) return null;
     }
 
