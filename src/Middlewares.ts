@@ -318,7 +318,7 @@ export namespace Middleware {
                 url,
                 fetchOptions: {
                   redirect: "manual",
-                  dispatcher: Util.pinnedFetch.createPinnedDispatcher(),
+                  dispatcher: Util.undiciPinnedDispatcher.create(),
                 } as import("undici").RequestInit,
               });
               if (data.error) {

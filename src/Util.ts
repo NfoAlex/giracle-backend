@@ -14,6 +14,7 @@ import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
+import { UndiciPinnedDispatcher } from "./Utils/UndiciPinnedDispatcher";
 import { ValidateUrl } from "./Utils/ValidateUrl";
 import { WSUserInstance } from "./Utils/WSUserInstance";
 
@@ -25,6 +26,7 @@ export namespace Util {
   export const compareRoleLevelToRole = CompareRoleLevelToRole;
   export const escapeLikePattern = EscapeLikePattern;
   export const pinnedFetch = PinnedFetch;
+  export const undiciPinnedDispatcher = UndiciPinnedDispatcher;
   export const validateUrl = ValidateUrl;
   export const getUserViewableChannel = GetUserViewableChannel;
   export const sendMessageNotifications = SendMessageNotifications;
