@@ -7,7 +7,7 @@ const MAX_REDIRECT = 3;
 // 単一hopの取得制限 (OWASP: 短いtimeout)
 const TIMEOUT_MS = 5000;
 
-export type SafeFetchResult = { response: Response; finalUrl: string };
+export type TSafeFetchResult = { response: Response; finalUrl: string };
 
 /**
  * OWASP準拠で取得する。失敗・検証NGはnull (理由の区別はしない)
@@ -17,7 +17,7 @@ export type SafeFetchResult = { response: Response; finalUrl: string };
 export default async function FetchSafe(
   urlStr: string,
   opts?: { maxRedirects?: number },
-): Promise<SafeFetchResult | null> {
+): Promise<TSafeFetchResult | null> {
   const maxRedirects = opts?.maxRedirects ?? MAX_REDIRECT;
   let current = urlStr.normalize("NFC");
 
@@ -38,22 +38,9 @@ export default async function FetchSafe(
 
     const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
 
-    // リテラルIPは一律除外
-    if (ValidateUrl.isLiteralIp(hostname)) return null;
-
-    // 全IPが公開IPのときだけ先頭IPへ直接接続 (DNS rebinding対策)
-    let addresses: { address: string; family: number }[];
-    try {
-      addresses = await Bun.dns.lookup(hostname);
-    } catch {
-      return null;
-    }
-    if (
-      addresses.length === 0 ||
-      addresses.some((a) => ValidateUrl.isBlockedIp(a.address))
-    ) {
-      return null;
-    }
+    // リテラルIP除外 + 全IPが公開IPかの検証 (DNS rebinding対策)。NGはnull
+    const addresses = await ValidateUrl.resolvePublicHost(hostname);
+    if (!addresses) return null;
 
     // 証明書検証はservername側で元ホスト名に対して行われる
     // currentは上記で検証済み。fetch先は検証済みIPに固定したpinnedのみ
