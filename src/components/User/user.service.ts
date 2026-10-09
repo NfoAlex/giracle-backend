@@ -13,6 +13,9 @@ import { QueryToken } from "../../queries/token.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
+//userIdにパス要素(/ \ ..)が混入していないか検証するための許可パターン(パストラバーサル対策)
+const PATH_SAFE_ID = /^[a-zA-Z0-9_-]+$/;
+
 export namespace ServiceUser {
   export const SignUp = async (
     username: string,
@@ -208,6 +211,8 @@ export namespace ServiceUser {
     return usersFound;
   };
   export const GetUserIcon = async (userId: string) => {
+    //userIdにパス要素が混入していないか検証(パストラバーサル対策)。不正なら未設定扱い
+    if (!PATH_SAFE_ID.test(userId)) return null;
     //アイコン読み取り、存在確認して返す
     const iconFilePng = Bun.file(`./STORAGE/icon/${userId}.png`);
     if (await iconFilePng.exists()) {
@@ -230,6 +235,8 @@ export namespace ServiceUser {
   };
 
   export const GetUserBanner = async (userId: string) => {
+    //userIdにパス要素が混入していないか検証(パストラバーサル対策)。不正なら未設定扱い
+    if (!PATH_SAFE_ID.test(userId)) return null;
     //アイコン読み取り、存在確認して返す
     const bannerFilePng = Bun.file(`./STORAGE/banner/${userId}.png`);
     if (await bannerFilePng.exists()) {

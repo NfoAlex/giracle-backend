@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { unlink } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 import { app, db } from "../src";
 import {
@@ -527,6 +528,35 @@ describe("/user/icon & /user/banner", () => {
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("User banner not found");
+  });
+
+  it("userIdにパストラバーサル :: STORAGE外のファイルを返さない", async () => {
+    const probePath = "./STORAGE/traversal_probe.png";
+    await Bun.write(probePath, "TRAVERSAL_PROBE_MARKER");
+    try {
+      const iconRes = await FETCH({
+        path: "/user/icon/..%2Ftraversal_probe",
+        method: "GET",
+      });
+      const iconText = await iconRes.text();
+      expect(iconText).not.toContain("TRAVERSAL_PROBE_MARKER");
+
+      const bannerRes = await FETCH({
+        path: "/user/banner/..%2Ftraversal_probe",
+        method: "GET",
+      });
+      const bannerText = await bannerRes.text();
+      expect(bannerText).not.toContain("TRAVERSAL_PROBE_MARKER");
+
+      //Windowsのバックスラッシュ区切りも拒否される
+      const backslashRes = await FETCH({
+        path: "/user/icon/..%5Ctraversal_probe",
+        method: "GET",
+      });
+      expect(await backslashRes.text()).not.toContain("TRAVERSAL_PROBE_MARKER");
+    } finally {
+      await unlink(probePath);
+    }
   });
 });
 
