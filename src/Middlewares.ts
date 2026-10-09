@@ -91,6 +91,9 @@ export namespace Middleware {
         if (cachedToken.isBanned) {
           return status(401, "User is banned");
         }
+        //期限延長の再発行時も属性を維持(XSS・CSRF対策)
+        token.httpOnly = true;
+        token.sameSite = "lax";
         //キャッシュの寿命を延長
         token.expires = new Date(now + ONE_MINUITE * 60 * 24 * 15);
 
@@ -129,7 +132,9 @@ export namespace Middleware {
         return status(401, "User is banned");
       }
 
-      //トークンの期限を延長
+      //トークンの期限を延長(再発行時も属性を維持)
+      token.httpOnly = true;
+      token.sameSite = "lax";
       token.expires = new Date(now + 1000 * 60 * 60 * 24 * 15); //15日間有効
 
       return { CheckToken: { _userId: tokenData.userId } };
