@@ -394,6 +394,16 @@ export namespace Middleware {
         CheckToken?: { _userId: string };
       };
 
+      //set.statusは string | number | undefined なので数値に揃える
+      const responseStatus =
+        typeof set.status === "number"
+          ? set.status
+          : set.status
+            ? Number(set.status)
+            : 200;
+
+      //レート制限で弾いたリクエストは記録しない(拒否1回ごとにDB書き込みさせない)
+      if (responseStatus === 429) return;
       if (request.method === "OPTIONS") return;
 
       let path: string;
@@ -408,12 +418,7 @@ export namespace Middleware {
           userId: CheckToken?._userId ?? null,
           method: request.method,
           path,
-          status:
-            typeof set.status === "number"
-              ? set.status
-              : set.status
-                ? Number(set.status)
-                : 200,
+          status: responseStatus,
         });
       } catch (e) {
         console.error("Middlewares :: RequestLogger : dbの記録に失敗", {
