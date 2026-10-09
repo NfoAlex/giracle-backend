@@ -10,14 +10,34 @@ export namespace ValidateUrl {
   const blockedIpv6Pattern =
     /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/;
 
+  // IPv4埋め込みIPv6 (::ffff:127.0.0.1 / ::ffff:7f00:1 / 完全展開形) の埋め込みIPv4を
+  // dotted-quadへ変換する。埋め込み形でなければnull
+  function readV4fromV6(lower: string): string | null {
+    const m = lower.match(
+      /^(?:(?:0{1,4}:){5}|::)(?:ffff:)?((?:\d{1,3}\.){3}\d{1,3}|[0-9a-f]{1,4}(?::[0-9a-f]{1,4})?)$/,
+    );
+    if (!m) return null;
+
+    // 既にdotted-quadならそのまま
+    if (m[1].includes(".")) return m[1];
+
+    // hex形 (7f00:1) は32bitへ詰める
+    const [hi, lo] = m[1].split(":");
+    const n = ((parseInt(hi, 16) << 16) | (lo ? parseInt(lo, 16) : 0)) >>> 0;
+
+    // 32bitへ詰めたhexをネットワークバイト順 (上位バイトから) に分解する。
+    // こうして作ったdotted-quadを既存のblockedIpv4Patternへそのまま渡せる
+    return [n >>> 24, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff].join(".");
+  }
+
   // プレビュー取得禁止IP判定 (名前解決後アドレス用)
   export function isBlockedIp(ip: string): boolean {
     const lower = ip.toLowerCase();
 
-    // IPv4-mapped IPv6は埋め込みIPv4部分で判定
-    const v4 = lower.replace(/^::ffff:/, "");
+    // IPv4-mapped IPv6は表記形 (dotted/hex/完全展開) に依らず埋め込みIPv4で判定
+    const target = readV4fromV6(lower) ?? lower;
 
-    return blockedIpv4Pattern.test(v4) || blockedIpv6Pattern.test(lower);
+    return blockedIpv4Pattern.test(target) || blockedIpv6Pattern.test(lower);
   }
 
   // リテラルIP (IPv4/IPv6) 判定。FetchSafeでも使うため公開
