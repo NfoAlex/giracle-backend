@@ -38,22 +38,9 @@ export default async function FetchSafe(
 
     const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
 
-    // リテラルIPは一律除外
-    if (ValidateUrl.isLiteralIp(hostname)) return null;
-
-    // 全IPが公開IPのときだけ先頭IPへ直接接続 (DNS rebinding対策)
-    let addresses: { address: string; family: number }[];
-    try {
-      addresses = await ValidateUrl.resolveHost(hostname);
-    } catch {
-      return null;
-    }
-    if (
-      addresses.length === 0 ||
-      addresses.some((a) => ValidateUrl.isBlockedIp(a.address))
-    ) {
-      return null;
-    }
+    // リテラルIP除外 + 全IPが公開IPかの検証 (DNS rebinding対策)。NGはnull
+    const addresses = await ValidateUrl.resolvePublicHost(hostname);
+    if (!addresses) return null;
 
     // 証明書検証はservername側で元ホスト名に対して行われる
     // currentは上記で検証済み。fetch先は検証済みIPに固定したpinnedのみ
