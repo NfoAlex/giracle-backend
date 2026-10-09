@@ -142,7 +142,6 @@ export namespace Middleware {
 
   export const CheckRoleTerm = new Elysia({ name: "checkRoleTerm" })
     .use(Middleware.CheckToken)
-    //.macro(({ onBeforeHandle }) => ({
     .macro({
       checkRoleTerm(roleTerm: string) {
         return {
