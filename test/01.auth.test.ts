@@ -218,6 +218,24 @@ describe("/user", () => {
     expect(j.data.userId).toBe("TESTUSER");
   });
 
+  it("/verify-token :: Set-CookieにHttpOnlyとSameSiteが付く", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/user/verify-token", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "token=TESTUSERTOKEN",
+        },
+      }),
+    );
+    expect(response.ok).toBe(true);
+    //期限延長で再発行されるCookieにも属性が必要
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie.toLowerCase()).toContain("httponly");
+    expect(setCookie.toLowerCase()).toContain("samesite=lax");
+  });
+
   it("/verify-token :: 期限切れトークンは無効", async () => {
     const response = await app.handle(
       new Request("http://localhost/user/verify-token", {
