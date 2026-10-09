@@ -7,7 +7,7 @@ const MAX_REDIRECT = 3;
 // 単一hopの取得制限 (OWASP: 短いtimeout)
 const TIMEOUT_MS = 5000;
 
-export type SafeFetchResult = { response: Response; finalUrl: string };
+export type TSafeFetchResult = { response: Response; finalUrl: string };
 
 /**
  * OWASP準拠で取得する。失敗・検証NGはnull (理由の区別はしない)
@@ -17,7 +17,7 @@ export type SafeFetchResult = { response: Response; finalUrl: string };
 export default async function FetchSafe(
   urlStr: string,
   opts?: { maxRedirects?: number },
-): Promise<SafeFetchResult | null> {
+): Promise<TSafeFetchResult | null> {
   const maxRedirects = opts?.maxRedirects ?? MAX_REDIRECT;
   let current = urlStr.normalize("NFC");
 
