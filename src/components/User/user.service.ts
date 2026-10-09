@@ -208,6 +208,8 @@ export namespace ServiceUser {
     return usersFound;
   };
   export const GetUserIcon = async (userId: string) => {
+    //不正なuserIdは未設定扱い(パストラバーサル対策)
+    if (!Util.isSafePathId(userId)) return null;
     //アイコン読み取り、存在確認して返す
     const iconFilePng = Bun.file(`./STORAGE/icon/${userId}.png`);
     if (await iconFilePng.exists()) {
@@ -230,6 +232,8 @@ export namespace ServiceUser {
   };
 
   export const GetUserBanner = async (userId: string) => {
+    //不正なuserIdは未設定扱い(パストラバーサル対策)
+    if (!Util.isSafePathId(userId)) return null;
     //アイコン読み取り、存在確認して返す
     const bannerFilePng = Bun.file(`./STORAGE/banner/${userId}.png`);
     if (await bannerFilePng.exists()) {

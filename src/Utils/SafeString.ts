@@ -1,3 +1,6 @@
+// 安全な文字列の許容判定をまとめる。
+// ファイル保存拡張子(MIME→拡張子)とパス要素ID(パストラバーサル対策)の2用途。
+
 // アップロードを許可する安全なファイル種別(Content-Type → 保存拡張子)。
 // ブラウザがアクティブコンテンツとして解釈し得る型(text/html / svg / xml / javascript 等)は含めない。
 // 画像以外のXSSは配信時の Content-Disposition: attachment + X-Content-Type-Options: nosniff で防ぐ。
@@ -43,9 +46,23 @@ const SAFE_FILE_EXTENSIONS = new Map<string, string>([
   ["video/x-matroska", "mkv"],
 ]);
 
-// 許可済みのContent-Typeなら保存用の安全な拡張子を返し、許可外なら undefined を返す
-export default function GetSafeFileExtension(
-  mimeType: string,
-): string | undefined {
+/**
+ * 許可済みのContent-Typeなら保存用の安全な拡張子を返し、許可外なら undefined を返す
+ * @param mimeType 正規化済みMIMEタイプ(小文字・パラメータ除去済み)
+ */
+export function GetSafeFileExtension(mimeType: string): string | undefined {
   return SAFE_FILE_EXTENSIONS.get(mimeType);
+}
+
+// パス要素として安全なIDのみ許可する。`/` `\` `.` を含まないため、
+// ファイルパスへの埋め込みによるディレクトリ脱出(パストラバーサル)を防ぐ。
+// 許可: 英数字・`_`・`-`(UUID / SYSTEM / TESTUSER 等)
+const PATH_SAFE_ID = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * パス要素に混入し得る文字(`/` `\` `.` `%` 等)を弾く(パストラバーサル対策)
+ * @param value パスへ埋め込む前の文字列(チャンネルId・ユーザーId等)
+ */
+export function IsSafePathId(value: string): boolean {
+  return PATH_SAFE_ID.test(value);
 }

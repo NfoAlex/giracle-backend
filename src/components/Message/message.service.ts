@@ -155,7 +155,7 @@ export namespace ServiceMessage {
     _userId: string,
   ) => {
     //channelIdにパス要素が混入していないか検証(パストラバーサル対策)。DB参照より先に、無効入力でDBを叩かない
-    if (!/^[a-zA-Z0-9_-]+$/.test(channelId)) {
+    if (!Util.isSafePathId(channelId)) {
       throw status(400, "Invalid channelId");
     }
 
