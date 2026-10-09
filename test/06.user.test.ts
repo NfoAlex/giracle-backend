@@ -539,6 +539,7 @@ describe("/user/icon & /user/banner", () => {
         method: "GET",
       });
       const iconText = await iconRes.text();
+      expect(iconRes.status).toBe(200);
       expect(iconText).not.toContain("TRAVERSAL_PROBE_MARKER");
 
       const bannerRes = await FETCH({
@@ -546,6 +547,7 @@ describe("/user/icon & /user/banner", () => {
         method: "GET",
       });
       const bannerText = await bannerRes.text();
+      expect(bannerRes.status).toBe(404);
       expect(bannerText).not.toContain("TRAVERSAL_PROBE_MARKER");
 
       //Windowsのバックスラッシュ区切りも拒否される
@@ -555,7 +557,7 @@ describe("/user/icon & /user/banner", () => {
       });
       expect(await backslashRes.text()).not.toContain("TRAVERSAL_PROBE_MARKER");
     } finally {
-      await unlink(probePath);
+      await unlink(probePath).catch(() => {});
     }
   });
 });
