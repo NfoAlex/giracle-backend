@@ -33,6 +33,33 @@ describe("ValidateUrl/isBlockedIp", () => {
   });
 });
 
+//DNS解決がハングしても取得が無制限に待たないことの検証
+describe("ValidateUrl/resolveHost", () => {
+  test("応答が無いホストはtimeoutMsで打ち切る", async () => {
+    const original = Bun.dns.lookup;
+    //応答しないDNSを再現
+    Bun.dns.lookup = (() => new Promise(() => {})) as typeof Bun.dns.lookup;
+    try {
+      await expect(ValidateUrl.resolveHost("example.com", 50)).rejects.toThrow(
+        "dns timeout",
+      );
+    } finally {
+      Bun.dns.lookup = original;
+    }
+  });
+
+  test("解決結果はそのまま返る", async () => {
+    const original = Bun.dns.lookup;
+    const resolved = [{ address: "93.184.216.34", family: 4, ttl: 0 }];
+    Bun.dns.lookup = (async () => resolved) as typeof Bun.dns.lookup;
+    try {
+      expect(await ValidateUrl.resolveHost("example.com")).toEqual(resolved);
+    } finally {
+      Bun.dns.lookup = original;
+    }
+  });
+});
+
 //IPアドレス直指定の入力は取得前に弾く（DNS解決へ進まないため実通信は発生しない）
 describe("FetchSafe/入力検証", () => {
   test("リテラルIP・非http(s)・不正表記はnullで拒否する", async () => {

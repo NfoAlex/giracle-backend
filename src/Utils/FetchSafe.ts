@@ -44,7 +44,7 @@ export default async function FetchSafe(
     // 全IPが公開IPのときだけ先頭IPへ直接接続 (DNS rebinding対策)
     let addresses: { address: string; family: number }[];
     try {
-      addresses = await Bun.dns.lookup(hostname);
+      addresses = await ValidateUrl.resolveHost(hostname);
     } catch {
       return null;
     }

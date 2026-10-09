@@ -10,6 +10,31 @@ export namespace ValidateUrl {
   const blockedIpv6Pattern =
     /^(::1$|::$|64:ff9b:|100::|2001:db8:|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:|ff[0-9a-f]*:)/;
 
+  // DNS解決の上限。c-ares/getaddrinfoの既定待ち時間に依存させない (OWASP: 短いtimeout)
+  const DNS_TIMEOUT_MS = 3000;
+
+  /**
+   * ホスト名を名前解決する。timeoutMs超過でreject
+   * @param hostname 解決対象ホスト名
+   * @param timeoutMs 打ち切りまでの時間
+   */
+  export async function resolveHost(
+    hostname: string,
+    timeoutMs = DNS_TIMEOUT_MS,
+  ): Promise<{ address: string; family: number }[]> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("dns timeout")), timeoutMs);
+    });
+
+    try {
+      // Bun.dns.lookupはsignal非対応のためraceで打ち切る
+      return await Promise.race([Bun.dns.lookup(hostname), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // IPv4埋め込みIPv6 (::ffff:127.0.0.1 / ::ffff:7f00:1 / 完全展開形) の埋め込みIPv4を
   // dotted-quadへ変換する。埋め込み形でなければnull
   function readV4fromV6(lower: string): string | null {
@@ -64,7 +89,7 @@ export namespace ValidateUrl {
       if (isLiteralIp(hostname)) return false;
 
       // 名前解決し、全アドレス公開IP確認
-      const addresses = await Bun.dns.lookup(hostname);
+      const addresses = await resolveHost(hostname);
       if (
         addresses.length === 0 ||
         addresses.some((addr) => isBlockedIp(addr.address))
