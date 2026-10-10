@@ -21,6 +21,7 @@ export const users = sqliteTable(
     name: text("name").unique(),
     selfIntroduction: text("selfIntroduction").notNull(),
     isBanned: integer("isBanned", { mode: "boolean" }).notNull().default(false),
+    isBot: integer("isBot", { mode: "boolean" }).notNull().default(false),
     isDeleted: integer("isDeleted", { mode: "boolean" })
       .notNull()
       .default(false),
@@ -504,6 +505,9 @@ export const serverConfigs = sqliteTable("ServerConfig", {
     .default(""),
   MessageMaxLength: integer("MessageMaxLength").notNull().default(3000),
   MessageMaxFileSize: integer("MessageMaxFileSize").notNull().default(512000),
+  BotEnabled: integer("BotEnabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 export const requestLog = sqliteTable(
@@ -538,6 +542,27 @@ export const requestLog = sqliteTable(
   ],
 );
 
+export const botManages = sqliteTable(
+  "BotManage",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    remoteUserId: text("remoteUserId")
+      .references(() => users.id),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    createdBy: text("createdBy")
+      .references(() => users.id),
+    isApproved: integer("isApproved", { mode: "boolean" }).default(false)
+  },
+  (table) => [
+    index("BotManage_createBy_idx").on(table.createdBy),
+    index("BotManage_remoteUserId_idx").on(table.remoteUserId)
+  ]
+);
+
 // ============================================================
 // リレーション定義
 // プロパティ名は schema.prisma のリレーションフィールド名と完全一致させる
@@ -567,6 +592,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   RoleInfo: many(roleInfos),
   RoleLink: many(roleLinks),
   Token: many(tokens),
+  botManages: many(botManages)
 }));
 
 export const roleInfosRelations = relations(roleInfos, ({ one, many }) => ({
