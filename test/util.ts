@@ -76,6 +76,7 @@ export async function INIT() {
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
     { id: "ADMINUSER", name: "adminuser", selfIntroduction: "" },
+    { id: "BOTUSER", name: "botuser", selfIntroduction: "" }
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
@@ -225,6 +226,12 @@ export async function INIT() {
   await db
     .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
+    .onConflictDoNothing();
+
+  // --- 05.bot: Bot管理情報を作成 ---
+  await db
+    .insert(botManages)
+    .values({ id: "BOTMANAGE", remoteUserId: "BOTUSER", tokenCode: "BOTMANAGETOKEN", createdBy: "TESTUSER" })
     .onConflictDoNothing();
 }
 
