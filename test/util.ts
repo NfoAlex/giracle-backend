@@ -75,6 +75,7 @@ export async function INIT() {
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
+    { id: "ADMINUSER", name: "adminuser", selfIntroduction: "" },
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
@@ -86,6 +87,7 @@ export async function INIT() {
       token: "TESTUSER2TOKEN_EXPIRED",
       expiresAt: new Date(Date.now() - 60 * 1000),
     },
+    { userId: "ADMINUSER", token: "ADMINUSERTOKEN" },
   ]);
   await db
     .insert(invitations)
@@ -178,6 +180,7 @@ export async function INIT() {
   await db
     .insert(channelViewableRoles)
     .values({ channelId: "TESTCHANNEL4", roleId: "CompletePrivate" });
+  await db.insert(roleLinks).values({ userId: "ADMINUSER", roleId: "HOST" });
 
   // --- 03.role: ロール管理権限付与 ---
   await db.insert(roleInfos).values({
@@ -230,6 +233,7 @@ export async function FETCH({
   method,
   body,
   useSecondaryUser = false,
+  useAdminUser = false,
   excludeCredential = false,
 }: {
   path: `/${string}`;
@@ -237,9 +241,14 @@ export async function FETCH({
   // biome-ignore lint/suspicious/noExplicitAny: for test
   body?: any;
   useSecondaryUser?: boolean;
+  useAdminUser?: boolean; // `useSecondaryUser`を上書きします
   excludeCredential?: boolean;
 }): Promise<Response> {
-  const tokenUsing = useSecondaryUser ? "TESTUSER2TOKEN" : "TESTUSERTOKEN";
+  const tokenUsing = useAdminUser
+    ? "ADMINUSERTOKEN"
+    : useSecondaryUser
+      ? "TESTUSER2TOKEN"
+      : "TESTUSERTOKEN";
   const isFormData = body instanceof FormData;
 
   return await app.handle(
