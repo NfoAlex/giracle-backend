@@ -19,6 +19,11 @@ export namespace ServiceUser {
     password: string,
     inviteCode?: string,
   ) => {
+    if (!GIRACLE_SERVER_CONFIG.RegisterAvailable)
+      throw status(400, {
+        message: "User registration is disabled",
+      });
+
     //SYSTEMのみ存在する状態=最初のユーザー。最初のユーザーは招待条件を確認しない
     const isFirstUser = (await QueryUser.countAll()) === 1;
     const needsInvite =
