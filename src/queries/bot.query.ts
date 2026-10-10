@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, gt, or } from "drizzle-orm";
 import { db } from "..";
 import { botManages, users } from "../db/schema";
 
@@ -81,5 +81,39 @@ export namespace QueryBot {
       .where(eq(botManages.tokenCode, query.tokenCode));
 
     return bot[0] !== undefined ? bot[0] : undefined;
+  };
+
+  //カーソル解決用(開始位置のソートキーのみ)
+  export const getCursorBot = (query: { botId: string }) => {
+    return db.query.botManages.findFirst({
+      columns: { createdAt: true, id: true },
+      where: eq(botManages.id, query.botId),
+    });
+  };
+
+  //ユーザーが作成したBot一覧(作成順。cursorBotで継続取得)
+  export const getList = async (query: {
+    createdBy: string;
+    length: number;
+    cursorBot?: { createdAt: Date; id: string } | undefined;
+  }) => {
+    return await db.query.botManages.findMany({
+      where: and(
+        eq(botManages.createdBy, query.createdBy),
+        //作成日時とBotId基準で取得(cursorBotIdだけで継続取得できる形に解決して渡す)
+        query.cursorBot
+          ? or(
+              gt(botManages.createdAt, query.cursorBot.createdAt),
+              //同一ミリ秒で作成されたとき用考慮
+              and(
+                eq(botManages.createdAt, query.cursorBot.createdAt),
+                gt(botManages.id, query.cursorBot.id),
+              ),
+            )
+          : undefined,
+      ),
+      orderBy: [asc(botManages.createdAt), asc(botManages.id)],
+      limit: query.length,
+    });
   };
 }

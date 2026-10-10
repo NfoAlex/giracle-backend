@@ -35,4 +35,26 @@ export const bot = new Elysia({ prefix: "/bot" })
         botId: t.String(),
       }),
     },
+  )
+  .get(
+    "/list",
+    async ({ query: { length, cursorBotId }, CheckToken: { _userId } }) => {
+      const list = await ServiceBot.GetList(_userId, length, cursorBotId);
+
+      return {
+        message: "Bot list fetched",
+        data: list,
+      };
+    },
+    {
+      query: t.Object({
+        length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
+        cursorBotId: t.Optional(t.String({ minLength: 1 })),
+      }),
+      detail: {
+        description:
+          "自分が作成したBotの一覧を作成順で取得します。cursorBotIdで継続取得できます",
+        tags: ["Bot"],
+      },
+    },
   );

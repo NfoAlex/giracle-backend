@@ -51,4 +51,25 @@ export namespace ServiceBot {
 
     return botData;
   };
+
+  export const GetList = async (
+    _userId: string,
+    length: number,
+    cursorBotId?: string,
+  ) => {
+    //cursorBotIdは外部にidのみ公開し、ソートキー(createdAt,id)への解決はここで行う
+    let cursorBot: { createdAt: Date; id: string } | undefined;
+    if (cursorBotId !== undefined) {
+      cursorBot = await QueryBot.getCursorBot({ botId: cursorBotId });
+      if (cursorBot === undefined) {
+        throw status(404, "Cursor bot not found");
+      }
+    }
+
+    return await QueryBot.getList({
+      createdBy: _userId,
+      length,
+      cursorBot,
+    });
+  };
 }

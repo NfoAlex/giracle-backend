@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it } from "bun:test";
-import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { eq, like } from "drizzle-orm";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { botManages, users } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
@@ -172,6 +172,119 @@ describe("POST /server/bot/set-approve", async () => {
       method: "POST",
       body: { botId: "BotTestApproved2", isApproved: true },
       useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /bot/list", () => {
+  //同一ミリ秒の複数件(タイブレーク必須)と別時刻の件を混在させる。取得順はid順とも挿入順とも限らない
+  const SAME_MS = new Date("2026-01-01T00:00:00.000Z");
+  const LATER = new Date("2026-01-02T00:00:00.000Z");
+  //期待順: createdAt昇順 → 同一createdAtはid昇順(挿入順 C,A,B,D とは異なる)
+  const EXPECTED = ["BOTLIST_A", "BOTLIST_B", "BOTLIST_C", "BOTLIST_D"];
+
+  beforeAll(async () => {
+    await db.insert(botManages).values([
+      {
+        id: "BOTLIST_C",
+        remoteUserId: "BOTUSER",
+        createdBy: "TESTUSER",
+        createdAt: SAME_MS,
+        tokenCode: "tokBotlistC",
+      },
+      {
+        id: "BOTLIST_A",
+        remoteUserId: "BOTUSER",
+        createdBy: "TESTUSER",
+        createdAt: SAME_MS,
+        tokenCode: "tokBotlistA",
+      },
+      {
+        id: "BOTLIST_B",
+        remoteUserId: "BOTUSER",
+        createdBy: "TESTUSER",
+        createdAt: SAME_MS,
+        tokenCode: "tokBotlistB",
+      },
+      {
+        id: "BOTLIST_D",
+        remoteUserId: "BOTUSER",
+        createdBy: "TESTUSER",
+        createdAt: LATER,
+        tokenCode: "tokBotlistD",
+      },
+      //別ユーザー作成分は混ざらないことの確認用
+      {
+        id: "BOTLIST_X",
+        remoteUserId: "BOTUSER",
+        createdBy: "TESTUSER2",
+        createdAt: SAME_MS,
+        tokenCode: "tokBotlistX",
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    //INITが用意したBOTMANAGE等を消さないよう、このテストで作ったidだけを削除する
+    await db.delete(botManages).where(like(botManages.id, "BOTLIST\\_%"));
+  });
+
+  it("正常 :: 作成順に全件取得できる(cursorBotIdで継続取得)", async () => {
+    const got: string[] = [];
+    let cursorBotId: string | undefined;
+    //cursorBotIdだけを渡して継続取得する(初回は未指定)
+    for (let page = 0; page < 5; page++) {
+      const path =
+        `/bot/list?length=2${cursorBotId ? `&cursorBotId=${cursorBotId}` : ""}` as const;
+      const res = await FETCH({ path, method: "GET" });
+      expect(res.ok).toBe(true);
+      const j = await res.json();
+      if (j.data.length === 0) break;
+      got.push(...j.data.map((b: { id: string }) => b.id));
+      cursorBotId = j.data[j.data.length - 1].id;
+    }
+
+    //INITのBOTMANAGEや同ファイル前半で作成したBotも同じ作成者のため、このテストの分だけ抜き出して順序を見る
+    expect(got.filter((id) => id.startsWith("BOTLIST_"))).toEqual(EXPECTED);
+    //他ユーザー作成分は含まれない
+    expect(got).not.toContain("BOTLIST_X");
+  });
+
+  it("正常 :: 初回はlimit件のみ返る", async () => {
+    const res = await FETCH({ path: "/bot/list?length=2", method: "GET" });
+    const j = await res.json();
+    expect(j.data.map((b: { id: string }) => b.id)).toEqual([
+      "BOTLIST_A",
+      "BOTLIST_B",
+    ]);
+  });
+
+  it("正常 :: 別ユーザーからは自分の作成分だけ返る", async () => {
+    const res = await FETCH({
+      path: "/bot/list?length=50",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    const j = await res.json();
+    expect(j.data.map((b: { id: string }) => b.id)).toEqual(["BOTLIST_X"]);
+  });
+
+  it("異常 :: 存在しないcursorBotIdは404", async () => {
+    const res = await FETCH({
+      path: "/bot/list?cursorBotId=NOT_EXISTING_BOT",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Cursor bot not found");
+  });
+
+  it("異常 :: 未認証", async () => {
+    const res = await FETCH({
+      path: "/bot/list",
+      method: "GET",
+      excludeCredential: true,
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
