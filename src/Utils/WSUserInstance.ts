@@ -119,14 +119,15 @@ export namespace WSUserInstance {
    * @param userId
    * @param wsChannel
    */
-  export function subscribe(userId: string, wsChannel: `${string}::${string}`) {
+  export function subscribe(userId: string, wsChannel: `${string}::${string}`, isBot: boolean = false) {
     const currentInstance = instances.get(userId);
     //存在しない場合スルー
     if (!currentInstance) {
       return;
     }
     for (const ws of currentInstance) {
-      ws.subscribe(wsChannel);
+      const targetChannel = isBot ? `bot::${wsChannel}` : wsChannel;
+      ws.subscribe(targetChannel);
     }
   }
 

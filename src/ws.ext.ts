@@ -89,10 +89,10 @@ export const extWs = new Elysia().ws("/ws", {
 
     ws.subscribe(`user::${botData.remoteUserId}`);
 
-    //Botユーザーのチャンネルへサブスク
+    //Botユーザーの閲覧可能チャンネルへサブスク
     const channelsViewable = await GetUserViewableChannel(botData.createdBy);
     for (const channel of channelsViewable) {
-      ws.subscribe(`channel::${channel.id}`);
+      ws.subscribe(`bot::channel::${channel.id}`);
     }
 
     //BotとしてユーザーWSインスタンス保存
