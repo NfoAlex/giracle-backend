@@ -8,7 +8,7 @@
  * WSインスタンスの最小インターフェース。
  * 実体はElysiaのElysiaWSだが、テストのダミーインスタンスも受け付けるため構造的に定義する。
  */
-type WSInstance = {
+type TWebSocketInstance = {
   send: (data: string) => unknown;
   close: () => unknown;
   subscribe: (topic: string) => unknown;
@@ -19,14 +19,14 @@ type WSInstance = {
 
 export namespace WSUserInstance {
   /** UserId -> 接続中のWSインスタンス群(複数端末の同時接続を許容する) */
-  export const instances = new Map<string, WSInstance[]>();
+  export const instances = new Map<string, TWebSocketInstance[]>();
 
   /**
    * WSインスタンスマップにユーザーのインスタンスを新しく追加
    * @param userId
    * @param ws
    */
-  export function add(userId: string, ws: WSInstance) {
+  export function add(userId: string, ws: TWebSocketInstance) {
     const currentInstance = instances.get(userId);
     //存在しない場合普通にset、あれば末尾に追加
     if (currentInstance) {
@@ -41,7 +41,7 @@ export namespace WSUserInstance {
    * @param userId
    * @param ws
    */
-  export function remove(userId: string, ws: WSInstance) {
+  export function remove(userId: string, ws: TWebSocketInstance) {
     const currentInstance = instances.get(userId);
     //存在しない場合スルー
     if (!currentInstance) {
@@ -68,7 +68,7 @@ export namespace WSUserInstance {
    * @param ws
    * @returns 削除できた場合のuserId、見つからなければundefined
    */
-  export function removeByInstance(ws: WSInstance): string | undefined {
+  export function removeByInstance(ws: TWebSocketInstance): string | undefined {
     //rawが無いと同一性判定ができない(テストのダミー等)
     if (ws.raw === undefined) {
       return undefined;
@@ -146,6 +146,7 @@ export namespace WSUserInstance {
     }
     for (const ws of currentInstance) {
       ws.unsubscribe(wsChannel);
+      ws.unsubscribe(`bot::${wsChannel}`); //Botを見越して両方やる
     }
   }
 }
