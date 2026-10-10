@@ -1,9 +1,9 @@
 CREATE TABLE `BotManage` (
 	`id` text PRIMARY KEY NOT NULL,
-	`remoteUserId` text,
+	`remoteUserId` text NOT NULL,
 	`createdAt` integer NOT NULL,
-	`createdBy` text,
-	`isApproved` integer DEFAULT false,
+	`createdBy` text NOT NULL,
+	`isApproved` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`remoteUserId`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`createdBy`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE cascade
 );

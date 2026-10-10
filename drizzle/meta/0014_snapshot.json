@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cfb40bcd-6a76-4ac3-b9f1-2a8dfcbab796",
+  "id": "25d24a2d-6e3a-4eca-adcd-d9557c94ad77",
   "prevId": "945b6acc-afe1-4691-b20e-5faa21b51d34",
   "tables": {
     "BlockedIPAddress": {
@@ -72,7 +72,7 @@
           "name": "remoteUserId",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
@@ -86,14 +86,14 @@
           "name": "createdBy",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "isApproved": {
           "name": "isApproved",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false,
           "default": false
         }
