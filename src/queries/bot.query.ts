@@ -75,6 +75,7 @@ export namespace QueryBot {
         id: botManages.id,
         isApproved: botManages.isApproved,
         remoteUserId: botManages.remoteUserId,
+        createdBy: botManages.createdBy,
       })
       .from(botManages)
       .where(eq(botManages.tokenCode, query.tokenCode));
