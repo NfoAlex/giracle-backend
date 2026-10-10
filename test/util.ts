@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { app, reloadServerConfig } from "../src";
 import { db } from "../src/db";
 import {
+  botManages,
   channelJoinOnDefaults,
   channelJoins,
   channelMutes,
@@ -63,6 +64,7 @@ export async function INIT() {
   await db.delete(channels);
   await db.delete(invitations);
   await db.delete(users);
+  await db.delete(botManages);
   await db.delete(serverConfigs);
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除

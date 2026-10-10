@@ -2,6 +2,7 @@
 import { mkdir } from "node:fs/promises";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
+import { bot } from "./components/Bot/bot.module";
 import { channel } from "./components/Channel/channel.module";
 import { message } from "./components/Message/message.module";
 import { notification } from "./components/Notification/notification.module";
@@ -62,6 +63,7 @@ export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
   RegisterAnnounceChannelId: "",
   MessageMaxLength: 3000,
   MessageMaxFileSize: 512000,
+  BotEnabled: false,
 };
 
 export async function reloadServerConfig() {
@@ -114,6 +116,7 @@ export const app = new Elysia({
   .use(message)
   .use(server)
   .use(notification)
+  .use(bot)
   .listen(3000);
 
 console.log("Server running at http://localhost:3000");
