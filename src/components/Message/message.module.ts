@@ -476,11 +476,18 @@ export const message = new Elysia({ prefix: "/message" })
         messageSaved.channelId,
       );
 
-      //WSで通知
+      //WSでBotと同時に通知
       server?.publish(
         `channel::${channelId}`,
         JSON.stringify({
           signal: "message::SendMessage",
+          data: messageSaved,
+        }),
+      );
+      server?.publish(
+        `bot::channel::${channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
           data: messageSaved,
         }),
       );
@@ -535,9 +542,16 @@ export const message = new Elysia({ prefix: "/message" })
         _userId,
       );
 
-      //WSで通知
+      //WSでBotと同時に通知
       server?.publish(
         `channel::${messageEditing.channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
+          data: messageEditing,
+        }),
+      );
+      server?.publish(
+        `bot::channel::${messageEditing.channelId}`,
         JSON.stringify({
           signal: "message::UpdateMessage",
           data: messageEditing,
