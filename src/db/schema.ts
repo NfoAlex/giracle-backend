@@ -560,6 +560,7 @@ export const botManages = sqliteTable(
     isApproved: integer("isApproved", { mode: "boolean" })
       .notNull()
       .default(false),
+    tokenCode: text("tokenCode").notNull().unique()
   },
   (table) => [
     index("BotManage_createBy_idx").on(table.createdBy),

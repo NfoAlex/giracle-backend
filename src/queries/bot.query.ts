@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "..";
 import { botManages } from "../db/schema";
@@ -12,11 +13,13 @@ export namespace QueryBot {
       requestSender: string;
     },
   ) => {
+    const tokenCode =  crypto.randomBytes(32).toString("hex");
     const [newBot] = await tx
       .insert(botManages)
       .values({
         remoteUserId: query.remoteUserId,
         createdBy: query.requestSender,
+        tokenCode
       })
       .returning();
 
