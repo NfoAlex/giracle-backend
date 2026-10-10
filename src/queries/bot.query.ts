@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "..";
-import { botManages } from "../db/schema";
+import { botManages, users } from "../db/schema";
 
 export namespace QueryBot {
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -44,6 +44,40 @@ export namespace QueryBot {
       .set({ isApproved: query.isApproved })
       .where(eq(botManages.id, query.botId))
       .returning();
+
+    return bot[0] !== undefined ? bot[0] : undefined;
+  };
+
+  export const getSingle = async (query: { botId: string }) => {
+    const bot = await db
+      .select()
+      .from(botManages)
+      .where(eq(botManages.id, query.botId));
+
+    return bot;
+  };
+
+  export const getSingleWithRemoteUser = async (query: { botId: string }) => {
+    const bot = await db
+      .select({ bot: botManages, user: users })
+      .from(botManages)
+      .where(eq(botManages.id, query.botId))
+      .leftJoin(users, eq(users.id, botManages.remoteUserId));
+
+    return bot;
+  };
+
+  export const getBotMinimumByTokenCode = async (query: {
+    tokenCode: string;
+  }) => {
+    const bot = await db
+      .select({
+        id: botManages.id,
+        isApproved: botManages.isApproved,
+        remoteUserId: botManages.remoteUserId,
+      })
+      .from(botManages)
+      .where(eq(botManages.tokenCode, query.tokenCode));
 
     return bot[0] !== undefined ? bot[0] : undefined;
   };

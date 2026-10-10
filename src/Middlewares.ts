@@ -2,6 +2,7 @@ import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
 import { QueryBlockedIPAddress } from "./queries/blockedIPAddress.query";
+import { QueryBot } from "./queries/bot.query";
 import { QueryMessage } from "./queries/message.query";
 import { QueryMessageUrlPreview } from "./queries/messageUrlPreview.query";
 import { QueryRequestLog } from "./queries/requestLog.query";
@@ -138,6 +139,37 @@ export namespace Middleware {
       token.expires = new Date(now + 1000 * 60 * 60 * 24 * 15); //15日間有効
 
       return { CheckToken: { _userId: tokenData.userId } };
+    });
+
+  export const CheckBotToken = new Elysia({ name: "CheckBotToken" })
+    .guard({
+      headers: t.Object({ authorization: t.String() }),
+    })
+    .resolve({ as: "scoped" }, async ({ headers: { authorization } }) => {
+      const tokenValue = authorization;
+      //そもそもBotTokenが無いならエラー
+      if (tokenValue === undefined) {
+        return status(401, "Invalid token");
+      }
+
+      //トークンがDBにあるか確認
+      const bot = await QueryBot.getBotMinimumByTokenCode({
+        tokenCode: tokenValue,
+      });
+
+      //トークンが無効ならエラー
+      if (bot === undefined) {
+        return status(401, "Invalid token");
+      }
+
+      //BAN確認
+      if (bot.isApproved) {
+        return status(401, "User is banned");
+      }
+
+      return {
+        CheckBotToken: { _botId: bot.id, _remoteUserId: bot.remoteUserId },
+      };
     });
 
   export const CheckRoleTerm = new Elysia({ name: "checkRoleTerm" })
