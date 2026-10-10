@@ -548,11 +548,11 @@ export const botManages = sqliteTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    remoteUserId: text("remoteUserId").references(() => users.id),
+    remoteUserId: text("remoteUserId").references(() => users.id, { onDelete: "cascade" }),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
-    createdBy: text("createdBy").references(() => users.id),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "cascade" }),
     isApproved: integer("isApproved", { mode: "boolean" }).default(false),
   },
   (table) => [
