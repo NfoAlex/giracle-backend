@@ -171,6 +171,7 @@ describe("POST /server/bot/set-approve", async () => {
       path: "/server/bot/set-approve",
       method: "POST",
       body: { botId: "BotTestApproved2", isApproved: true },
+      useSecondaryUser: true
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
