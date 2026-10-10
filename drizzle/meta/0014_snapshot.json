@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "79f33645-5c94-4e93-9090-58f0aaef9b5c",
+  "id": "cfb40bcd-6a76-4ac3-b9f1-2a8dfcbab796",
   "prevId": "945b6acc-afe1-4691-b20e-5faa21b51d34",
   "tables": {
     "BlockedIPAddress": {
@@ -125,7 +125,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "BotManage_createdBy_User_id_fk": {
@@ -138,7 +138,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

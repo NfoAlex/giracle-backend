@@ -4,8 +4,8 @@ CREATE TABLE `BotManage` (
 	`createdAt` integer NOT NULL,
 	`createdBy` text,
 	`isApproved` integer DEFAULT false,
-	FOREIGN KEY (`remoteUserId`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`createdBy`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`remoteUserId`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`createdBy`) REFERENCES `User`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `BotManage_createBy_idx` ON `BotManage` (`createdBy`);--> statement-breakpoint
