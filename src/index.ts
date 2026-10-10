@@ -11,6 +11,7 @@ import { server } from "./components/Server/server.module";
 import { user } from "./components/User/user.module";
 import { Middleware } from "./Middlewares";
 import { wsHandler } from "./ws";
+import { extWsHandler } from "./ws.ext";
 
 await mkdir("./STORAGE", { recursive: true }).catch((_) => {});
 await mkdir("./STORAGE/file", { recursive: true }).catch((_) => {});
@@ -110,6 +111,7 @@ export const app = new Elysia({
   })
   .use(Middleware.RequestLogger)
   .use(wsHandler)
+  .use(extWsHandler)
   .use(user)
   .use(channel)
   .use(role)

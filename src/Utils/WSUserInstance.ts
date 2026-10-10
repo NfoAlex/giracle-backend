@@ -118,8 +118,13 @@ export namespace WSUserInstance {
    * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルを購読させる
    * @param userId
    * @param wsChannel
+   * @param isBot
    */
-  export function subscribe(userId: string, wsChannel: `${string}::${string}`, isBot: boolean = false) {
+  export function subscribe(
+    userId: string,
+    wsChannel: `${string}::${string}`,
+    isBot: boolean = false,
+  ) {
     const currentInstance = instances.get(userId);
     //存在しない場合スルー
     if (!currentInstance) {

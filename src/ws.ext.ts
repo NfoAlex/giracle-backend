@@ -10,7 +10,7 @@ import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
  * Elysiaの静的ルーターは同一パスのWSルートを上書きするため、両者を1つのパスに共存させることはできない。
  * prefixは登録先の externalApi(prefix: "/ext")が付与するため、ここでは付けない。
  */
-export const extWs = new Elysia().ws("/ws", {
+export const extWsHandler = new Elysia().ws("/ws", {
   body: t.Object({
     signal: t.String({ minLength: 1 }),
     data: t.String({ minLength: 1 }),
