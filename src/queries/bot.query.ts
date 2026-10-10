@@ -13,13 +13,13 @@ export namespace QueryBot {
       requestSender: string;
     },
   ) => {
-    const tokenCode =  crypto.randomBytes(32).toString("hex");
+    const tokenCode = crypto.randomBytes(32).toString("hex");
     const [newBot] = await tx
       .insert(botManages)
       .values({
         remoteUserId: query.remoteUserId,
         createdBy: query.requestSender,
-        tokenCode
+        tokenCode,
       })
       .returning();
 
