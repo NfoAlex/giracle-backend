@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { status } from "elysia";
 import sharp from "sharp";
 import { GIRACLE_SERVER_CONFIG } from "../..";
+import { QueryBot } from "../../queries/bot.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryCustomEmoji } from "../../queries/customEmoji.query";
 import { QueryInvite } from "../../queries/invite.query";
@@ -337,5 +338,12 @@ export namespace ServiceServer {
       group: logByGroup,
       firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
     };
+  };
+
+  export const UpdateApprove = async (botId: string, isApproved: boolean) => {
+    const bot = await QueryBot.updateBotIsApproved({ botId, isApproved });
+    if (bot === undefined) throw status(404, "Bot not found");
+
+    return bot;
   };
 }

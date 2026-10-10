@@ -415,4 +415,22 @@ export const server = new Elysia({ prefix: "/server" })
       },
       checkRoleTerm: "manageServer",
     },
+  )
+  .post(
+    "/bot/set-approve",
+    async ({ body: { botId, isApproved } }) => {
+      const botUpdated = await ServiceServer.UpdateApprove(botId, isApproved);
+
+      return {
+        message: "Bot updated",
+        data: botUpdated,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        isApproved: t.Boolean(),
+      }),
+      checkRoleTerm: "manageServer",
+    },
   );

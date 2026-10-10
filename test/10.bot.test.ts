@@ -89,3 +89,90 @@ describe("DELETE /bot", async () => {
     expect(await res.text()).toBe("Bot not found");
   });
 });
+
+describe("POST /server/bot/set-approve", async () => {
+  it("正常 :: isApprovedがtrueへ更新される", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestApproved1", introduction: "to be approved" },
+        useAdminUser: true,
+      })
+    ).json();
+    const botId = created.data.bot.id;
+
+    const res = await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId, isApproved: true },
+      useAdminUser: true,
+    });
+    const t = await res.clone().text();
+    console.log("10.bot :: t", t);
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Bot updated");
+    expect(j.data.id).toBe(botId);
+    expect(j.data.isApproved).toBe(true);
+
+    //DB側も更新されている
+    const bot = await db.query.botManages.findFirst({
+      where: eq(botManages.id, botId),
+    });
+    expect(bot?.isApproved).toBe(true);
+  });
+
+  it("正常 :: isApprovedをfalseへ戻せる", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestApproved2", introduction: "to be unapproved" },
+        useAdminUser: true,
+      })
+    ).json();
+    const botId = created.data.bot.id;
+
+    //作成直後は既定で未承認
+    expect(created.data.bot.isApproved).toBe(false);
+
+    await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId, isApproved: true },
+      useAdminUser: true,
+    });
+    const res = await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId, isApproved: false },
+      useAdminUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.isApproved).toBe(false);
+  });
+
+  it("存在しないBotを承認しようとする", async () => {
+    const res = await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId: "NOT_EXISTING_BOT", isApproved: true },
+      useAdminUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("権限無しでの承認", async () => {
+    const res = await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId: "BotTestApproved2", isApproved: true },
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+});

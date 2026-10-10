@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { db } from "..";
+import { db } from "..";
 import { botManages } from "../db/schema";
 
 export namespace QueryBot {
@@ -30,5 +30,18 @@ export namespace QueryBot {
       .returning();
 
     return botDeleted[0] !== undefined ? botDeleted[0] : undefined;
-  }
+  };
+
+  export const updateBotIsApproved = async (query: {
+    botId: string;
+    isApproved: boolean;
+  }) => {
+    const bot = await db
+      .update(botManages)
+      .set({ isApproved: query.isApproved })
+      .where(eq(botManages.id, query.botId))
+      .returning();
+
+    return bot[0] !== undefined ? bot[0] : undefined;
+  };
 }
