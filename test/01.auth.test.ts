@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
-import { app, db } from "../src";
+import { app, db, GIRACLE_SERVER_CONFIG } from "../src";
 import { invitations } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -33,6 +33,26 @@ describe("/user", () => {
     });
 
     expect(res.ok).toBe(true);
+  });
+
+  it("/sign-up :: 新規登録が無効", async () => {
+    const backup = GIRACLE_SERVER_CONFIG.RegisterAvailable;
+    GIRACLE_SERVER_CONFIG.RegisterAvailable = false;
+    const res = await FETCH({
+      path: "/user/sign-up",
+      method: "PUT",
+      body: {
+        username: "testuser_withOutAvailability",
+        password: "testuser",
+        inviteCode: "testinvite",
+      },
+      excludeCredential: true,
+    });
+
+    expect(res.ok).toBe(false);
+    const t = await res.json();
+    expect(t.message).toBe("User registration is disabled");
+    GIRACLE_SERVER_CONFIG.RegisterAvailable = backup;
   });
 
   describe("/sign-up :: 招待コード上限", () => {
