@@ -30,24 +30,23 @@ export namespace ServiceBot {
     return botData;
   };
 
-  export const DeleteBot = async (
-    _userId: string,
-    botId: string
-  ) => {
+  export const DeleteBot = async (_userId: string, botId: string) => {
     const botData = await db.transaction(async (tx) => {
       const botDeleted = await QueryBot.deleteInTx(tx, { botId });
       if (botDeleted === undefined) {
         throw status(404, "Bot not found");
       }
-      const user = await QueryUser.setDeleted({ userId: botDeleted.remoteUserId });
+      const user = await QueryUser.setDeleted({
+        userId: botDeleted.remoteUserId,
+      });
       if (user === undefined) {
         throw status(404, "User not found");
       }
 
       return {
         bot: botDeleted,
-        remoteUser: user
-      }
+        remoteUser: user,
+      };
     });
 
     return botData;

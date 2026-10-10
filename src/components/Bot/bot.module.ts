@@ -32,7 +32,7 @@ export const bot = new Elysia({ prefix: "/bot" })
     },
     {
       body: t.Object({
-        botId: t.String()
+        botId: t.String(),
       }),
     },
   );
