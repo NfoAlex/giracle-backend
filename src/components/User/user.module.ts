@@ -284,7 +284,7 @@ export const user = new Elysia({ prefix: "/user" })
     {
       body: t.Object({
         name: t.Optional(t.String({ minLength: 1 })),
-        selfIntroduction: t.Optional(t.String()),
+        selfIntroduction: t.Optional(t.String({ maxLength: 128 })),
       }),
       detail: {
         description: "プロフィールの更新",
