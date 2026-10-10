@@ -548,19 +548,17 @@ export const botManages = sqliteTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    remoteUserId: text("remoteUserId")
-      .references(() => users.id),
+    remoteUserId: text("remoteUserId").references(() => users.id),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
-    createdBy: text("createdBy")
-      .references(() => users.id),
-    isApproved: integer("isApproved", { mode: "boolean" }).default(false)
+    createdBy: text("createdBy").references(() => users.id),
+    isApproved: integer("isApproved", { mode: "boolean" }).default(false),
   },
   (table) => [
     index("BotManage_createBy_idx").on(table.createdBy),
-    index("BotManage_remoteUserId_idx").on(table.remoteUserId)
-  ]
+    index("BotManage_remoteUserId_idx").on(table.remoteUserId),
+  ],
 );
 
 // ============================================================
@@ -592,7 +590,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   RoleInfo: many(roleInfos),
   RoleLink: many(roleLinks),
   Token: many(tokens),
-  botManages: many(botManages)
+  botManages: many(botManages),
 }));
 
 export const roleInfosRelations = relations(roleInfos, ({ one, many }) => ({
