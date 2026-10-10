@@ -20,4 +20,19 @@ export const bot = new Elysia({ prefix: "/bot" })
         introduction: t.Optional(t.String({ maxLength: 128 })),
       }),
     },
+  )
+  .delete(
+    "/",
+    async ({ body: { botId }, CheckToken: { _userId } }) => {
+      await ServiceBot.DeleteBot(_userId, botId);
+
+      return {
+        message: "Bot deleted",
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String()
+      }),
+    },
   );

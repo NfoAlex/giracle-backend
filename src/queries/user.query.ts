@@ -278,9 +278,12 @@ export namespace QueryUser {
 
   //論理削除
   export const setDeleted = async (query: { userId: string }) => {
-    await db
+    const user = await db
       .update(users)
       .set({ isDeleted: true })
-      .where(eq(users.id, query.userId));
+      .where(eq(users.id, query.userId))
+      .returning();
+
+    return user[0] !== undefined ? user[0] : undefined;
   };
 }
