@@ -4,6 +4,7 @@ import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { bot } from "./components/Bot/bot.module";
 import { channel } from "./components/Channel/channel.module";
+import { ext } from "./components/Ext/ext.module";
 import { message } from "./components/Message/message.module";
 import { notification } from "./components/Notification/notification.module";
 import { role } from "./components/Role/role.module";
@@ -112,6 +113,7 @@ export const app = new Elysia({
   .use(Middleware.RequestLogger)
   .use(wsHandler)
   .use(extWsHandler)
+  .use(ext)
   .use(user)
   .use(channel)
   .use(role)

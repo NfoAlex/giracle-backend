@@ -107,7 +107,7 @@ describe("DELETE /bot", async () => {
       path: "/bot",
       method: "DELETE",
       body: { botId },
-      useSecondaryUser: true
+      useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);

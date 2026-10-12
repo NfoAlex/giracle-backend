@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { Middleware } from "../../Middlewares";
 import { ServiceMessage } from "../Message/message.service";
 
-export const bot = new Elysia({ prefix: "/ext" })
+export const ext = new Elysia({ prefix: "/ext" })
   .use(Middleware.CheckBotToken)
   .post(
     "/message/send",
