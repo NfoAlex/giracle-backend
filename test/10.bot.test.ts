@@ -84,6 +84,31 @@ describe("DELETE /bot", async () => {
       method: "DELETE",
       body: { botId: "NOT_EXISTING_BOT" },
     });
+    const t = await res.clone().text();
+    console.log("10.bot.test :: t", t);
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("他人のBotを削除しようとする", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestDeleted2", introduction: "to be deleted" },
+      })
+    ).json();
+    const { botId } = {
+      botId: created.data.bot.id,
+    };
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "DELETE",
+      body: { botId },
+      useSecondaryUser: true
+    });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Bot not found");
