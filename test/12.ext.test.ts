@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import { db } from "../src";
-import { bot as extBot } from "../src/components/Ext/ext.module";
+import { db, GIRACLE_SERVER_CONFIG } from "../src";
+import { ext } from "../src/components/Ext/ext.module";
 import { channelJoins, messages } from "../src/db/schema";
 import { INIT } from "./util";
 
 //ext.module は index.ts の app に未登録のため、テスト内で単体マウントする
-const botApp = new Elysia().use(extBot);
+const botApp = new Elysia().use(ext);
 
 /**
  * Botとしてリクエストを送るためのFETCHクライアント。
@@ -53,6 +53,19 @@ afterAll(async () => {
 });
 
 describe("/ext/message/send", async () => {
+  it("サーバーでBotが無効化されている", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const res = await FETCHBOT({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "Hello from bot" },
+    });
+    expect(res.ok).toBeFalse();
+    const t = await res.text();
+    expect(t).toBe("Bot is not enabled on this server");
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+  });
+
   it("正常 :: Bot名義でメッセージが保存される", async () => {
     const res = await FETCHBOT({
       path: "/ext/message/send",

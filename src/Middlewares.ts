@@ -1,5 +1,6 @@
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
+import { GIRACLE_SERVER_CONFIG } from ".";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
 import { QueryBlockedIPAddress } from "./queries/blockedIPAddress.query";
 import { QueryBot } from "./queries/bot.query";
@@ -146,6 +147,10 @@ export namespace Middleware {
       headers: t.Object({ authorization: t.String() }),
     })
     .resolve({ as: "scoped" }, async ({ headers: { authorization } }) => {
+      if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+        return status(400, "Bot is not enabled on this server");
+      }
+
       const tokenValue = authorization;
       //そもそもBotTokenが無いならエラー
       if (tokenValue === undefined) {
