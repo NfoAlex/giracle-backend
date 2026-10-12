@@ -9,14 +9,15 @@ export namespace ServiceBot {
     name: string,
     introduction?: string,
   ) => {
-    const botData = await db.transaction(async (tx) => {
+    //bun-sqliteは同期トランザクションなのでコールバック内でawaitしない
+    const botData = db.transaction((tx) => {
       const botUser = QueryUser.insertInTx(tx, {
         name,
         isBot: true,
         selfIntroduction: introduction ?? "",
       });
 
-      const botManage = await QueryBot.insertWithRemoteUserIdInTx(tx, {
+      const botManage = QueryBot.insertWithRemoteUserIdInTx(tx, {
         remoteUserId: botUser.id,
         requestSender: _userId,
       });
@@ -36,12 +37,12 @@ export namespace ServiceBot {
       throw status(404, "Bot not found");
     }
 
-    const botData = await db.transaction(async (tx) => {
-      const botDeleted = await QueryBot.deleteInTx(tx, { botId });
+    const botData = db.transaction((tx) => {
+      const botDeleted = QueryBot.deleteInTx(tx, { botId });
       if (botDeleted === undefined) {
         throw status(404, "Bot not found");
       }
-      const user = await QueryUser.setDeleted({
+      const user = QueryUser.setDeletedInTx(tx, {
         userId: botDeleted.remoteUserId,
       });
 

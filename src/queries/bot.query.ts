@@ -6,7 +6,8 @@ import { botManages, users } from "../db/schema";
 export namespace QueryBot {
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-  export const insertWithRemoteUserIdInTx = async (
+  //トランザクション内でBotの管理情報を作成する
+  export const insertWithRemoteUserIdInTx = (
     tx: Tx,
     query: {
       remoteUserId: string;
@@ -14,25 +15,24 @@ export namespace QueryBot {
     },
   ) => {
     const tokenCode = crypto.randomBytes(32).toString("hex");
-    const [newBot] = await tx
+    return tx
       .insert(botManages)
       .values({
         remoteUserId: query.remoteUserId,
         createdBy: query.requestSender,
         tokenCode,
       })
-      .returning();
-
-    return newBot;
+      .returning()
+      .get();
   };
 
-  export const deleteInTx = async (tx: Tx, query: { botId: string }) => {
-    const botDeleted = await tx
+  //トランザクション内でBotの管理情報を削除する
+  export const deleteInTx = (tx: Tx, query: { botId: string }) => {
+    return tx
       .delete(botManages)
       .where(eq(botManages.id, query.botId))
-      .returning();
-
-    return botDeleted[0] !== undefined ? botDeleted[0] : undefined;
+      .returning()
+      .get();
   };
 
   export const updateBotIsApproved = async (query: {

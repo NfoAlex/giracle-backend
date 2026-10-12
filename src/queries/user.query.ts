@@ -286,4 +286,14 @@ export namespace QueryUser {
 
     return user[0] !== undefined ? user[0] : undefined;
   };
+
+  //トランザクション内での論理削除(対象なしはundefined)
+  export const setDeletedInTx = (tx: Tx, query: { userId: string }) => {
+    return tx
+      .update(users)
+      .set({ isDeleted: true })
+      .where(eq(users.id, query.userId))
+      .returning()
+      .get();
+  };
 }

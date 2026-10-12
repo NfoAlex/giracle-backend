@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { eq, like } from "drizzle-orm";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
+import { ServiceBot } from "../src/components/Bot/bot.service";
 import { botManages, users } from "../src/db/schema";
+import { QueryBot } from "../src/queries/bot.query";
+import { QueryUser } from "../src/queries/user.query";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -313,5 +316,67 @@ describe("GET /bot/list", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("トランザクションの原子性", () => {
+  it("Bot作成に失敗したらリモートユーザーも残らない", async () => {
+    //テスト用にBot行の挿入だけを失敗させる(名前空間オブジェクトは型上readonlyのためキャストする)
+    const stub = QueryBot as {
+      insertWithRemoteUserIdInTx: typeof QueryBot.insertWithRemoteUserIdInTx;
+    };
+    const original = stub.insertWithRemoteUserIdInTx;
+    stub.insertWithRemoteUserIdInTx = () => {
+      throw new Error("bot insert failed");
+    };
+    try {
+      await expect(
+        ServiceBot.PutBot("TESTUSER", "BotTestOrphan1"),
+      ).rejects.toThrow("bot insert failed");
+    } finally {
+      stub.insertWithRemoteUserIdInTx = original;
+    }
+
+    expect(
+      await db.query.users.findFirst({
+        where: eq(users.name, "BotTestOrphan1"),
+      }),
+    ).toBeUndefined();
+  });
+
+  it("Bot削除に失敗したらBot行もリモートユーザーも残る", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestRollback1", introduction: "rollback" },
+      })
+    ).json();
+    const botId = created.data.bot.id;
+    const remoteUserId = created.data.remoteUser.id;
+
+    //リモートユーザーの論理削除だけを失敗させ、先に消したBot行が戻ることを見る
+    const stub = QueryUser as {
+      setDeletedInTx: (tx: never, query: { userId: string }) => void;
+    };
+    const original = stub.setDeletedInTx;
+    stub.setDeletedInTx = () => {
+      throw new Error("user delete failed");
+    };
+    try {
+      await expect(ServiceBot.DeleteBot("TESTUSER", botId)).rejects.toThrow(
+        "user delete failed",
+      );
+    } finally {
+      stub.setDeletedInTx = original;
+    }
+
+    expect(
+      await db.query.botManages.findFirst({ where: eq(botManages.id, botId) }),
+    ).not.toBeUndefined();
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, remoteUserId),
+    });
+    expect(user?.isDeleted).toBe(false);
   });
 });
