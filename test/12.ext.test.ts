@@ -4,6 +4,8 @@ import { Elysia } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ext } from "../src/components/Ext/ext.module";
 import { channelJoins, messages } from "../src/db/schema";
+import { Util } from "../src/Util";
+import { extWsHandler } from "../src/ws.ext";
 import { INIT } from "./util";
 
 //ext.module は index.ts の app に未登録のため、テスト内で単体マウントする
@@ -185,5 +187,41 @@ describe("/ext/message/send", async () => {
     });
 
     expect(res.status).toBe(422);
+  });
+});
+
+describe("ext WS close", () => {
+  //close 時に Bot 行が消えている(削除直後等)ケースを模擬するダミーWS
+  function fakeWs(raw: object) {
+    const published: unknown[] = [];
+    return {
+      ws: {
+        data: { headers: { authorization: "DELETED_BOT_TOKEN" } },
+        raw,
+        send: () => {},
+        close: () => {},
+        subscribe: () => {},
+        unsubscribe: () => {},
+        publish: (_topic: string, payload: string) =>
+          published.push(JSON.parse(payload)),
+        // biome-ignore lint/suspicious/noExplicitAny: WSハンドラの型はElysia内部のためanyで受け取る
+      } as any,
+      published,
+    };
+  }
+
+  it("Bot行が引けないcloseでもWSインスタンスが残留しない", async () => {
+    const { ws, published } = fakeWs({ id: "RAW_EXT_CLOSE" });
+    Util.wsUserInstance.add("BOTUSER", ws);
+
+    // biome-ignore lint/suspicious/noExplicitAny: Elysiaのルートフック呼び出しのためany
+    const close = (extWsHandler.routes[0].hooks as any).close;
+    await close(ws);
+
+    expect(Util.wsUserInstance.instances.has("BOTUSER")).toBe(false);
+    expect(published).toContainEqual({
+      signal: "user::Disconnected",
+      data: "BOTUSER",
+    });
   });
 });

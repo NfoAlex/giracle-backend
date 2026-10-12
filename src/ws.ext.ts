@@ -108,27 +108,31 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
   },
 
   async close(ws) {
+    //Bot行が削除済みでtokenから引けない場合でも切断は記録するため、
+    //引けないときは生WSの同一性からuserIdを引く(ws.tsのcloseと同様)
     const botToken = ws.data.headers.authorization;
-    if (botToken === undefined) {
-      return;
+    const botData =
+      botToken !== undefined
+        ? await QueryBot.getBotMinimumByTokenCode({ tokenCode: botToken })
+        : undefined;
+
+    let removedUserId: string | undefined;
+    if (botData !== undefined) {
+      Util.wsUserInstance.remove(botData.remoteUserId, ws);
+      removedUserId = botData.remoteUserId;
+    } else {
+      removedUserId = Util.wsUserInstance.removeByInstance(ws);
     }
 
-    const botData = await QueryBot.getBotMinimumByTokenCode({
-      tokenCode: botToken,
-    });
-    if (botData === undefined) {
-      return;
-    }
-
-    //このbotWSインスタンス削除
-    Util.wsUserInstance.remove(botData.remoteUserId, ws);
-
-    if (!Util.wsUserInstance.instances.has(botData.remoteUserId)) {
+    if (
+      removedUserId !== undefined &&
+      !Util.wsUserInstance.instances.has(removedUserId)
+    ) {
       ws.publish(
         "GLOBAL",
         JSON.stringify({
           signal: "user::Disconnected",
-          data: botData.remoteUserId,
+          data: removedUserId,
         }),
       );
     }
