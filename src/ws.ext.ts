@@ -54,7 +54,7 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
       ws.close();
       return;
     }
-    if (botData.isApproved) {
+    if (!botData.isApproved) {
       ws.send({
         signal: "ERROR",
         data: "Your bot is not approved yet",
@@ -68,7 +68,7 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
     });
     if (
       botCreatedUser?.isDeleted === undefined ||
-      botCreatedUser?.isDeleted === false
+      botCreatedUser?.isDeleted === true
     ) {
       ws.send({
         signal: "ERROR",
