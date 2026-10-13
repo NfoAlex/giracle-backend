@@ -5,6 +5,7 @@ import { ServiceBot } from "../src/components/Bot/bot.service";
 import { botManages, users } from "../src/db/schema";
 import { QueryBot } from "../src/queries/bot.query";
 import { QueryUser } from "../src/queries/user.query";
+import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -180,6 +181,52 @@ describe("POST /server/bot/set-approve", async () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.isApproved).toBe(false);
+  });
+
+  it("正常 :: 承認を剥がすと接続中のBot WSが切断される", async () => {
+    //WSはopen時にしか承認を判定しないため、剥がす側で切らないと接続が残り続ける
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestUnapproved1", introduction: "to be unapproved" },
+        useAdminUser: true,
+      })
+    ).json();
+    const { botId, remoteUserId } = {
+      botId: created.data.bot.id,
+      remoteUserId: created.data.remoteUser.id,
+    };
+
+    await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId, isApproved: true },
+      useAdminUser: true,
+    });
+
+    //承認済みで接続中の状態を模す
+    const closed: string[] = [];
+    Util.wsUserInstance.instances.set(remoteUserId, [
+      {
+        send: () => {},
+        close: () => {
+          closed.push(remoteUserId);
+        },
+        subscribe: () => {},
+        unsubscribe: () => {},
+      },
+    ]);
+
+    const res = await FETCH({
+      path: "/server/bot/set-approve",
+      method: "POST",
+      body: { botId, isApproved: false },
+      useAdminUser: true,
+    });
+    expect(res.ok).toBe(true);
+    expect(closed).toEqual([remoteUserId]);
+    expect(Util.wsUserInstance.instances.has(remoteUserId)).toBe(false);
   });
 
   it("存在しないBotを承認しようとする", async () => {

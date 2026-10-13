@@ -11,6 +11,7 @@ import { QueryInvite } from "../../queries/invite.query";
 import { QueryRequestLog } from "../../queries/requestLog.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
 import { QueryUser } from "../../queries/user.query";
+import { Util } from "../../Util";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -343,6 +344,14 @@ export namespace ServiceServer {
   export const UpdateApprove = async (botId: string, isApproved: boolean) => {
     const bot = await QueryBot.updateBotIsApproved({ botId, isApproved });
     if (bot === undefined) throw status(404, "Bot not found");
+
+    //承認を剥がしたら接続中のWSも切る(切断まではopen時の判定しか効かないため)
+    if (!bot.isApproved) {
+      Util.wsUserInstance.disconnect(
+        bot.remoteUserId,
+        "Your bot is not approved yet",
+      );
+    }
 
     return bot;
   };
