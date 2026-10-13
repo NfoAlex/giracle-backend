@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { app, db, GIRACLE_SERVER_CONFIG } from "../src";
-import { invitations } from "../src/db/schema";
+import { invitations, passwords, tokens, users } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -211,6 +211,57 @@ describe("/user", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.userId).toBeDefined();
+  });
+
+  describe("/sign-in :: Botユーザー", () => {
+    const BOT_USER_ID = "BOTLOGINUSER";
+    const BOT_USER_NAME = "botloginuser";
+    const BOT_PASSWORD = "botpassword";
+
+    beforeAll(async () => {
+      //Botは通常パスワードを持たない。パスワード行が有るBotでもログインできないことを見る
+      const salt = "testsalt";
+      await db.insert(users).values({
+        id: BOT_USER_ID,
+        name: BOT_USER_NAME,
+        selfIntroduction: "",
+        isBot: true,
+      });
+      await db.insert(passwords).values({
+        userId: BOT_USER_ID,
+        password: await Bun.password.hash(BOT_PASSWORD + salt),
+        salt,
+      });
+    });
+
+    it("正しいパスワードでもログインできない", async () => {
+      const res = await FETCH({
+        path: "/user/sign-in",
+        method: "POST",
+        body: { username: BOT_USER_NAME, password: BOT_PASSWORD },
+        excludeCredential: true,
+      });
+      expect(res.status).toBe(401);
+      expect((await res.json()).message).toBe("You cannot login as bot user");
+
+      //トークンも発行されない
+      const issued = await db
+        .select()
+        .from(tokens)
+        .where(eq(tokens.userId, BOT_USER_ID));
+      expect(issued).toBeEmpty();
+    });
+
+    it("パスワードが違ってもBot判定が先に返る", async () => {
+      const res = await FETCH({
+        path: "/user/sign-in",
+        method: "POST",
+        body: { username: BOT_USER_NAME, password: "wrongpassword" },
+        excludeCredential: true,
+      });
+      expect(res.status).toBe(401);
+      expect((await res.json()).message).toBe("You cannot login as bot user");
+    });
   });
 
   it("/verify-token :: クレデンシャル無し", async () => {
