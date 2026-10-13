@@ -123,7 +123,7 @@ export namespace ServiceUser {
     }
     //パスワードが設定されていない場合
     if (!user.password) {
-      throw status(400, {
+      throw status(500, {
         message: "Internal error",
       });
     }
@@ -137,6 +137,12 @@ export namespace ServiceUser {
     if (user.isBanned) {
       throw status(401, {
         message: "User is banned",
+      });
+    }
+    //ユーザーがBot
+    if (user.isBot) {
+      throw status(401, {
+        message: "You cannot login as bot user",
       });
     }
 
