@@ -3,6 +3,7 @@ import { unlink } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 import { app, db } from "../src";
 import {
+  botManages,
   channelJoins,
   messages,
   passwords,
@@ -922,6 +923,48 @@ describe("/user/ban & /user/unban", () => {
     const t = await res.text();
     expect(res.ok).toBe(false);
     expect(t).toBe("You can't unban yourself");
+  });
+
+  it("正常 :: BAN時に作成者のBot WS接続も切断されること（Util.wsUserInstance.disconnectBotsCreatedBy）", async () => {
+    //BotのWSインスタンスはremoteUserIdキーで保持されるため、
+    //作成者Idへのdisconnectでは切れない。BAN後もBotが受信し続けるのを防ぐ
+    await db.insert(botManages).values({
+      id: "BANBOT1",
+      remoteUserId: "BOTUSER",
+      createdBy: BAN_TARGET_USER_ID,
+      tokenCode: "BANBOTTOKEN",
+    });
+
+    const closed: string[] = [];
+    //WSUserInstanceが要求する最小インターフェースを満たす構造的ダミー
+    Util.wsUserInstance.instances.set("BOTUSER", [
+      {
+        send: () => {},
+        close: () => {
+          closed.push("BOTUSER");
+        },
+        subscribe: () => {},
+        unsubscribe: () => {},
+      },
+    ]);
+
+    const res = await FETCH({
+      path: "/user/ban",
+      method: "POST",
+      body: { userId: BAN_TARGET_USER_ID },
+    });
+    expect(res.ok).toBe(true);
+    expect(closed).toEqual(["BOTUSER"]);
+    expect(Util.wsUserInstance.instances.has("BOTUSER")).toBe(false);
+
+    //後続テストへ影響させないよう解除する
+    const unbanRes = await FETCH({
+      path: "/user/unban",
+      method: "POST",
+      body: { userId: BAN_TARGET_USER_ID },
+    });
+    expect(unbanRes.ok).toBe(true);
+    await db.delete(botManages).where(eq(botManages.id, "BANBOT1"));
   });
 
   it("正常 :: BAN時に既存のWS接続が切断されること（Util.wsUserInstance.disconnect）", () => {

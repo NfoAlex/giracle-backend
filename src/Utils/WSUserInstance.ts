@@ -1,3 +1,5 @@
+import { QueryBot } from "../queries/bot.query";
+
 /**
  * ユーザーごとのWSインスタンス管理。
  * 通常ユーザー用ハンドラ(src/ws.ts)から使う共通処理。
@@ -112,6 +114,23 @@ export namespace WSUserInstance {
       ws.close();
     }
     instances.delete(userId);
+  }
+
+  /**
+   * 指定ユーザーが作成したBotのWS接続をすべて切断する。
+   * BotのWSインスタンスは remoteUserId をキーに保持されるため、
+   * 作成者Id(createdBy)への disconnect では切れない。
+   * @param createdBy Botの作成者Id
+   * @param reason 切断時に送る理由
+   */
+  export async function disconnectBotsCreatedBy(
+    createdBy: string,
+    reason?: string,
+  ): Promise<void> {
+    const bots = await QueryBot.getRemoteUserIdsByCreatedBy({ createdBy });
+    for (const bot of bots) {
+      disconnect(bot.remoteUserId, reason);
+    }
   }
 
   /**

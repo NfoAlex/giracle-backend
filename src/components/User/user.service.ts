@@ -545,6 +545,8 @@ export namespace ServiceUser {
 
     //既存のWS接続も切断する(BAN後も新着メッセージを受信し続けられるのを防ぐ)
     Util.wsUserInstance.disconnect(userId);
+    //BANされたユーザーが作成したBotのWSも切る(BotインスタンスはremoteUserIdキーのため上のdisconnectでは切れない)
+    await Util.wsUserInstance.disconnectBotsCreatedBy(userId);
 
     return userBanned;
   };
@@ -592,6 +594,8 @@ export namespace ServiceUser {
 
     //既存のWS接続も切断する
     Util.wsUserInstance.disconnect(userId);
+    //削除されたユーザーが作成したBotのWSも切る(BotManager行はcascadeで消えるが接続は残るため)
+    await Util.wsUserInstance.disconnectBotsCreatedBy(userId);
 
     return;
   };
