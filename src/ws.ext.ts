@@ -97,14 +97,18 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
 
     //BotとしてユーザーWSインスタンス保存
     Util.wsUserInstance.add(botData.remoteUserId, ws);
-    //ユーザー接続通知
-    ws.publish(
-      "GLOBAL",
-      JSON.stringify({
-        signal: "user::Connected",
-        data: botData.remoteUserId,
-      }),
-    );
+
+    const wsInstance = Util.wsUserInstance.instances.get(botData.remoteUserId);
+    if (wsInstance?.length === 1) {
+      //ユーザー接続通知
+      ws.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::Connected",
+          data: botData.remoteUserId,
+        }),
+      );
+    }
   },
 
   async close(ws) {
