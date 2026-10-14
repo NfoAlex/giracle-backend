@@ -346,6 +346,28 @@ describe("GET /bot/list", () => {
     expect(j.data.map((b: { id: string }) => b.id)).toEqual(["BOTLIST_X"]);
   });
 
+  it("正常 :: queryで名前の前方一致絞り込み", async () => {
+    await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotListQuery1", introduction: "" },
+    });
+    await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotListQueryOther1", introduction: "" },
+    });
+
+    const res = await FETCH({
+      path: "/bot/list?length=50&query=BotListQuery1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBe(1);
+    expect(j.data[0].remoteUserName).toBe("BotListQuery1");
+  });
+
   it("異常 :: 存在しないcursorBotIdは404", async () => {
     const res = await FETCH({
       path: "/bot/list?cursorBotId=NOT_EXISTING_BOT",
@@ -363,6 +385,183 @@ describe("GET /bot/list", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /bot/all", () => {
+  it("正常 :: 全Botが返る", async () => {
+    const res = await FETCH({
+      path: "/bot/all?length=50",
+      method: "GET",
+      useAdminUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Bot list fetched");
+    expect(j.data.length).toBeGreaterThan(0);
+    //tokenCodeは管理者一覧には含めない
+    expect(Object.keys(j.data[0])).not.toContain("tokenCode");
+    const botManage = j.data.find((b: { id: string }) => b.id === "BOTMANAGE");
+    expect(botManage.remoteUserName).toBe("botuser");
+  });
+
+  it("正常 :: 新しい順に並ぶ", async () => {
+    const res = await FETCH({
+      path: "/bot/all?length=50",
+      method: "GET",
+      useAdminUser: true,
+    });
+    const j = await res.json();
+    for (let i = 1; i < j.data.length; i++) {
+      const prev = new Date(j.data[i - 1].createdAt).getTime();
+      const cur = new Date(j.data[i].createdAt).getTime();
+      expect(prev).toBeGreaterThanOrEqual(cur);
+    }
+  });
+
+  it("正常 :: queryで名前の前方一致絞り込み", async () => {
+    await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotAllSearch1", introduction: "" },
+      useAdminUser: true,
+    });
+    await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotAllOther1", introduction: "" },
+      useAdminUser: true,
+    });
+
+    const res = await FETCH({
+      path: "/bot/all?length=50&query=BotAllSearch",
+      method: "GET",
+      useAdminUser: true,
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.length).toBeGreaterThan(0);
+    for (const bot of j.data) {
+      expect(bot.remoteUserName.startsWith("BotAllSearch")).toBe(true);
+    }
+    expect(
+      j.data.map((b: { remoteUserName: string }) => b.remoteUserName),
+    ).toContain("BotAllSearch1");
+  });
+
+  it("正常 :: cursorBotIdで継続取得", async () => {
+    const first = await (
+      await FETCH({
+        path: "/bot/all?length=1",
+        method: "GET",
+        useAdminUser: true,
+      })
+    ).json();
+    expect(first.data.length).toBe(1);
+
+    const second = await (
+      await FETCH({
+        path: `/bot/all?length=1&cursorBotId=${first.data[0].id}`,
+        method: "GET",
+        useAdminUser: true,
+      })
+    ).json();
+    expect(second.data.length).toBe(1);
+    expect(second.data[0].id).not.toBe(first.data[0].id);
+    //新しい順なので2件目は1件目より古いか同一
+    expect(new Date(second.data[0].createdAt).getTime()).toBeLessThanOrEqual(
+      new Date(first.data[0].createdAt).getTime(),
+    );
+  });
+
+  it("異常 :: 存在しないcursorBotIdは404", async () => {
+    const res = await FETCH({
+      path: "/bot/all?cursorBotId=NOT_EXISTING_BOT",
+      method: "GET",
+      useAdminUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Cursor bot not found");
+  });
+
+  it("異常 :: 権限無し", async () => {
+    const res = await FETCH({
+      path: "/bot/all",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Role level not enough");
+  });
+
+  it("異常 :: 未認証", async () => {
+    const res = await FETCH({
+      path: "/bot/all",
+      method: "GET",
+      excludeCredential: true,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /bot/:remoteUserId", () => {
+  it("正常 :: 作成者と承認状態が返りtokenCodeは含まない", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotInfoGet1", introduction: "info get" },
+      })
+    ).json();
+    const remoteUserId = created.data.remoteUser.id;
+
+    const res = await FETCH({
+      path: `/bot/${remoteUserId}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Bot info");
+    expect(j.data.id).toBe(created.data.bot.id);
+    expect(j.data.remoteUserId).toBe(remoteUserId);
+    expect(j.data.createdBy).toBe("TESTUSER");
+    expect(j.data.isApproved).toBe(false);
+    expect(j.data.tokenCode).toBeUndefined();
+  });
+
+  it("正常 :: 作成者が論理削除済みでも取得できる", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotInfoDeleted1", introduction: "" },
+      })
+    ).json();
+    const remoteUserId = created.data.remoteUser.id;
+
+    await db
+      .update(users)
+      .set({ isDeleted: true })
+      .where(eq(users.id, remoteUserId));
+
+    const res = await FETCH({
+      path: `/bot/${remoteUserId}`,
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.createdBy).toBe("TESTUSER");
+  });
+
+  it("異常 :: 存在しないremoteUserIdは404", async () => {
+    const res = await FETCH({
+      path: "/bot/NOT_EXISTING_USER",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
   });
 });
 

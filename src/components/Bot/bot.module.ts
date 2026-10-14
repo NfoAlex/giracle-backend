@@ -38,8 +38,16 @@ export const bot = new Elysia({ prefix: "/bot" })
   )
   .get(
     "/list",
-    async ({ query: { length, cursorBotId }, CheckToken: { _userId } }) => {
-      const list = await ServiceBot.GetList(_userId, length, cursorBotId);
+    async ({
+      query: { length, cursorBotId, query },
+      CheckToken: { _userId },
+    }) => {
+      const list = await ServiceBot.GetList(
+        _userId,
+        length,
+        cursorBotId,
+        query,
+      );
 
       return {
         message: "Bot list fetched",
@@ -50,11 +58,58 @@ export const bot = new Elysia({ prefix: "/bot" })
       query: t.Object({
         length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
         cursorBotId: t.Optional(t.String({ minLength: 1 })),
+        query: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
       }),
       detail: {
         description:
-          "自分が作成したBotの一覧を作成順で取得します。cursorBotIdで継続取得できます",
+          "自分が作成したBotの一覧を作成順で取得します。queryで名前の前方一致絞り込み、cursorBotIdで継続取得できます",
         tags: ["Bot"],
       },
+    },
+  )
+  .get(
+    "/:remoteUserId",
+    async ({ params: { remoteUserId } }) => {
+      const bot = await ServiceBot.GetByRemoteUserId(remoteUserId);
+
+      return {
+        message: "Bot info",
+        data: bot,
+      };
+    },
+    {
+      params: t.Object({
+        remoteUserId: t.String({ minLength: 1 }),
+      }),
+      detail: {
+        description:
+          "リモートユーザーIdからBotの管理情報(承認状態・作成者)を取得します。tokenCodeは含みません",
+        tags: ["Bot"],
+      },
+    },
+  )
+  .use(Middleware.CheckRoleTerm)
+  .get(
+    "/all",
+    async ({ query: { length, cursorBotId, query } }) => {
+      const list = await ServiceBot.GetListAll(length, cursorBotId, query);
+
+      return {
+        message: "Bot list fetched",
+        data: list,
+      };
+    },
+    {
+      query: t.Object({
+        length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
+        cursorBotId: t.Optional(t.String({ minLength: 1 })),
+        query: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+      }),
+      detail: {
+        description:
+          "全Botの一覧を新しい順で取得します。queryで名前の前方一致絞り込み、cursorBotIdで継続取得できます",
+        tags: ["Bot"],
+      },
+      checkRoleTerm: "manageServer",
     },
   );
