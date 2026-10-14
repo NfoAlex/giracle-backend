@@ -28,6 +28,7 @@ export namespace QueryServerConfig {
     RegisterAnnounceChannelId?: string;
     MessageMaxLength?: number;
     MessageMaxFileSize?: number;
+    BotEnabled?: boolean;
   }) => {
     const [serverinfo] = await db
       .update(serverConfigs)
@@ -37,6 +38,7 @@ export namespace QueryServerConfig {
         RegisterAnnounceChannelId: query.RegisterAnnounceChannelId,
         MessageMaxLength: query.MessageMaxLength,
         MessageMaxFileSize: query.MessageMaxFileSize,
+        BotEnabled: query.BotEnabled,
       })
       .returning();
 

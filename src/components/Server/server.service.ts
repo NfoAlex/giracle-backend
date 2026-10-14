@@ -97,6 +97,7 @@ export namespace ServiceServer {
     MessageMaxLength?: number,
     MessageMaxFileSize?: number,
     DefaultJoinChannel?: string[],
+    BotEnabled?: boolean,
   ) => {
     const serverinfo = await QueryServerConfig.updateConfig({
       RegisterAvailable,
@@ -104,6 +105,7 @@ export namespace ServiceServer {
       RegisterAnnounceChannelId,
       MessageMaxLength,
       MessageMaxFileSize,
+      BotEnabled,
     });
 
     if (serverinfo === undefined) throw status(500, "Server config not found");
@@ -119,6 +121,7 @@ export namespace ServiceServer {
       GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
     if (MessageMaxFileSize !== undefined)
       GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
+    if (BotEnabled !== undefined) GIRACLE_SERVER_CONFIG.BotEnabled = BotEnabled;
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
