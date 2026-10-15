@@ -565,6 +565,146 @@ describe("GET /bot/:remoteUserId", () => {
   });
 });
 
+describe("POST /", () => {
+  //更新対象のBotはサービス直呼びで作る(PUT /bot経由だと更新対象の作成者が常にTESTUSERになる)
+  const createBot = (name: string, introduction = "") =>
+    ServiceBot.PutBot("TESTUSER", name, introduction);
+
+  //status(4xx, ...)はErrorではなくElysiaCustomStatusResponseを投げるため、code/responseで見る
+  const catchStatus = async (promise: Promise<unknown>) =>
+    await promise.then(
+      () => undefined,
+      (err: { code: number; response: string }) => err,
+    );
+
+  it("正常 :: 名前と自己紹介が更新され、更新後のユーザーが返る", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdate1", "before");
+
+    const updated = await ServiceBot.Update(
+      "TESTUSER",
+      bot.id,
+      "BotUpdate1Renamed",
+      "after",
+    );
+
+    expect(updated?.id).toBe(remoteUser.id);
+    expect(updated?.name).toBe("BotUpdate1Renamed");
+    expect(updated?.selfIntroduction).toBe("after");
+
+    const row = await db.query.users.findFirst({
+      where: eq(users.id, remoteUser.id),
+    });
+    expect(row?.name).toBe("BotUpdate1Renamed");
+    expect(row?.selfIntroduction).toBe("after");
+  });
+
+  it("正常 :: 名前を変更すると承認が取り消される", async () => {
+    const { bot } = await createBot("BotUpdate2");
+    await QueryBot.updateBotIsApproved({ botId: bot.id, isApproved: true });
+
+    await ServiceBot.Update("TESTUSER", bot.id, "BotUpdate2Renamed");
+
+    const row = await db.query.botManages.findFirst({
+      where: eq(botManages.id, bot.id),
+    });
+    expect(row?.isApproved).toBe(false);
+  });
+
+  it("正常 :: 名前が変わらないなら承認は維持される", async () => {
+    const { bot } = await createBot("BotUpdate3", "before");
+    await QueryBot.updateBotIsApproved({ botId: bot.id, isApproved: true });
+
+    //同名を渡して自己紹介だけ変える(改名ではないので承認は剥がさない)
+    await ServiceBot.Update("TESTUSER", bot.id, "BotUpdate3", "after");
+
+    const row = await db.query.botManages.findFirst({
+      where: eq(botManages.id, bot.id),
+    });
+    expect(row?.isApproved).toBe(true);
+  });
+
+  it("正常 :: name未指定なら名前は変わらず、自己紹介だけ更新される", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdate4", "before");
+    await QueryBot.updateBotIsApproved({ botId: bot.id, isApproved: true });
+
+    await ServiceBot.Update("TESTUSER", bot.id, undefined, "after");
+
+    const row = await db.query.users.findFirst({
+      where: eq(users.id, remoteUser.id),
+    });
+    expect(row?.name).toBe("BotUpdate4");
+    expect(row?.selfIntroduction).toBe("after");
+
+    //改名していないので承認は剥がれない
+    const botRow = await db.query.botManages.findFirst({
+      where: eq(botManages.id, bot.id),
+    });
+    expect(botRow?.isApproved).toBe(true);
+  });
+
+  it("異常 :: 他人のBotは更新できない", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdate5", "before");
+
+    const err = await catchStatus(
+      ServiceBot.Update("TESTUSER2", bot.id, "BotUpdate5Renamed"),
+    );
+    expect(err?.code).toBe(400);
+    expect(err?.response).toBe("This is not your bot");
+
+    //他人の操作では何も書き換わらない
+    const row = await db.query.users.findFirst({
+      where: eq(users.id, remoteUser.id),
+    });
+    expect(row?.name).toBe("BotUpdate5");
+    expect(row?.selfIntroduction).toBe("before");
+  });
+
+  it("異常 :: 存在しないBotは404", async () => {
+    const err = await catchStatus(
+      ServiceBot.Update("TESTUSER", "NOT_EXISTING_BOT", "BotUpdate6Renamed"),
+    );
+    expect(err?.code).toBe(404);
+    expect(err?.response).toBe("Bot not found");
+  });
+
+  it("正常 :: POST /bot(body)経由で更新できる", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotUpdateHttp1", introduction: "before" },
+      })
+    ).json();
+    const { botId, remoteUserId } = {
+      botId: created.data.bot.id,
+      remoteUserId: created.data.remoteUser.id,
+    };
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "POST",
+      body: { botId, name: "BotUpdateHttp1Renamed", selfIntroduction: "after" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Bot user updated");
+    expect(j.data.id).toBe(remoteUserId);
+    expect(j.data.name).toBe("BotUpdateHttp1Renamed");
+    expect(j.data.selfIntroduction).toBe("after");
+  });
+
+  it("異常 :: POST /botで存在しないBotIdは404", async () => {
+    const res = await FETCH({
+      path: "/bot",
+      method: "POST",
+      body: { botId: "NOT_EXISTING_BOT", name: "BotUpdateHttp2Renamed" },
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+});
+
 describe("トランザクションの原子性", () => {
   it("Bot作成に失敗したらリモートユーザーも残らない", async () => {
     //テスト用にBot行の挿入だけを失敗させる(名前空間オブジェクトは型上readonlyのためキャストする)

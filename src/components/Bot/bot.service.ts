@@ -80,6 +80,35 @@ export namespace ServiceBot {
     });
   };
 
+  export const Update = async (
+    _userId: string,
+    botId: string,
+    name?: string,
+    selfIntroduction?: string,
+  ) => {
+    const [botData] = await QueryBot.getSingleWithRemoteUser({ botId });
+    if (botData === undefined) {
+      throw status(404, "Bot not found");
+    }
+    if (_userId !== botData.bot.createdBy) {
+      throw status(400, "This is not your bot");
+    }
+    //name未指定は改名ではないため、同名判定より先に弾く(自己紹介だけの更新で承認を剥がさない)
+    const botNameChanged = name !== undefined && name !== botData.user?.name;
+
+    const userUpdated = await QueryUser.updateProfile({
+      userId: botData.bot.remoteUserId,
+      name,
+      selfIntroduction,
+    });
+
+    //名前を変えているなら承諾状況を切り替え
+    if (botNameChanged) {
+      await QueryBot.updateBotIsApproved({ botId, isApproved: false });
+    }
+    return userUpdated;
+  };
+
   export const GetListAll = async (
     length: number,
     cursorBotId?: string,

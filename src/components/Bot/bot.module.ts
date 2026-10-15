@@ -67,6 +67,36 @@ export const bot = new Elysia({ prefix: "/bot" })
       },
     },
   )
+  .post(
+    "/",
+    async ({
+      body: { botId, name, selfIntroduction },
+      CheckToken: { _userId },
+    }) => {
+      const user = await ServiceBot.Update(
+        _userId,
+        botId,
+        name,
+        selfIntroduction,
+      );
+
+      return {
+        message: "Bot user updated",
+        data: user,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        name: t.Optional(t.String({ minLength: 2 })),
+        selfIntroduction: t.Optional(t.String({ maxLength: 128 })),
+      }),
+      detail: {
+        description: "Botの更新を行います",
+        tags: ["Bot"],
+      },
+    },
+  )
   .get(
     "/:remoteUserId",
     async ({ params: { remoteUserId } }) => {
