@@ -167,9 +167,9 @@ export namespace Middleware {
         return status(401, "Invalid token");
       }
 
-      //BAN確認
-      if (bot.isApproved) {
-        return status(401, "User is banned");
+      //未承認のBotはまだ使えない
+      if (!bot.isApproved) {
+        return status(401, "Bot is not approved yet");
       }
 
       return {
