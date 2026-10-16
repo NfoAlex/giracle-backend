@@ -9,6 +9,7 @@ import { QueryMessageUrlPreview } from "./queries/messageUrlPreview.query";
 import { QueryRequestLog } from "./queries/requestLog.query";
 import { QueryRoleLink } from "./queries/roleLink.query";
 import { QueryToken } from "./queries/token.query";
+import { QueryUser } from "./queries/user.query";
 import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
@@ -170,6 +171,12 @@ export namespace Middleware {
       //未承認のBotはまだ使えない
       if (!bot.isApproved) {
         return status(401, "Bot is not approved yet");
+      }
+
+      //作成者がBAN・削除済みならBotも停止(ws.ext.tsと同条件)
+      const creator = await QueryUser.getSingle({ userId: bot.createdBy });
+      if (creator === undefined || creator.isBanned || creator.isDeleted) {
+        return status(401, "This bot is disabled");
       }
 
       return {
