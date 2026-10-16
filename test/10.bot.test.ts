@@ -32,6 +32,22 @@ describe("PUT /bot", async () => {
     expect(j.data.bot.createdBy).toBe("TESTUSER");
   });
 
+  it("同名で作成してみる", async () => {
+    const res = await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotTestCreated1", introduction: "duplicate" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Requested name is used by other bot or user");
+
+    //ロールバックされBotManage行は残らない
+    const duplicated = await db.query.users.findMany({
+      where: eq(users.name, "BotTestCreated1"),
+    });
+    expect(duplicated.length).toBe(1);
+  });
+
   it("空名前で作成してみる", async () => {
     const res = await FETCH({
       path: "/bot",

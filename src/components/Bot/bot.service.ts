@@ -10,25 +10,32 @@ export namespace ServiceBot {
     introduction?: string,
   ) => {
     //bun-sqliteは同期トランザクションなのでコールバック内でawaitしない
-    const botData = db.transaction((tx) => {
-      const botUser = QueryUser.insertInTx(tx, {
-        name,
-        isBot: true,
-        selfIntroduction: introduction ?? "",
+    try {
+      const botData = db.transaction((tx) => {
+        const botUser = QueryUser.insertInTx(tx, {
+          name,
+          isBot: true,
+          selfIntroduction: introduction ?? "",
+        });
+
+        const botManage = QueryBot.insertWithRemoteUserIdInTx(tx, {
+          remoteUserId: botUser.id,
+          requestSender: _userId,
+        });
+
+        return {
+          remoteUser: botUser,
+          bot: botManage,
+        };
       });
 
-      const botManage = QueryBot.insertWithRemoteUserIdInTx(tx, {
-        remoteUserId: botUser.id,
-        requestSender: _userId,
-      });
-
-      return {
-        remoteUser: botUser,
-        bot: botManage,
-      };
-    });
-
-    return botData;
+      return botData;
+    } catch(e) {
+      if (e instanceof Error && e.message.includes("UNIQUE constraint failed: ")) {
+        throw status(400, "Requested name is used by other bot or user");
+      }
+      throw e;
+    }
   };
 
   export const DeleteBot = async (_userId: string, botId: string) => {
