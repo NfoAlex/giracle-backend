@@ -451,15 +451,7 @@ export const message = new Elysia({ prefix: "/message" })
       body: { channelId, message, fileIds, replyingMessageId },
       CheckToken: { _userId },
       server,
-      status,
     }) => {
-      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
-        throw status(
-          400,
-          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
-        );
-      }
-
       //メッセージの保存処理
       const { messageSaved, messageReplyingTo } = await ServiceMessage.Send(
         channelId,

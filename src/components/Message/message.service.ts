@@ -523,6 +523,13 @@ export namespace ServiceMessage {
     if (Util.isBlankString(message) && fileIds.length === 0)
       throw status(400, "Message is empty");
 
+    if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+      throw status(
+        400,
+        `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
+      );
+    }
+
     //チャンネル参加情報を取得
     const channelJoined = await QueryChannelJoin.getJoin({
       userId: _userId,
