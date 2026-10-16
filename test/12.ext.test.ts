@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ext } from "../src/components/Ext/ext.module";
-import { channelJoins, messages } from "../src/db/schema";
+import { botManages, channelJoins, messages, users } from "../src/db/schema";
 import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
 import { INIT } from "./util";
@@ -40,8 +40,17 @@ async function FETCHBOT({
   );
 }
 
+/** テストBotの承認状態を切り替える */
+async function setBotApproved(isApproved: boolean) {
+  await db
+    .update(botManages)
+    .set({ isApproved })
+    .where(eq(botManages.id, "BOTMANAGE"));
+}
+
 beforeAll(async () => {
   await INIT();
+  await setBotApproved(true);
   //BOTMANAGETOKEN の持ち主(BOTUSER)を送信先チャンネルへ参加させる
   await db
     .insert(channelJoins)
@@ -66,6 +75,38 @@ describe("/ext/message/send", async () => {
     const t = await res.text();
     expect(t).toBe("Bot is not enabled on this server");
     GIRACLE_SERVER_CONFIG.BotEnabled = true;
+  });
+
+  it("未承認のBot", async () => {
+    await setBotApproved(false);
+    const res = await FETCHBOT({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "unapproved" },
+    });
+    await setBotApproved(true);
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Bot is not approved yet");
+  });
+
+  it("作成者がBANされたBot", async () => {
+    await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(eq(users.id, "TESTUSER"));
+    const res = await FETCHBOT({
+      path: "/ext/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: "banned creator" },
+    });
+    await db
+      .update(users)
+      .set({ isBanned: false })
+      .where(eq(users.id, "TESTUSER"));
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("This bot is disabled");
   });
 
   it("正常 :: Bot名義でメッセージが保存される", async () => {
