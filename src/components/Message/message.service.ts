@@ -653,6 +653,13 @@ export namespace ServiceMessage {
     //空白のみは送信時と同じ基準で拒否する
     if (Util.isBlankString(message)) throw status(400, "Message is empty");
 
+    if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
+      throw status(
+        400,
+        `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
+      );
+    }
+
     const messageEditing = await QueryMessage.getSingle({ messageId });
     //メッセージが無かった時エラー
     if (messageEditing === undefined) {

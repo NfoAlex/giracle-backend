@@ -518,16 +518,8 @@ export const message = new Elysia({ prefix: "/message" })
     async ({
       body: { messageId, message },
       CheckToken: { _userId },
-      server,
-      status,
+      server
     }) => {
-      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
-        throw status(
-          400,
-          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
-        );
-      }
-
       const messageEditing = await ServiceMessage.Edit(
         messageId,
         message,
