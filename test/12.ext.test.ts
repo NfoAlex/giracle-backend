@@ -3,7 +3,13 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ext } from "../src/components/Ext/ext.module";
-import { botManages, channelJoins, inboxes, messages, users } from "../src/db/schema";
+import {
+  botManages,
+  channelJoins,
+  inboxes,
+  messages,
+  users,
+} from "../src/db/schema";
 import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
 import { INIT } from "./util";
@@ -142,7 +148,8 @@ describe("/ext/message/send", async () => {
     expect(j.replyingMessageId).toBe("TESTMESSAGE1");
     expect(j.replyingMessageId).toBe("TESTMESSAGE1");
 
-    const inboxAdded = db.select({ messageId: inboxes.messageId })
+    const inboxAdded = db
+      .select({ messageId: inboxes.messageId })
       .from(inboxes)
       .where(eq(inboxes.messageId, j.id))
       .get();
@@ -231,6 +238,178 @@ describe("/ext/message/send", async () => {
       path: "/ext/message/send",
       method: "POST",
       body: { channelId: "", message: "hi" },
+    });
+
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("/ext/message/edit", async () => {
+  beforeAll(async () => {
+    //編集対象はBot名義(BOTUSER)のメッセージに限られる
+    await db
+      .insert(messages)
+      .values([
+        {
+          id: "BOTMESSAGE1",
+          channelId: "TESTCHANNEL1",
+          content: "bot message 1",
+          userId: "BOTUSER",
+        },
+        {
+          id: "BOTMESSAGE2",
+          channelId: "TESTCHANNEL1",
+          content: "bot message 2",
+          userId: "BOTUSER",
+        },
+      ])
+      .onConflictDoNothing();
+  });
+
+  it("サーバーでBotが無効化されている", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "edited" },
+    });
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot is not enabled on this server");
+  });
+
+  it("未承認のBot", async () => {
+    await setBotApproved(false);
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "edited" },
+    });
+    await setBotApproved(true);
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Bot is not approved yet");
+  });
+
+  it("作成者がBANされたBot", async () => {
+    await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(eq(users.id, "TESTUSER"));
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "edited" },
+    });
+    await db
+      .update(users)
+      .set({ isBanned: false })
+      .where(eq(users.id, "TESTUSER"));
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("This bot is disabled");
+  });
+
+  it("未知のtokenCode", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      token: "NOT_EXIST_TOKEN",
+      body: { messageId: "BOTMESSAGE1", message: "edited" },
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("authorizationヘッダ無し", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      token: null,
+      body: { messageId: "BOTMESSAGE1", message: "edited" },
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("正常 :: Bot名義のメッセージが編集される", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "bot message 1 (edited)" },
+    });
+    const j = await res.json();
+
+    expect(res.ok).toBe(true);
+    expect(j.id).toBe("BOTMESSAGE1");
+    expect(j.channelId).toBe("TESTCHANNEL1");
+    expect(j.content).toBe("bot message 1 (edited)");
+    expect(j.userId).toBe("BOTUSER");
+    expect(j.isEdited).toBeTrue();
+
+    //DB側も更新されている
+    const saved = db
+      .select({ content: messages.content, isEdited: messages.isEdited })
+      .from(messages)
+      .where(eq(messages.id, "BOTMESSAGE1"))
+      .get();
+    expect(saved?.content).toBe("bot message 1 (edited)");
+    expect(saved?.isEdited).toBeTrue();
+  });
+
+  it("内容が同じ", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "bot message 1 (edited)" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Message is already same");
+  });
+
+  it("空白のみのメッセージ", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "BOTMESSAGE1", message: "   \n " },
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Message is empty");
+  });
+
+  it("Bot名義でないメッセージの編集", async () => {
+    //TESTMESSAGE2 は TESTUSER 名義なので、BotのremoteUserIdとは一致しない
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE2", message: "hijack" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not sender of this message");
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE999", message: "edited" },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Message not found");
+  });
+
+  it("messageIdが空", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/edit",
+      method: "POST",
+      body: { messageId: "", message: "edited" },
     });
 
     expect(res.status).toBe(422);

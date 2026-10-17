@@ -60,4 +60,40 @@ export const ext = new Elysia({ prefix: "/ext" })
       },
       bindUrlPreview: true,
     },
+  )
+  .post(
+    "/message/edit",
+    async ({
+      CheckBotToken: { _remoteUserId },
+      body: { messageId, message },
+      server,
+    }) => {
+      const messageEditing = await ServiceMessage.Edit(
+        messageId,
+        message,
+        _remoteUserId,
+      );
+
+      //WS通知、Botには通知しない
+      server?.publish(
+        `channel::${messageEditing.channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
+          data: messageEditing,
+        }),
+      );
+
+      return messageEditing;
+    },
+    {
+      body: t.Object({
+        messageId: t.String({ minLength: 1 }),
+        message: t.String(),
+      }),
+      detail: {
+        description: "Botとしてメッセージを編集します",
+        tags: ["Bot", "Message"],
+      },
+      bindUrlPreview: true,
+    },
   );
