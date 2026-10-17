@@ -15,7 +15,7 @@ import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
 import { INIT } from "./util";
 
-//ext.module は index.ts の app に未登録のため、テスト内で単体マウントする
+//ext.module は index.ts の app に登録済みだが、RequestLogger等を挟まずルート単体で検証するため単体マウントする
 const botApp = new Elysia().use(ext);
 
 /**
