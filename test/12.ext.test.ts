@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ext } from "../src/components/Ext/ext.module";
-import { botManages, channelJoins, messages, users } from "../src/db/schema";
+import { botManages, channelJoins, inboxes, messages, users } from "../src/db/schema";
 import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
 import { INIT } from "./util";
@@ -59,6 +59,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(inboxes).where(eq(inboxes.userId, "TESTUSER"));
   await db.delete(messages).where(eq(messages.userId, "BOTUSER"));
   await db.delete(channelJoins).where(eq(channelJoins.userId, "BOTUSER"));
 });
@@ -118,12 +119,11 @@ describe("/ext/message/send", async () => {
     const j = await res.json();
 
     expect(res.ok).toBe(true);
-    expect(j.message).toBe("Sent message");
-    expect(j.data.messageSaved.content).toBe("Hello from bot");
-    expect(j.data.messageSaved.channelId).toBe("TESTCHANNEL1");
+    expect(j.content).toBe("Hello from bot");
+    expect(j.channelId).toBe("TESTCHANNEL1");
     //CheckBotToken が解決した remoteUserId(BOTUSER)名義になる
-    expect(j.data.messageSaved.userId).toBe("BOTUSER");
-    expect(j.data.messageReplyingTo).toBeUndefined();
+    expect(j.userId).toBe("BOTUSER");
+    expect(j.replyingMessageId).toBeNull();
   });
 
   it("正常 :: 返信先メッセージを指定して送信", async () => {
@@ -139,8 +139,14 @@ describe("/ext/message/send", async () => {
     const j = await res.json();
 
     expect(res.ok).toBe(true);
-    expect(j.data.messageSaved.replyingMessageId).toBe("TESTMESSAGE1");
-    expect(j.data.messageReplyingTo.id).toBe("TESTMESSAGE1");
+    expect(j.replyingMessageId).toBe("TESTMESSAGE1");
+    expect(j.replyingMessageId).toBe("TESTMESSAGE1");
+
+    const inboxAdded = db.select({ messageId: inboxes.messageId })
+      .from(inboxes)
+      .where(eq(inboxes.messageId, j.id))
+      .get();
+    expect(inboxAdded?.messageId).toBe(j.id);
   });
 
   it("空白のみのメッセージ", async () => {

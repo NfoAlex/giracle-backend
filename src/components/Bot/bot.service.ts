@@ -30,8 +30,11 @@ export namespace ServiceBot {
       });
 
       return botData;
-    } catch(e) {
-      if (e instanceof Error && e.message.includes("UNIQUE constraint failed: ")) {
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message.includes("UNIQUE constraint failed: ")
+      ) {
         throw status(400, "Requested name is used by other bot or user");
       }
       throw e;

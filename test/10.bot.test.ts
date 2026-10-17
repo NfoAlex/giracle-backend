@@ -39,7 +39,9 @@ describe("PUT /bot", async () => {
       body: { name: "BotTestCreated1", introduction: "duplicate" },
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Requested name is used by other bot or user");
+    expect(await res.text()).toBe(
+      "Requested name is used by other bot or user",
+    );
 
     //ロールバックされBotManage行は残らない
     const duplicated = await db.query.users.findMany({
