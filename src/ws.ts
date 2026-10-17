@@ -1,12 +1,27 @@
-import Elysia, { t } from "elysia";
+import Elysia, { status, t } from "elysia";
 import { QueryToken } from "./queries/token.query";
 import { Util } from "./Util";
+
+// index.tsのcors設定と同一ソース。exact match用
+const ALLOWED_WS_ORIGINS: ReadonlySet<string> = new Set(
+  (Bun.env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 export const wsHandler = new Elysia().ws("/ws", {
   body: t.Object({
     signal: t.String({ minLength: 1 }),
     data: t.String({ minLength: 1 }),
   }),
+
+  // Cookie認証のためOrigin必須。欠落・不正はupgradeさせない(空設定時はfail closed)
+  beforeHandle({ request }) {
+    const origin = request.headers.get("origin");
+    if (!origin || !ALLOWED_WS_ORIGINS.has(origin))
+      return status(403, "Forbidden");
+  },
 
   message(ws, { signal }) {
     //pingを受け取ったらpongを返す
