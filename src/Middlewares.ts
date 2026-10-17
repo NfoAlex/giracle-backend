@@ -441,6 +441,9 @@ export namespace Middleware {
       const { CheckToken } = ctx as typeof ctx & {
         CheckToken?: { _userId: string };
       };
+      const { CheckBotToken } = ctx as typeof ctx & {
+        CheckBotToken?: { _remoteUserId: string };
+      };
 
       //set.statusは string | number | undefined なので数値に揃える
       const responseStatus =
@@ -463,7 +466,7 @@ export namespace Middleware {
 
       try {
         await QueryRequestLog.insertLog({
-          userId: CheckToken?._userId ?? null,
+          userId: (CheckToken?._userId ?? CheckBotToken?._remoteUserId) ?? null,
           method: request.method,
           path,
           status: responseStatus,
