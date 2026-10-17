@@ -7,6 +7,7 @@ import {
   botManages,
   channelJoins,
   inboxes,
+  messageReactions,
   messages,
   users,
 } from "../src/db/schema";
@@ -410,6 +411,172 @@ describe("/ext/message/edit", async () => {
       path: "/ext/message/edit",
       method: "POST",
       body: { messageId: "", message: "edited" },
+    });
+
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("/ext/message/delete", async () => {
+  beforeAll(async () => {
+    //削除対象はBot名義(BOTUSER)のメッセージに限られる
+    await db
+      .insert(messages)
+      .values({
+        id: "BOTMESSAGEDEL",
+        channelId: "TESTCHANNEL1",
+        content: "bot message to delete",
+        userId: "BOTUSER",
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(inboxes)
+      .values({
+        type: "message",
+        messageId: "BOTMESSAGEDEL",
+        userId: "TESTUSER",
+      })
+      .onConflictDoNothing();
+    await db
+      .insert(messageReactions)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        emojiCode: "👍",
+        messageId: "BOTMESSAGEDEL",
+      })
+      .onConflictDoNothing();
+  });
+
+  it("サーバーでBotが無効化されている", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bot is not enabled on this server");
+  });
+
+  it("未承認のBot", async () => {
+    await setBotApproved(false);
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+    await setBotApproved(true);
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Bot is not approved yet");
+  });
+
+  it("作成者がBANされたBot", async () => {
+    await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(eq(users.id, "TESTUSER"));
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+    await db
+      .update(users)
+      .set({ isBanned: false })
+      .where(eq(users.id, "TESTUSER"));
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("This bot is disabled");
+  });
+
+  it("未知のtokenCode", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      token: "NOT_EXIST_TOKEN",
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("authorizationヘッダ無し", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      token: null,
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Message not found");
+  });
+
+  it("Bot名義でないメッセージの削除", async () => {
+    //TESTMESSAGE2 は TESTUSER 名義なのでBotには削除できない
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE2" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("You are not owner of this message");
+  });
+
+  it("正常 :: Bot名義のメッセージと関連データが削除される", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "BOTMESSAGEDEL" },
+    });
+    const j = await res.json();
+
+    expect(res.ok).toBe(true);
+    expect(j.id).toBe("BOTMESSAGEDEL");
+    expect(j.channelId).toBe("TESTCHANNEL1");
+
+    //メッセージ本体と関連データ(通知/リアクション)が消えている
+    expect(
+      db.select().from(messages).where(eq(messages.id, "BOTMESSAGEDEL")).get(),
+    ).toBeUndefined();
+    expect(
+      db
+        .select()
+        .from(inboxes)
+        .where(eq(inboxes.messageId, "BOTMESSAGEDEL"))
+        .get(),
+    ).toBeUndefined();
+    expect(
+      db
+        .select()
+        .from(messageReactions)
+        .where(eq(messageReactions.messageId, "BOTMESSAGEDEL"))
+        .get(),
+    ).toBeUndefined();
+  });
+
+  it("messageIdが空", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/message/delete",
+      method: "DELETE",
+      body: { messageId: "" },
     });
 
     expect(res.status).toBe(422);

@@ -96,4 +96,33 @@ export const ext = new Elysia({ prefix: "/ext" })
       },
       bindUrlPreview: true,
     },
+  )
+  .delete(
+    "/message/delete",
+    async ({ body: { messageId }, CheckBotToken: { _remoteUserId }, server }) => {
+      const messageDeleted = await ServiceMessage.Delete(messageId, _remoteUserId);
+
+      //WSで通知、Botには通知しない
+      server?.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "message::MessageDeleted",
+          data: {
+            messageId: messageDeleted.id,
+            channelId: messageDeleted.channelId,
+          },
+        }),
+      );
+
+      return messageDeleted;
+    },
+    {
+      body: t.Object({
+        messageId: t.String({ minLength: 1 }),
+      }),
+      detail: {
+        description: "Botとして自分のメッセージを削除する",
+        tags: ["Bot", "Message"],
+      }
+    }
   );
