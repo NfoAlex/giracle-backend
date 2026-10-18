@@ -88,7 +88,7 @@ export const bot = new Elysia({ prefix: "/bot" })
     {
       body: t.Object({
         botId: t.String(),
-        name: t.Optional(t.String({ minLength: 2 })),
+        name: t.Optional(t.String({ minLength: 2, maxLength: 32 })),
         selfIntroduction: t.Optional(t.String({ maxLength: 128 })),
       }),
       detail: {
