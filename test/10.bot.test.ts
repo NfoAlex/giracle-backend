@@ -14,6 +14,25 @@ beforeAll(async () => {
   GIRACLE_SERVER_CONFIG.BotEnabled = true;
 });
 
+//disconnect() は文字列(JSON)を send してから close する
+function fakeDisconnectWs() {
+  let closed = false;
+  return {
+    ws: {
+      raw: { id: `RAW_BOT_DISCONNECT_${Math.random()}` },
+      send: () => {},
+      close: () => {
+        closed = true;
+      },
+      subscribe: () => {},
+      unsubscribe: () => {},
+      publish: () => {},
+      // biome-ignore lint/suspicious/noExplicitAny: WSハンドラの型はElysia内部のためanyで受け取る
+    } as any,
+    isClosed: () => closed,
+  };
+}
+
 describe("PUT /bot", async () => {
   it("正常", async () => {
     const res = await FETCH({
@@ -175,6 +194,21 @@ describe("DELETE /bot", async () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("正常 :: 削除したBotのWS接続も切れる", async () => {
+    const { bot, remoteUser } = await ServiceBot.PutBot(
+      "TESTUSER",
+      "BotDeleteWs1",
+      "",
+    );
+    const { ws, isClosed } = fakeDisconnectWs();
+    Util.wsUserInstance.add(remoteUser.id, ws);
+
+    await ServiceBot.DeleteBot("TESTUSER", bot.id);
+
+    expect(Util.wsUserInstance.instances.has(remoteUser.id)).toBe(false);
+    expect(isClosed()).toBeTrue();
   });
 });
 
@@ -761,6 +795,47 @@ describe("POST /", () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("正常 :: 改名で未承認になったBotのWS接続も切れる", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdateWs1", "");
+    await QueryBot.updateBotIsApproved({ botId: bot.id, isApproved: true });
+    const { ws, isClosed } = fakeDisconnectWs();
+    Util.wsUserInstance.add(remoteUser.id, ws);
+
+    await ServiceBot.Update("TESTUSER", bot.id, "BotUpdateWs1Renamed");
+
+    expect(Util.wsUserInstance.instances.has(remoteUser.id)).toBe(false);
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("異常 :: 既存名への改名は400", async () => {
+    await createBot("BotUpdateDupA", "");
+    const { bot } = await createBot("BotUpdateDupB", "");
+
+    const err = await catchStatus(
+      ServiceBot.Update("TESTUSER", bot.id, "BotUpdateDupA"),
+    );
+
+    expect(err?.code).toBe(400);
+    expect(err?.response).toBe("Requested name is used by other bot or user");
+  });
+
+  it("異常 :: 32文字を超える名前では更新されない", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdateLong1", "");
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "POST",
+      body: { botId: bot.id, name: "a".repeat(33) },
+    });
+
+    //app経由ではバリデーションエラーがonErrorで500になるため状態コードは固定しない
+    expect(res.ok).toBeFalse();
+    const row = await db.query.users.findFirst({
+      where: eq(users.id, remoteUser.id),
+    });
+    expect(row?.name).toBe("BotUpdateLong1");
   });
 });
 

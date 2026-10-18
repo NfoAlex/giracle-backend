@@ -13,7 +13,7 @@ import {
 } from "../src/db/schema";
 import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
-import { INIT } from "./util";
+import { FETCH, INIT } from "./util";
 
 //ext.module は index.ts の app に登録済みだが、RequestLogger等を挟まずルート単体で検証するため単体マウントする
 const botApp = new Elysia().use(ext);
@@ -57,6 +57,7 @@ async function setBotApproved(isApproved: boolean) {
 
 beforeAll(async () => {
   await INIT();
+  GIRACLE_SERVER_CONFIG.BotEnabled = true;
   await setBotApproved(true);
   //BOTMANAGETOKEN の持ち主(BOTUSER)を送信先チャンネルへ参加させる
   await db
@@ -670,5 +671,178 @@ describe("ext WS close", () => {
       signal: "user::Disconnected",
       data: "BOTUSER",
     });
+  });
+});
+
+describe("ext WS open", () => {
+  //biome-ignore lint/suspicious/noExplicitAny: Elysiaのルートフック呼び出しのためany
+  const getOpen = () => (extWsHandler.routes[0].hooks as any).open;
+
+  function fakeOpenWs(token?: string) {
+    const sent: { signal: string; data: string }[] = [];
+    const subscribed: string[] = [];
+    let closed = false;
+    return {
+      ws: {
+        data: { headers: token === undefined ? {} : { authorization: token } },
+        raw: { id: `RAW_EXT_OPEN_${Math.random()}` },
+        send: (payload: string | { signal: string; data: string }) =>
+          sent.push(
+            typeof payload === "string" ? JSON.parse(payload) : payload,
+          ),
+        close: () => {
+          closed = true;
+        },
+        subscribe: (topic: string) => subscribed.push(topic),
+        unsubscribe: () => {},
+        publish: () => {},
+        //biome-ignore lint/suspicious/noExplicitAny: WSハンドラの型はElysia内部のためanyで受け取る
+      } as any,
+      sent,
+      subscribed,
+      isClosed: () => closed,
+    };
+  }
+
+  it("authorizationヘッダ無しは接続しない", async () => {
+    const { ws, sent, isClosed } = fakeOpenWs();
+
+    await getOpen()(ws);
+
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "Bot token not valid",
+    });
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("未知のtokenCodeは接続しない", async () => {
+    const { ws, sent, isClosed } = fakeOpenWs("NOT_EXISTING_TOKEN");
+
+    await getOpen()(ws);
+
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "Bot token not valid",
+    });
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("未承認のBotは接続しない", async () => {
+    await setBotApproved(false);
+    const { ws, sent, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+
+    try {
+      await getOpen()(ws);
+    } finally {
+      await setBotApproved(true);
+    }
+
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "Your bot is not approved yet",
+    });
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("作成者がBANされたBotは接続しない", async () => {
+    await db
+      .update(users)
+      .set({ isBanned: true })
+      .where(eq(users.id, "TESTUSER"));
+    const { ws, sent, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+
+    try {
+      await getOpen()(ws);
+    } finally {
+      await db
+        .update(users)
+        .set({ isBanned: false })
+        .where(eq(users.id, "TESTUSER"));
+    }
+
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "This bot is disabled",
+    });
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("作成者が削除されたBotは接続しない", async () => {
+    await db
+      .update(users)
+      .set({ isDeleted: true })
+      .where(eq(users.id, "TESTUSER"));
+    const { ws, sent, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+
+    try {
+      await getOpen()(ws);
+    } finally {
+      await db
+        .update(users)
+        .set({ isDeleted: false })
+        .where(eq(users.id, "TESTUSER"));
+    }
+
+    expect(isClosed()).toBeTrue();
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "User not found. This is a server side issue",
+    });
+  });
+
+  it("サーバーでBotが無効化されているときは接続しない", async () => {
+    GIRACLE_SERVER_CONFIG.BotEnabled = false;
+    const { ws, sent, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+
+    try {
+      await getOpen()(ws);
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    }
+
+    expect(sent).toContainEqual({
+      signal: "ERROR",
+      data: "Bot is not enabled on this server",
+    });
+    expect(isClosed()).toBeTrue();
+  });
+
+  it("正常 :: 購読するのはBot自身が見れるチャンネルのみ", async () => {
+    const { ws, subscribed, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+
+    try {
+      await getOpen()(ws);
+    } finally {
+      Util.wsUserInstance.instances.delete("BOTUSER");
+    }
+
+    expect(isClosed()).toBeFalse();
+    expect(subscribed).toContain("user::BOTUSER");
+    //BOTUSERが参加しているチャンネルは購読される
+    expect(subscribed).toContain("bot::channel::TESTCHANNEL1");
+    //作成者(TESTUSER)だけが見れる非公開チャンネルは購読しない
+    expect(subscribed).not.toContain("bot::channel::TESTCHANNEL3");
+    expect(subscribed).not.toContain("bot::channel::TESTCHANNEL4");
+  });
+
+  it("BotEnabledを無効化すると接続中のBotも切れる", async () => {
+    const { ws, isClosed } = fakeOpenWs("BOTMANAGETOKEN");
+    Util.wsUserInstance.add("BOTUSER", ws);
+
+    const res = await FETCH({
+      path: "/server/change-config",
+      method: "POST",
+      body: { BotEnabled: false },
+      useAdminUser: true,
+    });
+
+    try {
+      expect(res.ok).toBe(true);
+      expect(Util.wsUserInstance.instances.has("BOTUSER")).toBe(false);
+      expect(isClosed()).toBeTrue();
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    }
   });
 });
