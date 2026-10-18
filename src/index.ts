@@ -1,5 +1,5 @@
-//ユーザーアップロード用のディレクトリ作成
-import { mkdir } from "node:fs/promises";
+//初期処理(ディレクトリ作成・Cron・シード・Web Push・ServerConfig読み込み)
+import "./init";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { bot } from "./components/Bot/bot.module";
@@ -14,79 +14,14 @@ import { Middleware } from "./Middlewares";
 import { wsHandler } from "./ws";
 import { extWsHandler } from "./ws.ext";
 
-await mkdir("./STORAGE", { recursive: true }).catch((_) => {});
-await mkdir("./STORAGE/file", { recursive: true }).catch((_) => {});
-await mkdir("./STORAGE/icon", { recursive: true }).catch((_) => {});
-await mkdir("./STORAGE/banner", { recursive: true }).catch((_) => {});
-await mkdir("./STORAGE/custom-emoji", { recursive: true }).catch((_) => {});
-await mkdir("./STORAGE/thumbnail", { recursive: true }).catch((_) => {});
-
-//cron適用
-import "./Cron";
-
 //DB設定 (Drizzle)
 export { db } from "./db";
-
-import { seedIt } from "./db/seeds";
-
-//起動時にシードを投入(migrate済みDBが前提)。
-await seedIt();
-
-//プッシュ通知設定
-import webpush from "web-push";
-
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
-let vapidReady = false;
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    vapidReady = true;
-  } catch (e) {
-    console.warn(
-      "index :: VAPID setVapidDetails failed, web push disabled:",
-      e,
-    );
-  }
-} else {
-  console.warn("index :: VAPID keys are not set. Web push is disabled.");
-}
-export const ConstWebPush = {
-  isWebPushReady: vapidReady,
-  getVapidPublicKey: VAPID_PUBLIC_KEY,
-};
-
-import type { serverConfigs } from "./db/schema";
-import { QueryServerConfig } from "./queries/serverConfig.query";
-//グローバルに使えるGiracleサーバーの設定
-//ServerConfigが引けないときはスキーマ既定値で埋める(未設定で招待制チェックや文字数上限が素通りするのを防ぐ)
-export const GIRACLE_SERVER_CONFIG: typeof serverConfigs.$inferSelect = {
-  id: 0,
-  name: "Giracle",
-  introduction: "",
-  RegisterAvailable: true,
-  RegisterInviteOnly: true,
-  RegisterAnnounceChannelId: "",
-  MessageMaxLength: 3000,
-  MessageMaxFileSize: 512000,
-  BotEnabled: false,
-};
-
-export async function reloadServerConfig() {
-  const config = await QueryServerConfig.getSingle();
-  if (!config) {
-    throw new Error("Server config not found");
-  }
-  Object.assign(GIRACLE_SERVER_CONFIG, config);
-}
-
-try {
-  await reloadServerConfig();
-} catch (e) {
-  // 取得できない場合スキーマ既定値のまま。設定変更が効かないので通知は出す
-  console.error("index :: ServerConfigの取得に失敗。既定値で起動します", e);
-}
+//初期処理から
+export {
+  ConstWebPush,
+  GIRACLE_SERVER_CONFIG,
+  reloadServerConfig,
+} from "./init";
 
 export const app = new Elysia({
   //16MB
