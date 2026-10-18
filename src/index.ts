@@ -27,6 +27,11 @@ import "./Cron";
 //DB設定 (Drizzle)
 export { db } from "./db";
 
+import { seedIt } from "./db/seeds";
+
+//起動時にシードを投入(migrate済みDBが前提)。
+await seedIt();
+
 //プッシュ通知設定
 import webpush from "web-push";
 
