@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceMessage } from "../Message/message.service";
+import { ServiceUser } from "../User/user.service";
 
 export const ext = new Elysia({ prefix: "/ext" })
   .use(Middleware.CheckBotToken)
@@ -124,5 +125,18 @@ export const ext = new Elysia({ prefix: "/ext" })
         description: "Botとして自分のメッセージを削除する",
         tags: ["Bot", "Message"],
       }
+    }
+  )
+  .get(
+    "/user/:userId",
+    async ({ params: { userId }, CheckBotToken: { _remoteUserId } }) => {
+      const user = await ServiceUser.GetUserInfo(_remoteUserId, userId);
+
+      return user;
+    },
+    {
+      params: t.Object({
+        userId: t.String({ minLength: 1 })
+      })
     }
   );

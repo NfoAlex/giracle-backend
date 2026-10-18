@@ -583,6 +583,60 @@ describe("/ext/message/delete", async () => {
   });
 });
 
+describe("/ext/user/:userId", () => {
+  it("未知のtokenCode", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/user/TESTUSER",
+      method: "GET",
+      token: "NOT_EXIST_TOKEN",
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("authorizationヘッダ無し", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/user/TESTUSER",
+      method: "GET",
+      token: null,
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe("Invalid token");
+  });
+
+  it("存在しないユーザー", async () => {
+    const res = await FETCHBOT({
+      path: "/ext/user/NOTEXISTUSER999",
+      method: "GET",
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("User not found");
+  });
+
+  it("正常 :: ユーザー情報が取得できる", async () => {
+    const res = await FETCHBOT({ path: "/ext/user/TESTUSER", method: "GET" });
+    const j = await res.json();
+
+    expect(res.ok).toBe(true);
+    expect(j.id).toBe("TESTUSER");
+    expect(j.name).toBe("testsystemuser");
+  });
+
+  it("正常 :: Botが参加していないチャンネルはChannelJoinから除外される", async () => {
+    //TESTUSER は TESTCHANNEL1/2 に参加しているが、BOTUSER は TESTCHANNEL1 のみ
+    const res = await FETCHBOT({ path: "/ext/user/TESTUSER", method: "GET" });
+    const j = await res.json();
+
+    expect(res.ok).toBe(true);
+    expect(
+      j.ChannelJoin.map((c: { channelId: string }) => c.channelId),
+    ).toEqual(["TESTCHANNEL1"]);
+  });
+});
+
 describe("ext WS close", () => {
   //close 時に Bot 行が消えている(削除直後等)ケースを模擬するダミーWS
   function fakeWs(raw: object) {
