@@ -59,6 +59,12 @@ export namespace ServiceBot {
       if (botDeleted === undefined) {
         throw status(404, "Bot not found");
       }
+      //削除したBotにBotロールを残さない
+      QueryRoleLink.removeLinkInTx(tx, {
+        userId: botDeleted.remoteUserId,
+        roleId: "BOT",
+      });
+
       const user = QueryUser.setDeletedInTx(tx, {
         userId: botDeleted.remoteUserId,
       });

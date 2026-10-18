@@ -116,6 +116,31 @@ describe("DELETE /bot", async () => {
     expect(deletedUser?.isDeleted).toBe(true);
   });
 
+  it("正常 :: BOTロールリンクが消える", async () => {
+    const created = await (
+      await FETCH({
+        path: "/bot",
+        method: "PUT",
+        body: { name: "BotTestDeleted3", introduction: "to be deleted" },
+      })
+    ).json();
+    const { botId, remoteUserId } = {
+      botId: created.data.bot.id,
+      remoteUserId: created.data.remoteUser.id,
+    };
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "DELETE",
+      body: { botId },
+    });
+    expect(res.ok).toBe(true);
+
+    //削除済みBotにロール付与が残らない
+    const links = await QueryRoleLink.getLinksByUser({ userId: remoteUserId });
+    expect(links).toEqual([]);
+  });
+
   it("存在しないBotを削除しようとする", async () => {
     const res = await FETCH({
       path: "/bot",

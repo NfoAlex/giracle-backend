@@ -118,6 +118,21 @@ export namespace QueryRoleLink {
     tx.delete(roleLinks).where(eq(roleLinks.roleId, query.roleId)).run();
   };
 
+  //トランザクション内でユーザーからロールを剥奪する
+  export const removeLinkInTx = (
+    tx: Tx,
+    query: { userId: string; roleId: string },
+  ) => {
+    tx.delete(roleLinks)
+      .where(
+        and(
+          eq(roleLinks.userId, query.userId),
+          eq(roleLinks.roleId, query.roleId),
+        ),
+      )
+      .run();
+  };
+
   //トランザクション内でユーザーにロールを付与する
   export const insertLinkInTx = (
     tx: Tx,
