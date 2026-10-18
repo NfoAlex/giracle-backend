@@ -4,6 +4,7 @@ import { db, GIRACLE_SERVER_CONFIG } from "../src";
 import { ServiceBot } from "../src/components/Bot/bot.service";
 import { botManages, users } from "../src/db/schema";
 import { QueryBot } from "../src/queries/bot.query";
+import { QueryRoleLink } from "../src/queries/roleLink.query";
 import { QueryUser } from "../src/queries/user.query";
 import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
@@ -30,6 +31,21 @@ describe("PUT /bot", async () => {
     expect(j.data.remoteUser.name).toBe("BotTestCreated1");
     expect(j.data.remoteUser.selfIntroduction).toBe("Created this for test");
     expect(j.data.bot.createdBy).toBe("TESTUSER");
+  });
+
+  it("正常 :: 作成時にBOTロールがリンクされる", async () => {
+    const res = await FETCH({
+      path: "/bot",
+      method: "PUT",
+      body: { name: "BotRoleLink1", introduction: "" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+
+    const links = await QueryRoleLink.getLinksByUser({
+      userId: j.data.remoteUser.id,
+    });
+    expect(links.map((l) => l.roleId)).toContain("BOT");
   });
 
   it("同名で作成してみる", async () => {
@@ -744,6 +760,30 @@ describe("トランザクションの原子性", () => {
     expect(
       await db.query.users.findFirst({
         where: eq(users.name, "BotTestOrphan1"),
+      }),
+    ).toBeUndefined();
+  });
+
+  it("ロールリンクの作成に失敗したらリモートユーザーもBot行も残らない", async () => {
+    //ロールリンク挿入だけを失敗させ、ユーザーとBot行が巻き戻ることを見る
+    const stub = QueryRoleLink as {
+      insertLinkInTx: typeof QueryRoleLink.insertLinkInTx;
+    };
+    const original = stub.insertLinkInTx;
+    stub.insertLinkInTx = () => {
+      throw new Error("role link failed");
+    };
+    try {
+      await expect(
+        ServiceBot.PutBot("TESTUSER", "BotTestOrphan2"),
+      ).rejects.toThrow("role link failed");
+    } finally {
+      stub.insertLinkInTx = original;
+    }
+
+    expect(
+      await db.query.users.findFirst({
+        where: eq(users.name, "BotTestOrphan2"),
       }),
     ).toBeUndefined();
   });

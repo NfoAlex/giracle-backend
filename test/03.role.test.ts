@@ -227,6 +227,22 @@ describe("/role/link", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("Botロールはリンクできない", async () => {
+    //作成時に自動でリンクされる専用ロールなので、後から付与させない
+    const res = await FETCH({
+      path: "/role/link",
+      method: "POST",
+      body: {
+        userId: "TESTUSER2",
+        roleId: "BOT",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("You cannot link default role");
+    expect(res.status).toBe(400);
+    expect(res.ok).toBe(false);
+  });
+
   it("権限ない人によるリンク", async () => {
     const res = await FETCH({
       path: "/role/link",
