@@ -47,7 +47,7 @@ export namespace QueryRoleLink {
     userId: string;
     roleTerm: string;
   }) => {
-    //roleTermはルート定義から渡される動的なカラム名のため
+    //SAFETY: roleTermはルート定義から渡される動的なカラム名で、roleInfosの列に必ず存在する
     const roleTermColumn = (roleInfos as unknown as Record<string, unknown>)[
       query.roleTerm
     ];
