@@ -1,4 +1,5 @@
 import Elysia, { t } from "elysia";
+import { GIRACLE_SERVER_CONFIG } from "./init";
 import { QueryBot } from "./queries/bot.query";
 import { QueryUser } from "./queries/user.query";
 import { Util } from "./Util";
@@ -33,6 +34,16 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
   },
 
   async open(ws) {
+    //HTTP側(CheckBotToken)と同じく無効化中は受け付けない
+    if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+      ws.send({
+        signal: "ERROR",
+        data: "Bot is not enabled on this server",
+      });
+      ws.close();
+      return;
+    }
+
     const botToken = ws.data.headers.authorization;
     if (botToken === undefined) {
       ws.send({
@@ -89,8 +100,8 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
 
     ws.subscribe(`user::${botData.remoteUserId}`);
 
-    //Botユーザーの閲覧可能チャンネルへサブスク
-    const channelsViewable = await GetUserViewableChannel(botData.createdBy);
+    //Botユーザーの閲覧可能チャンネルへサブスク(作成者の権限で広げない)
+    const channelsViewable = await GetUserViewableChannel(botData.remoteUserId);
     for (const channel of channelsViewable) {
       ws.subscribe(`bot::channel::${channel.id}`);
     }

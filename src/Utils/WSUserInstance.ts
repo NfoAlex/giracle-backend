@@ -134,6 +134,17 @@ export namespace WSUserInstance {
   }
 
   /**
+   * 全BotのWS接続を切断する(BotEnabledの無効化時に使用)
+   * @param reason 切断時に送る理由
+   */
+  export async function disconnectAllBots(reason?: string): Promise<void> {
+    const bots = await QueryBot.getAllRemoteUserIds();
+    for (const bot of bots) {
+      disconnect(bot.remoteUserId, reason);
+    }
+  }
+
+  /**
    * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルを購読させる
    * @param userId
    * @param wsChannel

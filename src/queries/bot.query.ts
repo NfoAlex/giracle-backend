@@ -102,6 +102,13 @@ export namespace QueryBot {
       .where(eq(botManages.createdBy, query.createdBy));
   };
 
+  //全BotのリモートユーザーId一覧(BotEnabled無効化時にWSを切るため)
+  export const getAllRemoteUserIds = async () => {
+    return await db
+      .select({ remoteUserId: botManages.remoteUserId })
+      .from(botManages);
+  };
+
   //ユーザーが作成したBot一覧(作成順。cursorBotで継続取得)
   export const getList = async (query: {
     createdBy: string;

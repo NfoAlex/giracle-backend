@@ -121,7 +121,15 @@ export namespace ServiceServer {
       GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
     if (MessageMaxFileSize !== undefined)
       GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
-    if (BotEnabled !== undefined) GIRACLE_SERVER_CONFIG.BotEnabled = BotEnabled;
+    if (BotEnabled !== undefined) {
+      GIRACLE_SERVER_CONFIG.BotEnabled = BotEnabled;
+      //無効化したら接続中のBotも切る(open時の判定しか効かないため)
+      if (!BotEnabled) {
+        await Util.wsUserInstance.disconnectAllBots(
+          "Bot is not enabled on this server",
+        );
+      }
+    }
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
