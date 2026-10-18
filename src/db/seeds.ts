@@ -1,19 +1,27 @@
 import { db, sqlite } from "./index";
 import { roleInfos, serverConfigs, users } from "./schema";
 
-async function main() {
-  await db.insert(serverConfigs).values({
-    name: "Giracle",
-    introduction: "みんなで楽しめるチャットサーバー。",
-  });
+// 起動毎に呼ばれる冪等シード。非冪等な処理を足さないこと
+// (既存行は onConflictDoNothing で無視される前提)
+export async function seedIt() {
+  await db
+    .insert(serverConfigs)
+    .values({
+      name: "Giracle",
+      introduction: "みんなで楽しめるチャットサーバー。",
+    })
+    .onConflictDoNothing();
 
-  await db.insert(users).values({
-    id: "SYSTEM",
-    name: "SYSTEM",
-    selfIntroduction: "This is a system user.",
-  });
+  await db
+    .insert(users)
+    .values({
+      id: "SYSTEM",
+      name: "SYSTEM",
+      selfIntroduction: "This is a system user.",
+    })
+    .onConflictDoNothing();
 
-  const [HOST] = await db
+  await db
     .insert(roleInfos)
     .values({
       id: "HOST",
@@ -21,9 +29,10 @@ async function main() {
       manageServer: true,
       createdUserId: "SYSTEM",
     })
+    .onConflictDoNothing()
     .returning();
 
-  const [MEMBER] = await db
+  await db
     .insert(roleInfos)
     .values({
       id: "MEMBER",
@@ -31,17 +40,32 @@ async function main() {
       manageServer: false,
       createdUserId: "SYSTEM",
     })
+    .onConflictDoNothing()
     .returning();
 
-  console.log("Created HOST role: ", HOST, MEMBER);
+  await db
+    .insert(roleInfos)
+    .values({
+      id: "BOT",
+      name: "Bot",
+      manageServer: false,
+      createdUserId: "SYSTEM",
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  console.log("seeds :: main : Seed完了");
 }
 
-main()
-  .then(() => {
-    sqlite.close();
-  })
-  .catch((e) => {
-    console.error(e);
-    sqlite.close();
-    process.exit(1);
-  });
+// `bun run src/db/seeds.ts` の単発実行用。index.ts から import されたときは走らせない
+if (import.meta.main) {
+  seedIt()
+    .then(() => {
+      sqlite.close();
+    })
+    .catch((e) => {
+      console.error(e);
+      sqlite.close();
+      process.exit(1);
+    });
+}
