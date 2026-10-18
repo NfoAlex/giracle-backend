@@ -50,6 +50,7 @@ export async function seedIt() {
       name: "Bot",
       manageServer: false,
       createdUserId: "SYSTEM",
+      color: "#0000FF"
     })
     .onConflictDoNothing()
     .returning();
