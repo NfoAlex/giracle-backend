@@ -16,7 +16,8 @@ export const wsHandler = new Elysia().ws("/ws", {
     data: t.String({ minLength: 1 }),
   }),
 
-  // Cookie認証のためOrigin必須。欠落・不正はupgradeさせない(空設定時はfail closed)
+  // Cookie認証のためOriginは必須。CORS_ORIGIN設定時は一覧一致のみ許可する
+  // (未設定時は全Originを許可する。HTTP側の cors({origin:false}) とは異なる)
   beforeHandle({ request }) {
     const origin = request.headers.get("origin");
     if (
