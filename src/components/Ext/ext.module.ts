@@ -100,8 +100,15 @@ export const ext = new Elysia({ prefix: "/ext" })
   )
   .delete(
     "/message/delete",
-    async ({ body: { messageId }, CheckBotToken: { _remoteUserId }, server }) => {
-      const messageDeleted = await ServiceMessage.Delete(messageId, _remoteUserId);
+    async ({
+      body: { messageId },
+      CheckBotToken: { _remoteUserId },
+      server,
+    }) => {
+      const messageDeleted = await ServiceMessage.Delete(
+        messageId,
+        _remoteUserId,
+      );
 
       //WSで通知、Botには通知しない
       server?.publish(
@@ -124,8 +131,8 @@ export const ext = new Elysia({ prefix: "/ext" })
       detail: {
         description: "Botとして自分のメッセージを削除する",
         tags: ["Bot", "Message"],
-      }
-    }
+      },
+    },
   )
   .get(
     "/user/:userId",
@@ -136,7 +143,7 @@ export const ext = new Elysia({ prefix: "/ext" })
     },
     {
       params: t.Object({
-        userId: t.String({ minLength: 1 })
-      })
-    }
+        userId: t.String({ minLength: 1 }),
+      }),
+    },
   );

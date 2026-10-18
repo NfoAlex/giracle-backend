@@ -1,5 +1,4 @@
 import Elysia, { file, status, t } from "elysia";
-import { GIRACLE_SERVER_CONFIG } from "../..";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceMessage } from "./message.service";
@@ -518,7 +517,7 @@ export const message = new Elysia({ prefix: "/message" })
     async ({
       body: { messageId, message },
       CheckToken: { _userId },
-      server
+      server,
     }) => {
       const messageEditing = await ServiceMessage.Edit(
         messageId,

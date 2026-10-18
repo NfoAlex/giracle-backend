@@ -466,7 +466,7 @@ export namespace Middleware {
 
       try {
         await QueryRequestLog.insertLog({
-          userId: (CheckToken?._userId ?? CheckBotToken?._remoteUserId) ?? null,
+          userId: CheckToken?._userId ?? CheckBotToken?._remoteUserId ?? null,
           method: request.method,
           path,
           status: responseStatus,

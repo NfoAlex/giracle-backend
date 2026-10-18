@@ -20,8 +20,7 @@ export const wsHandler = new Elysia().ws("/ws", {
   beforeHandle({ request }) {
     const origin = request.headers.get("origin");
     if (
-      !origin
-      ||
+      !origin ||
       (ALLOWED_WS_ORIGINS.size !== 0 && !ALLOWED_WS_ORIGINS.has(origin))
     )
       return status(403, "Forbidden");
