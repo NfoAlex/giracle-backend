@@ -19,7 +19,11 @@ export const wsHandler = new Elysia().ws("/ws", {
   // Cookie認証のためOrigin必須。欠落・不正はupgradeさせない(空設定時はfail closed)
   beforeHandle({ request }) {
     const origin = request.headers.get("origin");
-    if (!origin || !ALLOWED_WS_ORIGINS.has(origin))
+    if (
+      !origin
+      ||
+      (ALLOWED_WS_ORIGINS.size !== 0 && !ALLOWED_WS_ORIGINS.has(origin))
+    )
       return status(403, "Forbidden");
   },
 
