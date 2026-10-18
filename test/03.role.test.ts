@@ -375,7 +375,7 @@ describe("/role/list", async () => {
     const j = await res.json();
     expect(j.message).toBe("Role list");
     expect(res.ok).toBe(true);
-    expect(j.data.length).toBe(6);
+    expect(j.data.length).toBe(7);
   });
 
   it("正常 :: 第２ユーザーとして", async () => {
@@ -387,6 +387,6 @@ describe("/role/list", async () => {
     const j = await res.json();
     expect(j.message).toBe("Role list");
     expect(res.ok).toBe(true);
-    expect(j.data.length).toBe(6);
+    expect(j.data.length).toBe(7);
   });
 });

@@ -1,6 +1,7 @@
 import { status } from "elysia";
 import { db } from "../..";
 import { QueryBot } from "../../queries/bot.query";
+import { QueryRoleLink } from "../../queries/roleLink.query";
 import { QueryUser } from "../../queries/user.query";
 
 export namespace ServiceBot {
@@ -21,6 +22,12 @@ export namespace ServiceBot {
         const botManage = QueryBot.insertWithRemoteUserIdInTx(tx, {
           remoteUserId: botUser.id,
           requestSender: _userId,
+        });
+
+        //Bot専用ロールをリンク
+        QueryRoleLink.insertLinkInTx(tx, {
+          userId: botUser.id,
+          roleId: "BOT",
         });
 
         return {
