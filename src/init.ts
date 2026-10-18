@@ -75,4 +75,4 @@ try {
   console.error("init :: ServerConfigの取得に失敗。既定値で起動します", e);
 }
 
-console.log("init :: ====== 終了 ======")
+console.log("init :: ====== 終了 ======");
