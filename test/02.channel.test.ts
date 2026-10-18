@@ -386,6 +386,29 @@ describe("/channel/get-history/:channelId", async () => {
     expect(resPrivate.status).toBe(404);
     expect(tPrivate).toBe("Channel not found");
   });
+
+  it("他チャンネルのメッセージIdをカーソルに使うと404", async () => {
+    //基準メッセージはチャンネル一致を検証する。不一致を素通しすると他チャンネルの
+    //メッセージIdの存在確認(oracle)に使えてしまう
+    const sent = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      useSecondaryUser: true,
+      body: { channelId: "TESTCHANNEL2", message: "other channel message" },
+    });
+    const sentJson = await sent.json();
+    expect(sent.ok).toBe(true);
+
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: { messageIdFrom: sentJson.data.id },
+    });
+    const t = await res.text();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(404);
+    expect(t).toBe("Message cursor position not found");
+  });
 });
 
 describe("/channel/search", async () => {
