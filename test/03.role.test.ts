@@ -165,6 +165,62 @@ describe("/role/update", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("MEMBERの権限昇格", async () => {
+    //MEMBERは全ユーザーが既定で持つため、MEMBERにmanageRoleを付けると全員が権限管理者になる
+    const res = await FETCH({
+      path: "/role/update",
+      method: "POST",
+      body: {
+        roleId: "MEMBER",
+        roleData: {
+          name: "Member",
+          color: "#ffffff",
+          manageRole: true,
+        },
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("Role power is too powerful");
+    expect(res.status).toBe(400);
+    expect(res.ok).toBe(false);
+  });
+
+  it("MEMBERの権限を下位のものに書き換える", async () => {
+    const res = await FETCH({
+      path: "/role/update",
+      method: "POST",
+      body: {
+        roleId: "MEMBER",
+        roleData: {
+          name: "Renamed Member",
+          color: "#00ff00",
+          manageEmoji: true,
+        },
+      },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Role updated");
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe("MEMBER");
+    expect(j.data.name).toBe("Renamed Member");
+    expect(j.data.manageEmoji).toBeTrue();
+
+    //後続のテストへ影響しないよう元に戻す
+    const revert = await FETCH({
+      path: "/role/update",
+      method: "POST",
+      body: {
+        roleId: "MEMBER",
+        roleData: {
+          name: "Member",
+          color: "#000000",
+          manageEmoji: false,
+        },
+      },
+    });
+    expect(revert.ok).toBe(true);
+  });
+
   it("存在しないロール更新", async () => {
     const res = await FETCH({
       path: "/role/update",
@@ -343,6 +399,20 @@ describe("/role/delete", async () => {
     expect(j.message).toBe("Role deleted");
     expect(j.data).toBe(TEST__CREATED_ROLEID);
     expect(res.ok).toBe(true);
+  });
+
+  it("既定ロールMEMBERは削除できない", async () => {
+    const res = await FETCH({
+      method: "DELETE",
+      path: "/role/delete",
+      body: {
+        roleId: "MEMBER",
+      },
+    });
+    const t = await res.text();
+    expect(t).toBe("You cannot delete default role");
+    expect(res.status).toBe(400);
+    expect(res.ok).toBe(false);
   });
 
   it("存在しないロール", async () => {
