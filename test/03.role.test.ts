@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { NAME_MAX_LENGTH } from "../src";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -91,6 +92,18 @@ describe("/role/create", async () => {
     expect(res.ok).toBe(false);
   });
 
+  it("roleNameが長すぎる", async () => {
+    const res = await FETCH({
+      path: "/role/create",
+      method: "PUT",
+      body: {
+        roleName: "a".repeat(NAME_MAX_LENGTH + 1),
+        rolePower: {},
+      },
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("名前被り", async () => {
     const res = await FETCH({
       path: "/role/create",
@@ -144,6 +157,21 @@ describe("/role/update", async () => {
     expect(res.ok).toBe(true);
     expect(j.data.name).toBe("updated role");
     expect(j.data.color).toBe("#ff0000");
+  });
+
+  it("roleData.nameが長すぎる", async () => {
+    const res = await FETCH({
+      path: "/role/update",
+      method: "POST",
+      body: {
+        roleId: TEST__CREATED_ROLEID,
+        roleData: {
+          name: "a".repeat(NAME_MAX_LENGTH + 1),
+          color: "#ff0000",
+        },
+      },
+    });
+    expect(res.ok).toBe(false);
   });
 
   it("今の権力よりも強い権力を持つロールに更新", async () => {

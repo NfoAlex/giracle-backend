@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { and, eq, inArray } from "drizzle-orm";
-import { db } from "../src";
+import { db, NAME_MAX_LENGTH } from "../src";
 import {
   channels,
   channelViewableRoles,
@@ -1007,6 +1007,18 @@ describe("/channel/update", async () => {
     expect(jRestore.message).toBe("Channel updated");
     expect(jRestore.data.name).toBe("General");
     expect(resRestore.ok).toBe(true);
+  });
+
+  it("nameが長すぎる", async () => {
+    const res = await FETCH({
+      path: "/channel/update",
+      method: "POST",
+      body: {
+        channelId: "TESTCHANNEL1",
+        name: "a".repeat(NAME_MAX_LENGTH + 1),
+      },
+    });
+    expect(res.ok).toBe(false);
   });
 
   it("正常 :: viewableRoleが指定した全件に置換される(既存ロールが消えない)", async () => {

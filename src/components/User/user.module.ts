@@ -1,4 +1,5 @@
 import Elysia, { file, status, t } from "elysia";
+import { NAME_MAX_LENGTH } from "../../Consts";
 import { Middleware } from "../../Middlewares";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
@@ -49,7 +50,7 @@ export const user = new Elysia({ prefix: "/user" })
     },
     {
       body: t.Object({
-        username: t.String({ minLength: 1 }),
+        username: t.String({ minLength: 1, maxLength: NAME_MAX_LENGTH }),
         password: t.String({ minLength: 4 }),
         inviteCode: t.Optional(t.String({ minLength: 1 })),
       }),
@@ -283,7 +284,9 @@ export const user = new Elysia({ prefix: "/user" })
     },
     {
       body: t.Object({
-        name: t.Optional(t.String({ minLength: 1 })),
+        name: t.Optional(
+          t.String({ minLength: 1, maxLength: NAME_MAX_LENGTH }),
+        ),
         selfIntroduction: t.Optional(t.String({ maxLength: 128 })),
       }),
       detail: {
@@ -336,7 +339,7 @@ export const user = new Elysia({ prefix: "/user" })
     {
       body: t.Object({
         sessionId: t.Number(),
-        name: t.String({ minLength: 1 }),
+        name: t.String({ minLength: 1, maxLength: NAME_MAX_LENGTH }),
       }),
     },
   )
