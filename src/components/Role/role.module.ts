@@ -86,7 +86,7 @@ export const role = new Elysia({ prefix: "/role" })
       body: t.Object({
         roleId: t.String(),
         roleData: t.Object({
-          name: t.String({ maxLength: NAME_MAX_LENGTH }),
+          name: t.String({ minLength: 2, maxLength: NAME_MAX_LENGTH }),
           color: t.String(),
           manageServer: t.Optional(t.Boolean()),
           manageChannel: t.Optional(t.Boolean()),
