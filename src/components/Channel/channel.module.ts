@@ -1,4 +1,5 @@
 import Elysia, { t } from "elysia";
+import { NAME_MAX_LENGTH } from "../../Consts";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceChannel } from "./channel.service";
@@ -316,7 +317,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     {
       body: t.Object({
         channelId: t.String({ minLength: 1 }),
-        name: t.Optional(t.String()),
+        name: t.Optional(t.String({ maxLength: NAME_MAX_LENGTH })),
         description: t.Optional(t.String()),
         viewableRole: t.Optional(t.Array(t.String())),
         isArchived: t.Optional(t.Boolean()),
@@ -349,7 +350,7 @@ export const channel = new Elysia({ prefix: "/channel" })
     },
     {
       body: t.Object({
-        channelName: t.String({ minLength: 1 }),
+        channelName: t.String({ minLength: 1, maxLength: NAME_MAX_LENGTH }),
         description: t.Optional(t.String()),
       }),
       detail: {

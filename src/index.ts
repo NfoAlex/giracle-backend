@@ -14,6 +14,8 @@ import { Middleware } from "./Middlewares";
 import { wsHandler } from "./ws";
 import { extWsHandler } from "./ws.ext";
 
+//共通の定数
+export { NAME_MAX_LENGTH } from "./Consts";
 //DB設定 (Drizzle)
 export { db } from "./db";
 //初期処理から

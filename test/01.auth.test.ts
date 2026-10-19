@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
-import { app, db, GIRACLE_SERVER_CONFIG } from "../src";
+import { app, db, GIRACLE_SERVER_CONFIG, NAME_MAX_LENGTH } from "../src";
 import { invitations, passwords, tokens, users } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
 
@@ -33,6 +33,21 @@ describe("/user", () => {
     });
 
     expect(res.ok).toBe(true);
+  });
+
+  it("/sign-up :: usernameが長すぎる", async () => {
+    const res = await FETCH({
+      path: "/user/sign-up",
+      method: "PUT",
+      body: {
+        username: "a".repeat(NAME_MAX_LENGTH + 1),
+        password: "testuser",
+        inviteCode: "testinvite",
+      },
+      excludeCredential: true,
+    });
+
+    expect(res.ok).toBe(false);
   });
 
   it("/sign-up :: 新規登録が無効", async () => {

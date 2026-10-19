@@ -1,4 +1,5 @@
 import Elysia, { status, t } from "elysia";
+import { NAME_MAX_LENGTH } from "../../Consts";
 import { Middleware } from "../../Middlewares";
 import { ServiceRole } from "./role.service";
 
@@ -49,7 +50,7 @@ export const role = new Elysia({ prefix: "/role" })
     },
     {
       body: t.Object({
-        roleName: t.String({ minLength: 1 }),
+        roleName: t.String({ minLength: 1, maxLength: NAME_MAX_LENGTH }),
         rolePower: t.Object({
           manageServer: t.Optional(t.Boolean()),
           manageChannel: t.Optional(t.Boolean()),
@@ -85,7 +86,7 @@ export const role = new Elysia({ prefix: "/role" })
       body: t.Object({
         roleId: t.String(),
         roleData: t.Object({
-          name: t.String(),
+          name: t.String({ maxLength: NAME_MAX_LENGTH }),
           color: t.String(),
           manageServer: t.Optional(t.Boolean()),
           manageChannel: t.Optional(t.Boolean()),
