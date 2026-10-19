@@ -13,6 +13,12 @@ import { QueryToken } from "../../queries/token.query";
 import { QueryUser } from "../../queries/user.query";
 import { Util } from "../../Util";
 
+//ロールIDとユーザーIDは別物(HOSTロール保持者のユーザーIDは任意)。保持者かどうかはroleLinksで判定する
+const holdsHostRole = async (userId: string) =>
+  (await QueryRoleLink.getLinksByUser({ userId })).some(
+    (link) => link.roleId === "HOST",
+  );
+
 export namespace ServiceUser {
   export const SignUp = async (
     username: string,
@@ -388,7 +394,28 @@ export namespace ServiceUser {
     return;
   };
 
-  export const ResetPassword = async (targetUserId: string) => {
+  export const ResetPassword = async (
+    targetUserId: string,
+    _userId: string,
+  ) => {
+    //HOSTのパスワードは誰も(同レベル含め)リセットできない
+    if (await holdsHostRole(targetUserId)) {
+      throw status(400, "You can't reset HOST password");
+    }
+    const targetUser = await QueryUser.getSingleWithMinimum({
+      userId: targetUserId,
+    });
+    if (targetUser === undefined) {
+      throw status(404, "User not found");
+    }
+    //同レベル以下のリセットは乗っ取りになるため拒否
+    if (
+      (await Util.getUsersRoleLevel(_userId)) <=
+      (await Util.getUsersRoleLevel(targetUserId))
+    ) {
+      throw status(400, "You can't reset higher role level user");
+    }
+
     const newPassword = crypto.randomBytes(16).toString("hex");
 
     // ソルト再生成してハッシュ化保存（平文保存だとサインイン検証で必ず不一致になる）
@@ -527,8 +554,8 @@ export namespace ServiceUser {
   };
 
   export const Ban = async (userId: string, _userId: string) => {
-    //HOSTをBANすることはできない
-    if (userId === "HOST") {
+    //HOSTロール保持者をBANすることはできない
+    if (await holdsHostRole(userId)) {
       throw status(400, "You can't ban HOST");
     }
     //自分自身をBANすることはできない
@@ -558,8 +585,8 @@ export namespace ServiceUser {
   };
 
   export const Delete = async (userId: string, _userId: string) => {
-    //SYSTEM・HOSTは削除できない
-    if (userId === "SYSTEM" || userId === "HOST") {
+    //SYSTEMユーザー・HOSTロール保持者は削除できない
+    if (userId === "SYSTEM" || (await holdsHostRole(userId))) {
       throw status(400, "You can't delete SYSTEM or HOST");
     }
     //自分自身を削除することはできない
