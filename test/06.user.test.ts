@@ -32,6 +32,18 @@ let SUB_USER_ID = "";
 let BAN_TARGET_TOKEN = "";
 let BAN_TARGET_USER_ID = "";
 
+/** 指定ユーザーをTESTUSERと同じロール構成にして同レベルにする。戻り値で元に戻す */
+async function makeSameLevel(userId: string) {
+  const links = await db.query.roleLinks.findMany({
+    where: eq(roleLinks.userId, "TESTUSER"),
+  });
+  await db
+    .insert(roleLinks)
+    .values(links.map((link) => ({ roleId: link.roleId, userId })));
+
+  return () => db.delete(roleLinks).where(eq(roleLinks.userId, userId));
+}
+
 async function subFetch({
   path,
   method,
@@ -828,6 +840,28 @@ describe("/user/ban & /user/unban", () => {
     expect(t).toBe("You can't ban HOST");
   });
 
+  it("同レベルのユーザーをBANしようとする", async () => {
+    const restore = await makeSameLevel(SUB_USER_ID);
+
+    try {
+      const res = await FETCH({
+        path: "/user/ban",
+        method: "POST",
+        body: { userId: SUB_USER_ID },
+      });
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(400);
+
+      //同レベル相手はBANされていない
+      const target = await db.query.users.findFirst({
+        where: eq(users.id, SUB_USER_ID),
+      });
+      expect(target?.isBanned).toBe(false);
+    } finally {
+      await restore();
+    }
+  });
+
   it("権限がない人によるBAN", async () => {
     const res = await FETCH({
       path: "/user/ban",
@@ -1134,6 +1168,28 @@ describe("/user/delete", () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("You can't delete SYSTEM or HOST");
+  });
+
+  it("同レベルのユーザーを削除しようとする", async () => {
+    const restore = await makeSameLevel(SUB_USER_ID);
+
+    try {
+      const res = await FETCH({
+        path: "/user",
+        method: "DELETE",
+        body: { userId: SUB_USER_ID },
+      });
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(400);
+
+      //同レベル相手は削除されていない
+      const target = await db.query.users.findFirst({
+        where: eq(users.id, SUB_USER_ID),
+      });
+      expect(target?.isDeleted).toBe(false);
+    } finally {
+      await restore();
+    }
   });
 
   it("存在しないユーザーを削除しようとする", async () => {

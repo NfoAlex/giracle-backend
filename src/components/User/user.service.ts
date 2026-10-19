@@ -562,9 +562,9 @@ export namespace ServiceUser {
     if (userId === _userId) {
       throw status(400, "You can't ban yourself");
     }
-    //ロールレベルが対象より低いとBANできない
+    //ロールレベルが対象以下ならBANできない(同レベルの相互BANを防ぐ)
     if (
-      (await Util.getUsersRoleLevel(_userId)) <
+      (await Util.getUsersRoleLevel(_userId)) <=
       (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't ban higher role level user");
@@ -602,9 +602,9 @@ export namespace ServiceUser {
     if (targetUser.isDeleted) {
       throw status(400, "User already deleted");
     }
-    //ロールレベルが対象より低いと削除できない
+    //ロールレベルが対象以下なら削除できない(同レベルの相互削除を防ぐ)
     if (
-      (await Util.getUsersRoleLevel(_userId)) <
+      (await Util.getUsersRoleLevel(_userId)) <=
       (await Util.getUsersRoleLevel(userId))
     ) {
       throw status(400, "You can't delete higher role level user");
