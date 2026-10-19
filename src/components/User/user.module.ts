@@ -493,8 +493,11 @@ export const user = new Elysia({ prefix: "/user" })
   )
   .post(
     "/reset-password",
-    async ({ body: { targetUserId } }) => {
-      const newPassword = await ServiceUser.ResetPassword(targetUserId);
+    async ({ body: { targetUserId }, CheckToken: { _userId } }) => {
+      const newPassword = await ServiceUser.ResetPassword(
+        targetUserId,
+        _userId,
+      );
 
       return {
         message: "Password resetted",
