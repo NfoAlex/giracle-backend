@@ -816,14 +816,15 @@ describe("/user/ban & /user/unban", () => {
     expect(t).toBe("You can't ban yourself");
   });
 
-  it("HOSTをBANしようとする", async () => {
+  it("HOSTロール保持者をBANしようとする", async () => {
     const res = await FETCH({
       path: "/user/ban",
       method: "POST",
-      body: { userId: "HOST" },
+      body: { userId: "ADMINUSER" },
     });
     const t = await res.text();
     expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
     expect(t).toBe("You can't ban HOST");
   });
 
@@ -1124,6 +1125,17 @@ describe("/user/delete", () => {
     expect(await res.text()).toBe("You can't delete yourself");
   });
 
+  it("HOSTロール保持者を削除しようとする", async () => {
+    const res = await FETCH({
+      path: "/user",
+      method: "DELETE",
+      body: { userId: "ADMINUSER" },
+    });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("You can't delete SYSTEM or HOST");
+  });
+
   it("存在しないユーザーを削除しようとする", async () => {
     const res = await FETCH({
       path: "/user",
@@ -1220,10 +1232,17 @@ describe("/user/delete", () => {
 describe("/user/reset-password", () => {
   let RESET_TARGET_TOKEN = "";
   let RESET_TARGET_USER_ID = "";
+  //同レベル比較用(サインイン不要なのでDBに直挿入する。匿名HTTPはレート制限に当たりうる)
+  const RESET_EQUAL_USER_ID = "RESETEQUALUSER";
 
   beforeAll(async () => {
     ({ token: RESET_TARGET_TOKEN, userId: RESET_TARGET_USER_ID } =
       await signUpAndSignIn("usertestreset"));
+    await db.insert(users).values({
+      id: RESET_EQUAL_USER_ID,
+      name: "usertestreset2",
+      selfIntroduction: "",
+    });
 
     // reset-passwordはcheckRoleTerm: "manageServer"必須。TESTUSERに付与する
     await db.insert(roleInfos).values({
@@ -1232,9 +1251,11 @@ describe("/user/reset-password", () => {
       createdUserId: "TESTUSER",
       manageServer: true,
     });
-    await db
-      .insert(roleLinks)
-      .values({ roleId: "ServerManageForResetTest", userId: "TESTUSER" });
+    await db.insert(roleLinks).values([
+      { roleId: "ServerManageForResetTest", userId: "TESTUSER" },
+      // 同レベル(manageServer)同士のリセットを拒否する確認用
+      { roleId: "ServerManageForResetTest", userId: RESET_EQUAL_USER_ID },
+    ]);
   });
 
   it("未認証 :: 401", async () => {
@@ -1259,6 +1280,36 @@ describe("/user/reset-password", () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(t).toBe("Role level not enough");
+  });
+
+  it("HOSTロール保持者 :: 400", async () => {
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: "ADMINUSER" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("You can't reset HOST password");
+  });
+
+  it("存在しないユーザー :: 404", async () => {
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: "NOTEXISTUSER999" },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("User not found");
+  });
+
+  it("同レベルのmanageServer保持者 :: 400", async () => {
+    const res = await FETCH({
+      path: "/user/reset-password",
+      method: "POST",
+      body: { targetUserId: RESET_EQUAL_USER_ID },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("You can't reset higher role level user");
   });
 
   it("正常 :: パスワードがリセットされ全セッションが無効化される", async () => {
