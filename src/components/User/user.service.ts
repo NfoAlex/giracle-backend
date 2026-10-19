@@ -450,6 +450,16 @@ export namespace ServiceUser {
       throw status(404, "User not found");
     }
 
+    //名前のUNIQUE制約で500にならないよう事前に重複を判定する
+    if (name !== undefined) {
+      const userWithSameName = await QueryUser.getSingleWithMinimumByName({
+        name,
+      });
+      if (userWithSameName && userWithSameName.id !== user.id) {
+        throw status(400, "User already exists");
+      }
+    }
+
     //データ更新
     const userUpdated = await QueryUser.updateProfile({
       userId: user.id,

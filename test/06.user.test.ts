@@ -752,6 +752,17 @@ describe("/user/profile-update", () => {
     expect(j.data.selfIntroduction).toBe("自己紹介文");
   });
 
+  it("既存ユーザーと名前が重複", async () => {
+    const res = await subFetch({
+      path: "/user/profile-update",
+      method: "POST",
+      body: { name: "testsystemuser2" },
+    });
+    const t = await res.text();
+    expect(res.status).toBe(400);
+    expect(t).toBe("User already exists");
+  });
+
   it("nameが空欄", async () => {
     const res = await subFetch({
       path: "/user/profile-update",
