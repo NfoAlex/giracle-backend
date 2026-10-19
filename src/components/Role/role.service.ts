@@ -63,10 +63,11 @@ export namespace ServiceRole {
     if ((await Util.compareRoleLevelToRole(_userId, roleId)) === false) {
       throw status(400, "Role level not enough or role not found");
     }
-    //更新予定のロールレベルが送信者のロールレベルを超えていないか確認
+    //更新予定のロールレベルが送信者のロールレベル未満か確認(Createと同じ厳密比較)
+    //MEMBERは全ユーザーが既定で持つため、等号を許すと自分と同じ権限を全員に配れる
     const roleLevelIfUpdated = Util.calculateRoleLevel(roleData);
     const userRoleLevel = await Util.getUsersRoleLevel(_userId);
-    if (userRoleLevel < roleLevelIfUpdated) {
+    if (userRoleLevel <= roleLevelIfUpdated) {
       throw status(400, "Role power is too powerful");
     }
 
@@ -153,6 +154,11 @@ export namespace ServiceRole {
   };
 
   export const Delete = async (roleId: string, _userId: string) => {
+    //既定ロールは全ユーザー/Botが自動で持つため削除不可
+    if (roleId === "MEMBER" || roleId === "HOST" || roleId === "BOT") {
+      throw status(400, "You cannot delete default role");
+    }
+
     //送信者のロールレベルが足りるか確認
     if (!(await Util.compareRoleLevelToRole(_userId, roleId))) {
       throw status(400, "Role level not enough or role not found");
