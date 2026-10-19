@@ -1,5 +1,4 @@
 import Elysia, { file, status, t } from "elysia";
-import { GIRACLE_SERVER_CONFIG } from "../..";
 import { Middleware } from "../../Middlewares";
 import { Util } from "../../Util";
 import { ServiceMessage } from "./message.service";
@@ -451,15 +450,7 @@ export const message = new Elysia({ prefix: "/message" })
       body: { channelId, message, fileIds, replyingMessageId },
       CheckToken: { _userId },
       server,
-      status,
     }) => {
-      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
-        throw status(
-          400,
-          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
-        );
-      }
-
       //メッセージの保存処理
       const { messageSaved, messageReplyingTo } = await ServiceMessage.Send(
         channelId,
@@ -476,11 +467,18 @@ export const message = new Elysia({ prefix: "/message" })
         messageSaved.channelId,
       );
 
-      //WSで通知
+      //WSでBotと同時に通知
       server?.publish(
         `channel::${channelId}`,
         JSON.stringify({
           signal: "message::SendMessage",
+          data: messageSaved,
+        }),
+      );
+      server?.publish(
+        `bot::channel::${channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
           data: messageSaved,
         }),
       );
@@ -520,24 +518,23 @@ export const message = new Elysia({ prefix: "/message" })
       body: { messageId, message },
       CheckToken: { _userId },
       server,
-      status,
     }) => {
-      if (message.length > GIRACLE_SERVER_CONFIG.MessageMaxLength) {
-        throw status(
-          400,
-          `Message is too long. Maximum length is ${GIRACLE_SERVER_CONFIG.MessageMaxLength}`,
-        );
-      }
-
       const messageEditing = await ServiceMessage.Edit(
         messageId,
         message,
         _userId,
       );
 
-      //WSで通知
+      //WSでBotと同時に通知
       server?.publish(
         `channel::${messageEditing.channelId}`,
+        JSON.stringify({
+          signal: "message::UpdateMessage",
+          data: messageEditing,
+        }),
+      );
+      server?.publish(
+        `bot::channel::${messageEditing.channelId}`,
         JSON.stringify({
           signal: "message::UpdateMessage",
           data: messageEditing,

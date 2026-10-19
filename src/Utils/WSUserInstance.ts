@@ -1,3 +1,5 @@
+import { QueryBot } from "../queries/bot.query";
+
 /**
  * ユーザーごとのWSインスタンス管理。
  * 通常ユーザー用ハンドラ(src/ws.ts)から使う共通処理。
@@ -8,7 +10,7 @@
  * WSインスタンスの最小インターフェース。
  * 実体はElysiaのElysiaWSだが、テストのダミーインスタンスも受け付けるため構造的に定義する。
  */
-type WSInstance = {
+type TWebSocketInstance = {
   send: (data: string) => unknown;
   close: () => unknown;
   subscribe: (topic: string) => unknown;
@@ -19,14 +21,14 @@ type WSInstance = {
 
 export namespace WSUserInstance {
   /** UserId -> 接続中のWSインスタンス群(複数端末の同時接続を許容する) */
-  export const instances = new Map<string, WSInstance[]>();
+  export const instances = new Map<string, TWebSocketInstance[]>();
 
   /**
    * WSインスタンスマップにユーザーのインスタンスを新しく追加
    * @param userId
    * @param ws
    */
-  export function add(userId: string, ws: WSInstance) {
+  export function add(userId: string, ws: TWebSocketInstance) {
     const currentInstance = instances.get(userId);
     //存在しない場合普通にset、あれば末尾に追加
     if (currentInstance) {
@@ -41,7 +43,7 @@ export namespace WSUserInstance {
    * @param userId
    * @param ws
    */
-  export function remove(userId: string, ws: WSInstance) {
+  export function remove(userId: string, ws: TWebSocketInstance) {
     const currentInstance = instances.get(userId);
     //存在しない場合スルー
     if (!currentInstance) {
@@ -68,7 +70,7 @@ export namespace WSUserInstance {
    * @param ws
    * @returns 削除できた場合のuserId、見つからなければundefined
    */
-  export function removeByInstance(ws: WSInstance): string | undefined {
+  export function removeByInstance(ws: TWebSocketInstance): string | undefined {
     //rawが無いと同一性判定ができない(テストのダミー等)
     if (ws.raw === undefined) {
       return undefined;
@@ -115,18 +117,52 @@ export namespace WSUserInstance {
   }
 
   /**
+   * 指定ユーザーが作成したBotのWS接続をすべて切断する。
+   * BotのWSインスタンスは remoteUserId をキーに保持されるため、
+   * 作成者Id(createdBy)への disconnect では切れない。
+   * @param createdBy Botの作成者Id
+   * @param reason 切断時に送る理由
+   */
+  export async function disconnectBotsCreatedBy(
+    createdBy: string,
+    reason?: string,
+  ): Promise<void> {
+    const bots = await QueryBot.getRemoteUserIdsByCreatedBy({ createdBy });
+    for (const bot of bots) {
+      disconnect(bot.remoteUserId, reason);
+    }
+  }
+
+  /**
+   * 全BotのWS接続を切断する(BotEnabledの無効化時に使用)
+   * @param reason 切断時に送る理由
+   */
+  export async function disconnectAllBots(reason?: string): Promise<void> {
+    const bots = await QueryBot.getAllRemoteUserIds();
+    for (const bot of bots) {
+      disconnect(bot.remoteUserId, reason);
+    }
+  }
+
+  /**
    * 指定のユーザーIdのWSインスタンスすべてに対し指定のWSチャンネルを購読させる
    * @param userId
    * @param wsChannel
+   * @param isBot
    */
-  export function subscribe(userId: string, wsChannel: `${string}::${string}`) {
+  export function subscribe(
+    userId: string,
+    wsChannel: `${string}::${string}`,
+    isBot: boolean = false,
+  ) {
     const currentInstance = instances.get(userId);
     //存在しない場合スルー
     if (!currentInstance) {
       return;
     }
     for (const ws of currentInstance) {
-      ws.subscribe(wsChannel);
+      const targetChannel = isBot ? `bot::${wsChannel}` : wsChannel;
+      ws.subscribe(targetChannel);
     }
   }
 
@@ -146,6 +182,7 @@ export namespace WSUserInstance {
     }
     for (const ws of currentInstance) {
       ws.unsubscribe(wsChannel);
+      ws.unsubscribe(`bot::${wsChannel}`); //Botを見越して両方やる
     }
   }
 }

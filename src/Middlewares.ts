@@ -1,12 +1,15 @@
 import { Elysia, status, t } from "elysia";
 import ogs from "open-graph-scraper";
+import { GIRACLE_SERVER_CONFIG } from ".";
 import type { Message, NewMessageUrlPreview } from "./db/schema";
 import { QueryBlockedIPAddress } from "./queries/blockedIPAddress.query";
+import { QueryBot } from "./queries/bot.query";
 import { QueryMessage } from "./queries/message.query";
 import { QueryMessageUrlPreview } from "./queries/messageUrlPreview.query";
 import { QueryRequestLog } from "./queries/requestLog.query";
 import { QueryRoleLink } from "./queries/roleLink.query";
 import { QueryToken } from "./queries/token.query";
+import { QueryUser } from "./queries/user.query";
 import { Util } from "./Util";
 
 // トークンキャッシュ (5分間有効)
@@ -138,6 +141,47 @@ export namespace Middleware {
       token.expires = new Date(now + 1000 * 60 * 60 * 24 * 15); //15日間有効
 
       return { CheckToken: { _userId: tokenData.userId } };
+    });
+
+  export const CheckBotToken = new Elysia({ name: "CheckBotToken" })
+    .guard({
+      headers: t.Object({ authorization: t.String() }),
+    })
+    .resolve({ as: "scoped" }, async ({ headers: { authorization } }) => {
+      if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+        return status(400, "Bot is not enabled on this server");
+      }
+
+      const tokenValue = authorization;
+      //そもそもBotTokenが無いならエラー
+      if (tokenValue === undefined) {
+        return status(401, "Invalid token");
+      }
+
+      //トークンがDBにあるか確認
+      const bot = await QueryBot.getBotMinimumByTokenCode({
+        tokenCode: tokenValue,
+      });
+
+      //トークンが無効ならエラー
+      if (bot === undefined) {
+        return status(401, "Invalid token");
+      }
+
+      //未承認のBotはまだ使えない
+      if (!bot.isApproved) {
+        return status(401, "Bot is not approved yet");
+      }
+
+      //作成者がBAN・削除済みならBotも停止(ws.ext.tsと同条件)
+      const creator = await QueryUser.getSingle({ userId: bot.createdBy });
+      if (creator === undefined || creator.isBanned || creator.isDeleted) {
+        return status(401, "This bot is disabled");
+      }
+
+      return {
+        CheckBotToken: { _botId: bot.id, _remoteUserId: bot.remoteUserId },
+      };
     });
 
   export const CheckRoleTerm = new Elysia({ name: "checkRoleTerm" })
@@ -397,6 +441,9 @@ export namespace Middleware {
       const { CheckToken } = ctx as typeof ctx & {
         CheckToken?: { _userId: string };
       };
+      const { CheckBotToken } = ctx as typeof ctx & {
+        CheckBotToken?: { _remoteUserId: string };
+      };
 
       //set.statusは string | number | undefined なので数値に揃える
       const responseStatus =
@@ -419,7 +466,7 @@ export namespace Middleware {
 
       try {
         await QueryRequestLog.insertLog({
-          userId: CheckToken?._userId ?? null,
+          userId: CheckToken?._userId ?? CheckBotToken?._remoteUserId ?? null,
           method: request.method,
           path,
           status: responseStatus,

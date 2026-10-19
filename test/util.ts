@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { app, reloadServerConfig } from "../src";
 import { db } from "../src/db";
 import {
+  botManages,
   channelJoinOnDefaults,
   channelJoins,
   channelMutes,
@@ -63,6 +64,7 @@ export async function INIT() {
   await db.delete(channels);
   await db.delete(invitations);
   await db.delete(users);
+  await db.delete(botManages);
   await db.delete(serverConfigs);
 
   await fs.rm("./STORAGE/file/TESTCHANNEL1", { recursive: true, force: true }); //テストチャンネルのアップロードファイル削除
@@ -73,6 +75,8 @@ export async function INIT() {
   await db.insert(users).values([
     { id: "TESTUSER", name: "testsystemuser", selfIntroduction: "" },
     { id: "TESTUSER2", name: "testsystemuser2", selfIntroduction: "" },
+    { id: "ADMINUSER", name: "adminuser", selfIntroduction: "" },
+    { id: "BOTUSER", name: "botuser", selfIntroduction: "" },
   ]);
   await db.insert(tokens).values([
     { userId: "TESTUSER", token: "TESTUSERTOKEN" },
@@ -84,6 +88,7 @@ export async function INIT() {
       token: "TESTUSER2TOKEN_EXPIRED",
       expiresAt: new Date(Date.now() - 60 * 1000),
     },
+    { userId: "ADMINUSER", token: "ADMINUSERTOKEN" },
   ]);
   await db
     .insert(invitations)
@@ -176,6 +181,7 @@ export async function INIT() {
   await db
     .insert(channelViewableRoles)
     .values({ channelId: "TESTCHANNEL4", roleId: "CompletePrivate" });
+  await db.insert(roleLinks).values({ userId: "ADMINUSER", roleId: "HOST" });
 
   // --- 03.role: ロール管理権限付与 ---
   await db.insert(roleInfos).values({
@@ -221,6 +227,17 @@ export async function INIT() {
     .insert(inboxes)
     .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
     .onConflictDoNothing();
+
+  // --- 05.bot: Bot管理情報を作成 ---
+  await db
+    .insert(botManages)
+    .values({
+      id: "BOTMANAGE",
+      remoteUserId: "BOTUSER",
+      tokenCode: "BOTMANAGETOKEN",
+      createdBy: "TESTUSER",
+    })
+    .onConflictDoNothing();
 }
 
 export async function FETCH({
@@ -228,6 +245,7 @@ export async function FETCH({
   method,
   body,
   useSecondaryUser = false,
+  useAdminUser = false,
   excludeCredential = false,
 }: {
   path: `/${string}`;
@@ -235,9 +253,14 @@ export async function FETCH({
   // biome-ignore lint/suspicious/noExplicitAny: for test
   body?: any;
   useSecondaryUser?: boolean;
+  useAdminUser?: boolean; // `useSecondaryUser`を上書きします
   excludeCredential?: boolean;
 }): Promise<Response> {
-  const tokenUsing = useSecondaryUser ? "TESTUSER2TOKEN" : "TESTUSERTOKEN";
+  const tokenUsing = useAdminUser
+    ? "ADMINUSERTOKEN"
+    : useSecondaryUser
+      ? "TESTUSER2TOKEN"
+      : "TESTUSERTOKEN";
   const isFormData = body instanceof FormData;
 
   return await app.handle(

@@ -123,7 +123,7 @@ export namespace ServiceUser {
     }
     //パスワードが設定されていない場合
     if (!user.password) {
-      throw status(400, {
+      throw status(500, {
         message: "Internal error",
       });
     }
@@ -137,6 +137,12 @@ export namespace ServiceUser {
     if (user.isBanned) {
       throw status(401, {
         message: "User is banned",
+      });
+    }
+    //ユーザーがBot
+    if (user.isBot) {
+      throw status(401, {
+        message: "You cannot login as bot user",
       });
     }
 
@@ -545,6 +551,8 @@ export namespace ServiceUser {
 
     //既存のWS接続も切断する(BAN後も新着メッセージを受信し続けられるのを防ぐ)
     Util.wsUserInstance.disconnect(userId);
+    //BANされたユーザーが作成したBotのWSも切る(BotインスタンスはremoteUserIdキーのため上のdisconnectでは切れない)
+    await Util.wsUserInstance.disconnectBotsCreatedBy(userId);
 
     return userBanned;
   };
@@ -592,6 +600,8 @@ export namespace ServiceUser {
 
     //既存のWS接続も切断する
     Util.wsUserInstance.disconnect(userId);
+    //削除されたユーザーが作成したBotのWSも切る(BotManager行はcascadeで消えるが接続は残るため)
+    await Util.wsUserInstance.disconnectBotsCreatedBy(userId);
 
     return;
   };

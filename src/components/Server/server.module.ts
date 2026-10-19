@@ -149,6 +149,7 @@ export const server = new Elysia({ prefix: "/server" })
         MessageMaxLength,
         MessageMaxFileSize,
         DefaultJoinChannel,
+        BotEnabled,
       },
       server,
     }) => {
@@ -159,6 +160,7 @@ export const server = new Elysia({ prefix: "/server" })
         MessageMaxLength,
         MessageMaxFileSize,
         DefaultJoinChannel,
+        BotEnabled,
       );
 
       //WSで全体へ通知
@@ -183,6 +185,7 @@ export const server = new Elysia({ prefix: "/server" })
         MessageMaxLength: t.Optional(t.Number()),
         MessageMaxFileSize: t.Optional(t.Number()),
         DefaultJoinChannel: t.Optional(t.Array(t.String())),
+        BotEnabled: t.Optional(t.Boolean()),
       }),
       detail: {
         description: "サーバーの設定を変更します",
@@ -413,6 +416,24 @@ export const server = new Elysia({ prefix: "/server" })
           }),
         }),
       },
+      checkRoleTerm: "manageServer",
+    },
+  )
+  .post(
+    "/bot/set-approve",
+    async ({ body: { botId, isApproved } }) => {
+      const botUpdated = await ServiceServer.UpdateApprove(botId, isApproved);
+
+      return {
+        message: "Bot updated",
+        data: botUpdated,
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        isApproved: t.Boolean(),
+      }),
       checkRoleTerm: "manageServer",
     },
   );

@@ -1,0 +1,155 @@
+import Elysia, { t } from "elysia";
+import { GIRACLE_SERVER_CONFIG } from "./init";
+import { QueryBot } from "./queries/bot.query";
+import { QueryUser } from "./queries/user.query";
+import { Util } from "./Util";
+import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
+
+/**
+ * Bot用 WebSocket ハンドラ ( /ext/ws )
+ * 通常ユーザー用(/ws, src/ws.ts)とは認証方法が異なる(AuthorizationヘッダのtokenCode)ため分離している。
+ * Elysiaの静的ルーターは同一パスのWSルートを上書きするため、両者を1つのパスに共存させることはできない。
+ * prefixは登録先の externalApi(prefix: "/ext")が付与するため、ここでは付けない。
+ */
+export const extWsHandler = new Elysia().ws("/ext/ws", {
+  body: t.Object({
+    signal: t.String({ minLength: 1 }),
+    data: t.String({ minLength: 1 }),
+  }),
+  headers: t.Optional(
+    t.Object({
+      authorization: t.Union([t.String(), t.Undefined()]),
+    }),
+  ),
+
+  message(ws, { signal }) {
+    //pingを受け取ったらpongを返す
+    if (signal === "ping") {
+      ws.send({
+        signal: "pong",
+        data: "pong",
+      });
+      return;
+    }
+  },
+
+  async open(ws) {
+    //HTTP側(CheckBotToken)と同じく無効化中は受け付けない
+    if (!GIRACLE_SERVER_CONFIG.BotEnabled) {
+      ws.send({
+        signal: "ERROR",
+        data: "Bot is not enabled on this server",
+      });
+      ws.close();
+      return;
+    }
+
+    const botToken = ws.data.headers.authorization;
+    if (botToken === undefined) {
+      ws.send({
+        signal: "ERROR",
+        data: "Bot token not valid",
+      });
+      ws.close();
+      return;
+    }
+
+    const botData = await QueryBot.getBotMinimumByTokenCode({
+      tokenCode: botToken,
+    });
+    if (botData === undefined) {
+      ws.send({
+        signal: "ERROR",
+        data: "Bot token not valid",
+      });
+      ws.close();
+      return;
+    }
+    if (!botData.isApproved) {
+      ws.send({
+        signal: "ERROR",
+        data: "Your bot is not approved yet",
+      });
+      ws.close();
+      return;
+    }
+
+    const botCreatedUser = await QueryUser.getSingle({
+      userId: botData.createdBy,
+    });
+    if (
+      botCreatedUser?.isDeleted === undefined ||
+      botCreatedUser?.isDeleted === true
+    ) {
+      ws.send({
+        signal: "ERROR",
+        data: "User not found. This is a server side issue",
+      });
+      ws.close();
+      return;
+    }
+
+    if (botCreatedUser.isBanned || botCreatedUser.isDeleted) {
+      ws.send({
+        signal: "ERROR",
+        data: "This bot is disabled",
+      });
+      ws.close();
+      return;
+    }
+
+    ws.subscribe(`user::${botData.remoteUserId}`);
+
+    //Botユーザーの閲覧可能チャンネルへサブスク(作成者の権限で広げない)
+    const channelsViewable = await GetUserViewableChannel(botData.remoteUserId);
+    for (const channel of channelsViewable) {
+      ws.subscribe(`bot::channel::${channel.id}`);
+    }
+
+    //BotとしてユーザーWSインスタンス保存
+    Util.wsUserInstance.add(botData.remoteUserId, ws);
+
+    const wsInstance = Util.wsUserInstance.instances.get(botData.remoteUserId);
+    if (wsInstance?.length === 1) {
+      //ユーザー接続通知
+      ws.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::Connected",
+          data: botData.remoteUserId,
+        }),
+      );
+    }
+  },
+
+  async close(ws) {
+    //Bot行が削除済みでtokenから引けない場合でも切断は記録するため、
+    //引けないときは生WSの同一性からuserIdを引く(ws.tsのcloseと同様)
+    const botToken = ws.data.headers.authorization;
+    const botData =
+      botToken !== undefined
+        ? await QueryBot.getBotMinimumByTokenCode({ tokenCode: botToken })
+        : undefined;
+
+    let removedUserId: string | undefined;
+    if (botData !== undefined) {
+      Util.wsUserInstance.remove(botData.remoteUserId, ws);
+      removedUserId = botData.remoteUserId;
+    } else {
+      removedUserId = Util.wsUserInstance.removeByInstance(ws);
+    }
+
+    if (
+      removedUserId !== undefined &&
+      !Util.wsUserInstance.instances.has(removedUserId)
+    ) {
+      ws.publish(
+        "GLOBAL",
+        JSON.stringify({
+          signal: "user::Disconnected",
+          data: removedUserId,
+        }),
+      );
+    }
+  },
+});

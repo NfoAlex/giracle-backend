@@ -47,7 +47,7 @@ export namespace QueryRoleLink {
     userId: string;
     roleTerm: string;
   }) => {
-    //roleTermはルート定義から渡される動的なカラム名のため
+    //SAFETY: roleTermはルート定義から渡される動的なカラム名で、roleInfosの列に必ず存在する
     const roleTermColumn = (roleInfos as unknown as Record<string, unknown>)[
       query.roleTerm
     ];
@@ -116,6 +116,21 @@ export namespace QueryRoleLink {
   //トランザクション内でロールに紐づく付与情報を削除する
   export const removeByRoleInTx = (tx: Tx, query: { roleId: string }) => {
     tx.delete(roleLinks).where(eq(roleLinks.roleId, query.roleId)).run();
+  };
+
+  //トランザクション内でユーザーからロールを剥奪する
+  export const removeLinkInTx = (
+    tx: Tx,
+    query: { userId: string; roleId: string },
+  ) => {
+    tx.delete(roleLinks)
+      .where(
+        and(
+          eq(roleLinks.userId, query.userId),
+          eq(roleLinks.roleId, query.roleId),
+        ),
+      )
+      .run();
   };
 
   //トランザクション内でユーザーにロールを付与する

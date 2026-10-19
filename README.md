@@ -49,7 +49,9 @@ bun dev
 giracle-backend/
 ├── src/
 │   ├── index.ts              # エントリーポイント・サーバー起動
-│   ├── ws.ts                 # WebSocket ハンドラ
+│   ├── init.ts               # 起動時初期処理 (STORAGE作成 / シード / Web Push / ServerConfig読み込み)
+│   ├── ws.ts                 # WebSocket ハンドラ (ユーザー用)
+│   ├── ws.ext.ts             # WebSocket ハンドラ (Bot用 /ext/ws)
 │   ├── Middlewares.ts        # ミドルウェア定義
 │   ├── Utils/                # 共通ユーティリティ
 │   ├── db/                   # DB接続・スキーマ・シード (Drizzle)
@@ -57,9 +59,14 @@ giracle-backend/
 │   │   ├── schema.ts         # テーブル定義 + relations + 型export
 │   │   └── seeds.ts          # 初期データ投入
 │   └── components/           # 機能モジュール
+│       ├── Bot/
+│       │   ├── bot.module.ts
+│       │   └── bot.service.ts
 │       ├── Channel/
 │       │   ├── channel.module.ts   # ルーティング
 │       │   └── channel.service.ts  # ビジネスロジック
+│       ├── Ext/
+│       │   └── ext.module.ts       # Bot用API (/ext)
 │       ├── Message/
 │       │   ├── message.module.ts
 │       │   └── message.service.ts
@@ -187,7 +194,7 @@ giracle-backend/
 | PUT | `/server/create-invite` | ✅ | `manageServer` | 招待コード作成 |
 | DELETE | `/server/delete-invite` | ✅ | `manageServer` | 招待コード削除 |
 | POST | `/server/change-info` | ✅ | `manageServer` | サーバー基本情報変更（WS通知: `server::ConfigUpdate`） |
-| POST | `/server/change-config` | ✅ | `manageServer` | サーバー設定変更（WS通知: `server::ConfigUpdate`） |
+| POST | `/server/change-config` | ✅ | `manageServer` | サーバー設定変更（WS通知: `server::ConfigUpdate`）。`BotEnabled` を `false` にすると接続中の Bot の WS も切断される |
 | POST | `/server/change-banner` | ✅ | `manageServer` | バナー画像変更 |
 | PUT | `/server/custom-emoji/upload` | ✅ | `manageEmoji` | カスタム絵文字追加（WS通知: `server::CustomEmojiUploaded`） |
 | DELETE | `/server/custom-emoji/delete` | ✅ | `manageEmoji` | カスタム絵文字削除（WS通知: `server::CustomEmojiDeleted`） |
@@ -212,6 +219,37 @@ giracle-backend/
 
 ---
 
+### Bot モジュール (`/bot`)
+
+Bot はユーザーとして作成され、`BOT` ロールが付与される（既定ロールのため手動リンク不可）。
+作成直後は未承認 (`isApproved=false`) で、`POST /server/bot/set-approve`（`manageServer`）で承認されるまで Bot API は使えない。
+
+| メソッド | パス | 認証 | 権限 | 概要 |
+| ---------- | ------ | ------ | ------ | ------ |
+| PUT | `/bot` | ✅ | - | Bot 作成（名前は 32 文字まで。重複時は 400） |
+| DELETE | `/bot` | ✅ | - | 自分の Bot 削除（接続中の WS も切断） |
+| GET | `/bot/list` | ✅ | - | 自分が作成した Bot 一覧（`query` で名前前方一致、`cursorBotId` で継続取得） |
+| POST | `/bot` | ✅ | - | 自分の Bot のユーザー情報更新（改名すると承認が取り消され WS も切断） |
+| GET | `/bot/:remoteUserId` | ✅ | - | Bot 管理情報取得（承認状態・作成者。`tokenCode` は含まない） |
+| GET | `/bot/all` | ✅ | `manageServer` | 全 Bot 一覧（新しい順。`query` / `cursorBotId`） |
+
+---
+
+### Ext モジュール (`/ext`)
+
+外部アプリが Bot として操作するための API。認証は Cookie ではなく `Authorization` ヘッダに `tokenCode` を載せる。
+`BotEnabled=false` のときは全て 400、未承認・作成者の BAN/削除時は 401 を返す。
+
+| メソッド | パス | 認証 | 概要 |
+| ---------- | ------ | ------ | ------ |
+| POST | `/ext/message/send` | Bot token | Bot としてメッセージ送信（WS 通知・Inbox 追加も通常送信と同じ） |
+| POST | `/ext/message/edit` | Bot token | Bot 名義のメッセージ編集 |
+| DELETE | `/ext/message/delete` | Bot token | Bot 名義のメッセージ削除 |
+| GET | `/ext/user/:userId` | Bot token | ユーザー情報取得 |
+| WS | `/ext/ws` | Bot token | Bot 用 WebSocket（下記） |
+
+---
+
 ## WebSocket (`/ws`)
 
 接続時に Cookie または `?token` クエリパラメータでトークン認証。
@@ -223,6 +261,9 @@ giracle-backend/
 | `GLOBAL` | 全ユーザー共通イベント |
 | `user::{userId}` | 該当ユーザー向けイベント |
 | `channel::{channelId}` | 参加済みチャンネルのイベント |
+| `bot::channel::{channelId}` | Bot 用（`/ext/ws` のみ）。Bot 自身が閲覧できるチャンネルのイベント |
+
+Cookie 認証のため `Origin` ヘッダが必須。`CORS_ORIGIN` 設定時はその一覧に一致する Origin のみ接続できる（未設定時は Origin の一致検査を行わない）。
 
 ### クライアント → サーバー シグナル
 
@@ -259,6 +300,22 @@ giracle-backend/
 | `server::ConfigUpdate` | サーバー設定更新 |
 | `server::CustomEmojiUploaded` | カスタム絵文字追加 |
 | `server::CustomEmojiDeleted` | カスタム絵文字削除 |
+
+---
+
+## WebSocket (`/ext/ws`)
+
+Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie は使わない）。
+`BotEnabled=false`・未承認・作成者の BAN/削除時は接続できない。
+接続時に `user::{botUserId}` と、Bot 自身が閲覧できる各チャンネルの `bot::channel::{channelId}` を購読する。
+
+| signal | 方向 | 説明 |
+| -------- | ------ | ------ |
+| `ping` | 送信 | 疎通確認（`pong` を返す） |
+| `ERROR` | 受信 | 接続拒否・切断理由（`data` に文言） |
+| `user::Connected` / `user::Disconnected` | 受信 | Bot ユーザーの接続状態 |
+| `message::SendMessage` / `message::UpdateMessage` | 受信 | Bot が見られるチャンネルのメッセージ |
+| `inbox::Added` / `inbox::Deleted` / `inbox::Clear` | 受信 | Bot 宛の通知 |
 
 ---
 

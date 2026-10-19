@@ -225,13 +225,14 @@ export namespace QueryUser {
   //トランザクション内でのユーザー作成(パスワード・ロールは呼び出し側で同一トランザクションに作る)
   export const insertInTx = (
     tx: Tx,
-    query: { name: string; selfIntroduction: string },
+    query: { name: string; selfIntroduction: string; isBot?: boolean },
   ) => {
     return tx
       .insert(users)
       .values({
         name: query.name,
         selfIntroduction: query.selfIntroduction,
+        isBot: query.isBot,
       })
       .returning()
       .get();
@@ -277,9 +278,22 @@ export namespace QueryUser {
 
   //論理削除
   export const setDeleted = async (query: { userId: string }) => {
-    await db
+    const user = await db
       .update(users)
       .set({ isDeleted: true })
-      .where(eq(users.id, query.userId));
+      .where(eq(users.id, query.userId))
+      .returning();
+
+    return user[0] !== undefined ? user[0] : undefined;
+  };
+
+  //トランザクション内での論理削除(対象なしはundefined)
+  export const setDeletedInTx = (tx: Tx, query: { userId: string }) => {
+    return tx
+      .update(users)
+      .set({ isDeleted: true })
+      .where(eq(users.id, query.userId))
+      .returning()
+      .get();
   };
 }

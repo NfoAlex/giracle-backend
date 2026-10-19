@@ -119,8 +119,9 @@ export namespace ServiceChannel {
       messageDataFrom = await QueryMessage.getSingle({
         messageId: messageIdFrom,
       });
-      //無ければエラー
-      if (!messageDataFrom) {
+      //無ければエラー。他チャンネルのメッセージをカーソルに使うと存在確認の oracle になるため、
+      //チャンネル不一致も「無い」と同じ応答にする
+      if (!messageDataFrom || messageDataFrom.channelId !== channelId) {
         throw status(404, "Message cursor position not found");
       }
     }
@@ -229,6 +230,7 @@ export namespace ServiceChannel {
             e,
           });
         }
+        return undefined;
       }),
     );
 

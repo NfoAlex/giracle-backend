@@ -86,7 +86,7 @@ export namespace ServiceRole {
     _userId: string,
   ) => {
     //デフォルトのロールはリンク不可
-    if (roleId === "MEMBER" || roleId === "HOST") {
+    if (roleId === "MEMBER" || roleId === "HOST" || roleId === "BOT") {
       throw status(400, "You cannot link default role");
     }
 

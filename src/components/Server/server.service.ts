@@ -4,12 +4,14 @@ import * as path from "node:path";
 import { status } from "elysia";
 import sharp from "sharp";
 import { GIRACLE_SERVER_CONFIG } from "../..";
+import { QueryBot } from "../../queries/bot.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryCustomEmoji } from "../../queries/customEmoji.query";
 import { QueryInvite } from "../../queries/invite.query";
 import { QueryRequestLog } from "../../queries/requestLog.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
 import { QueryUser } from "../../queries/user.query";
+import { Util } from "../../Util";
 
 export namespace ServiceServer {
   export const Config = async () => {
@@ -95,6 +97,7 @@ export namespace ServiceServer {
     MessageMaxLength?: number,
     MessageMaxFileSize?: number,
     DefaultJoinChannel?: string[],
+    BotEnabled?: boolean,
   ) => {
     const serverinfo = await QueryServerConfig.updateConfig({
       RegisterAvailable,
@@ -102,6 +105,7 @@ export namespace ServiceServer {
       RegisterAnnounceChannelId,
       MessageMaxLength,
       MessageMaxFileSize,
+      BotEnabled,
     });
 
     if (serverinfo === undefined) throw status(500, "Server config not found");
@@ -117,6 +121,15 @@ export namespace ServiceServer {
       GIRACLE_SERVER_CONFIG.MessageMaxLength = MessageMaxLength;
     if (MessageMaxFileSize !== undefined)
       GIRACLE_SERVER_CONFIG.MessageMaxFileSize = MessageMaxFileSize;
+    if (BotEnabled !== undefined) {
+      GIRACLE_SERVER_CONFIG.BotEnabled = BotEnabled;
+      //無効化したら接続中のBotも切る(open時の判定しか効かないため)
+      if (!BotEnabled) {
+        await Util.wsUserInstance.disconnectAllBots(
+          "Bot is not enabled on this server",
+        );
+      }
+    }
 
     //デフォルト参加チャンネル設定もあるなら更新する
     if (DefaultJoinChannel) {
@@ -337,5 +350,20 @@ export namespace ServiceServer {
       group: logByGroup,
       firstDayLog: includeFirstDayLogs ? await GetLogs(weekStart) : undefined,
     };
+  };
+
+  export const UpdateApprove = async (botId: string, isApproved: boolean) => {
+    const bot = await QueryBot.updateBotIsApproved({ botId, isApproved });
+    if (bot === undefined) throw status(404, "Bot not found");
+
+    //承認を剥がしたら接続中のWSも切る(切断まではopen時の判定しか効かないため)
+    if (!bot.isApproved) {
+      Util.wsUserInstance.disconnect(
+        bot.remoteUserId,
+        "Your bot is not approved yet",
+      );
+    }
+
+    return bot;
   };
 }

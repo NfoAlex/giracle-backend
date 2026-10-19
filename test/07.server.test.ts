@@ -207,6 +207,7 @@ describe("POST /server/change-config", () => {
         MessageMaxLength: 123,
         MessageMaxFileSize: 2048,
         DefaultJoinChannel: ["TESTCHANNEL1", "TESTCHANNEL2"],
+        BotEnabled: true,
       },
     });
     const j = await res.json();
@@ -224,6 +225,8 @@ describe("POST /server/change-config", () => {
     expect(GIRACLE_SERVER_CONFIG.MessageMaxLength).toBe(123);
     expect(j.data.MessageMaxFileSize).toBe(2048);
     expect(GIRACLE_SERVER_CONFIG.MessageMaxFileSize).toBe(2048);
+    expect(j.data.BotEnabled).toBeTrue();
+    expect(GIRACLE_SERVER_CONFIG.BotEnabled).toBeTrue();
 
     const sc = db.select().from(serverConfigs).limit(1).get();
     expect(sc).toBeDefined();
