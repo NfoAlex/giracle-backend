@@ -8,15 +8,19 @@ import { Middleware } from "../src/Middlewares";
 import { INIT } from "./util";
 
 //レート制限のバケットはプロセス内で共有されるため、このファイル内の実行順に依存する
-const botApp = new Elysia().use(ext);
+//extはBOT_RATE_LIMIT_ENABLEDで有効化されるため、テストではリミッターをextと同じ順でマウントする
+const botApp = new Elysia()
+  .use(Middleware.CheckBotToken)
+  .use(Middleware.BotRateLimiter)
+  .get("/ping", () => "ok");
 
 //1つ目のBot(共通のシード)と、独立性検証用の2つ目のBot
 const BOT1_TOKEN = "BOTMANAGETOKEN";
 const BOT2 = { id: "BOTMANAGE2", token: "BOTMANAGE2TOKEN" };
 
-const fetchBot = (token: string, userId = "TESTUSER") =>
+const fetchBot = (token: string) =>
   botApp.handle(
-    new Request(`http://localhost/ext/user/${userId}`, {
+    new Request("http://localhost/ping", {
       method: "GET",
       headers: { authorization: token },
     }),

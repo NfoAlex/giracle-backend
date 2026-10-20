@@ -374,8 +374,9 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 | `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
-| `RATE_LIMIT_BOT_COUNT` | `120` | Bot(`/ext/*`)の制限リクエスト数(Bot単位) |
-| `RATE_LIMIT_BOT_TIMEOUT` | `60` | Botのウィンドウ幅（秒） |
+| `BOT_RATE_LIMIT_ENABLED` | - | `"true"` で Bot のレート制限有効化 |
+| `RATE_LIMIT_BOT_COUNT` | `15` | Bot(`/ext/*`)の制限リクエスト数(Bot単位) |
+| `RATE_LIMIT_BOT_TIMEOUT` | `5` | Botのウィンドウ幅（秒） |
 | `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
 | `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
 | `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
@@ -403,7 +404,7 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 - **HTTPS 必須。** 認証トークンは Cookie（`httpOnly`）で扱う。TLS 終端の背後でのみ運用すること。平文 HTTP ではトークンが盗聴される。
 - **`CORS_ORIGIN` を必ず設定する。** 未設定だとオリジン制限が効かず、Cookie 認証と組み合わさると危険。本番では信頼するフロントエンドのオリジンを明示する。
 - **レート制限はデフォルト無効。** `RATE_LIMIT_ENABLED=true` にしない限りログインの総当たりに無防備。本番では有効化する。
-- **Botエンドポイント(`/ext/*`)のレート制限は`/ext`モジュール側の`BotRateLimiter`のみ。** Botトークンごとに独立したバケットで数え、超過時は429のみ（トークン無効化・IPブロックはしない）。`/ext`は共通`RateLimiter`より先に登録してあるため、共通側のIP制限・IPブロックはかからない（トークンが不正なリクエストも同様。認証で401になるだけで回数制限はない）。
+- **Botエンドポイント(`/ext/*`)のレート制限は`/ext`モジュール側の`BotRateLimiter`で、`BOT_RATE_LIMIT_ENABLED=true`のときだけ有効。** Botトークンごとに独立したバケットで数え、超過時は429のみ（トークン無効化・IPブロックはしない）。`/ext`は共通`RateLimiter`より先に登録してあるため、共通側のIP制限・IPブロックはかからない（トークンが不正なリクエストも同様。認証で401になるだけで回数制限はない）。
 - **未認証リクエストの IP 判定は接続元ソケットの IP（`server.requestIP()`）を基準にする。** ヘッダー偽装では回避できないが、リバースプロキシ配下ではリクエストが全てプロキシの IP として扱われ、レート制限が実質機能しなくなる（あるいは利用者全員が同一キーとして巻き込まれる）。プロキシ経由で運用する場合は、プロキシ側で L4/L7 のレート制限・IP ブロックを別途用意するか、信頼できるプロキシのみが到達できる構成にすること。
 - **パスワードの最小長は 4 文字と緩い。** 必要なら運用ポリシーやフロント側のバリデーションで補う。
 - **URL プレビュー・サムネイルの取得は `src/Utils/FetchSafe.ts` に集約し、SSRF 対策を行う。** `http` / `https` 以外とユーザー情報付き URL を除外、生 IP 指定を除外、DNS 解決後の全アドレスが公開 IP であることを確認（内部 IP が 1 つでもあれば拒否）、解決先 IP に固定して接続（`Host` / TLS `servername` は元ホスト名）する。リダイレクトは自動追従せず hop ごとに再検証し、上限 3 hop・1 hop 5 秒・DNS 3 秒で打ち切る。

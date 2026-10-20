@@ -62,9 +62,8 @@ const limitConfig = {
       Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
   },
   bot: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_BOT_COUNT ?? "120", 10),
-    windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_BOT_TIMEOUT ?? "60", 10) * 1000,
+    limit: Number.parseInt(Bun.env.BOT_RATE_LIMIT_COUNT ?? "15", 10),
+    windowMs: Number.parseInt(Bun.env.BOT_RATE_LIMIT_TIMEOUT ?? "5", 10) * 1000,
   },
 };
 type LimitConfig = (typeof limitConfig)["anonymous"];
@@ -301,6 +300,7 @@ export namespace Middleware {
     },
   );
 
+  //必ずCheckBotTokenより後に登録する(先に置くとトークン検証前に走って401になる)
   export const BotRateLimiter = new Elysia({ name: "botRateLimiter" })
     .use(CheckBotToken)
     .onBeforeHandle({ as: "scoped" }, ({ CheckBotToken }) => {

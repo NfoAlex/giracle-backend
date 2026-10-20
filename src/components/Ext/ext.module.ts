@@ -6,7 +6,11 @@ import { ServiceUser } from "../User/user.service";
 
 export const ext = new Elysia({ prefix: "/ext" })
   .use(Middleware.CheckBotToken)
-  .use(Middleware.BotRateLimiter)
+  .use(
+    Bun.env.BOT_RATE_LIMIT_ENABLED === "true"
+      ? Middleware.BotRateLimiter
+      : undefined,
+  )
   .post(
     "/message/send",
     async ({
