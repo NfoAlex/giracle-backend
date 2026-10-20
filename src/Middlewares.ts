@@ -61,9 +61,30 @@ const limitConfig = {
     windowMs:
       Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
   },
+  bot: {
+    limit: Number.parseInt(Bun.env.RATE_LIMIT_BOT_COUNT ?? "120", 10),
+    windowMs:
+      Number.parseInt(Bun.env.RATE_LIMIT_BOT_TIMEOUT ?? "60", 10) * 1000,
+  },
 };
+type LimitConfig = (typeof limitConfig)["anonymous"];
 //レート制限用クライアントごとのバケット管理
 const buckets = new Map<string, { count: number; resetAt: number }>();
+//バケットを1消費して、消費後のバケットを返す(超過判定は呼び出し側で count を見る)
+const consumeBucket = (key: string, config: LimitConfig) => {
+  const now = Date.now();
+  const bucket = buckets.get(key);
+
+  if (!bucket || bucket.resetAt < now) {
+    const created = { count: 1, resetAt: now + config.windowMs };
+    buckets.set(key, created);
+    return created;
+  }
+
+  bucket.count += 1;
+  return bucket;
+};
+
 //レート制限用バケットの古いデータを定期的に削除
 setInterval(() => {
   const now = Date.now();
@@ -254,25 +275,14 @@ export namespace Middleware {
         }
       }
 
-      const now = Date.now();
-      const bucket = buckets.get(key);
-
       //認証しているかどうかで使用設定を変更
       const configUsing = isAnonymous
         ? limitConfig.anonymous
         : limitConfig.authenticated;
 
-      //バケットが無いかリセット時間を過ぎているなら新規作成
-      if (!bucket || bucket.resetAt < now) {
-        buckets.set(key, { count: 1, resetAt: now + configUsing.windowMs });
-        return;
-      }
-
       //制限を超過しているか確認、超過しているなら429を返す
-      if (bucket.count >= configUsing.limit) {
-        //ブロックされるけどカウント増加
-        bucket.count += 1;
-
+      const bucket = consumeBucket(key, configUsing);
+      if (bucket.count > configUsing.limit) {
         //認証済みで制限を超えたならトークンを無効化
         if (!isAnonymous) {
           await QueryToken.removeByToken({ token: key });
@@ -288,11 +298,23 @@ export namespace Middleware {
 
         return status(429, "Too Many Requests");
       }
-
-      //カウント増加
-      bucket.count += 1;
     },
   );
+
+  export const BotRateLimiter = new Elysia({ name: "botRateLimiter" })
+    .use(CheckBotToken)
+    .onBeforeHandle({ as: "scoped" }, ({ CheckBotToken }) => {
+      if (CheckBotToken === undefined) return status(401, "Unauthorized");
+
+      //Bot単位で独立したバケットを使う(トークン無効化やIPブロックはしない)
+      const bucket = consumeBucket(
+        `bot::${CheckBotToken._botId}`,
+        limitConfig.bot,
+      );
+      if (bucket.count > limitConfig.bot.limit) {
+        return status(429, "Too Many Requests");
+      }
+    });
 
   export const UrlPreviewControl = new Elysia({ name: "urlPreviewControl" })
     .guard({

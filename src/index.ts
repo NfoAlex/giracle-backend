@@ -39,9 +39,6 @@ export const app = new Elysia({
       credentials: true,
     }),
   )
-  .use(
-    Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
-  )
   .onError(({ error, code }) => {
     if (code === "NOT_FOUND") return status(404, "Not Found :(");
     if (process.env.NODE_ENV !== "test") {
@@ -55,7 +52,12 @@ export const app = new Elysia({
   .use(Middleware.RequestLogger)
   .use(wsHandler)
   .use(extWsHandler)
+  //Bot(/ext)はBotRateLimiterで別に制限するため、共通RateLimiterの対象外にする
+  //(scopedミドルウェアは後から登録したルートにしか効かない)
   .use(ext)
+  .use(
+    Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
+  )
   .use(user)
   .use(channel)
   .use(role)
