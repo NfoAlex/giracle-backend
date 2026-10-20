@@ -59,7 +59,7 @@ describe("BotRateLimiter", () => {
 
   it("上限を超えると429 :: バケットはBot単位で独立している", async () => {
     let hitsLimit = false;
-    //既定の上限(RATE_LIMIT_BOT_COUNT)に依存しないよう、429まで叩く
+    //既定の上限(BOT_RATE_LIMIT_COUNT)に依存しないよう、429まで叩く
     for (let i = 0; i < 400; i++) {
       const res = await fetchBot(BOT1.token);
       if (res.status === 429) {

@@ -375,8 +375,8 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 | `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
 | `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
 | `BOT_RATE_LIMIT_ENABLED` | - | `"true"` で Bot のレート制限有効化 |
-| `RATE_LIMIT_BOT_COUNT` | `15` | Bot(`/ext/*`)の制限リクエスト数(Bot単位) |
-| `RATE_LIMIT_BOT_TIMEOUT` | `5` | Botのウィンドウ幅（秒） |
+| `BOT_RATE_LIMIT_COUNT` | `15` | Bot(`/ext/*`)の制限リクエスト数(Bot単位) |
+| `BOT_RATE_LIMIT_TIMEOUT` | `5` | Botのウィンドウ幅（秒） |
 | `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
 | `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
 | `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
