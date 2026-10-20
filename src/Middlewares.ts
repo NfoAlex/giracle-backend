@@ -94,6 +94,11 @@ export function consumeBotBucket(botId: string): boolean {
   return bucket.count <= limitConfig.bot.limit;
 }
 
+/** テスト間でバケットを持ち越さないための初期化 */
+export function resetRateLimitBuckets() {
+  buckets.clear();
+}
+
 //レート制限用バケットの古いデータを定期的に削除
 setInterval(() => {
   const now = Date.now();
