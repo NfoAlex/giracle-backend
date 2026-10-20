@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "bun:test";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db, GIRACLE_SERVER_CONFIG } from "../src";
@@ -11,6 +18,7 @@ import {
   messages,
   users,
 } from "../src/db/schema";
+import { resetRateLimitBuckets } from "../src/Middlewares";
 import { Util } from "../src/Util";
 import { extWsHandler } from "../src/ws.ext";
 import { FETCH, INIT } from "./util";
@@ -70,6 +78,11 @@ afterAll(async () => {
   await db.delete(inboxes).where(eq(inboxes.userId, "TESTUSER"));
   await db.delete(messages).where(eq(messages.userId, "BOTUSER"));
   await db.delete(channelJoins).where(eq(channelJoins.userId, "BOTUSER"));
+});
+
+//同一Botトークンで全ケースを回すため、Botレート制限のバケットをケース毎に初期化する
+beforeEach(() => {
+  resetRateLimitBuckets();
 });
 
 describe("/ext/message/send", async () => {
