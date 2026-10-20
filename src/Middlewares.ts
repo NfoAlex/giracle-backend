@@ -84,6 +84,16 @@ const consumeBucket = (key: string, config: LimitConfig) => {
   return bucket;
 };
 
+/**
+ * Bot単位のバケットを1消費し、制限内ならtrue
+ * WS(extWsHandler)はハンドラ内で検証後に呼ぶため、プラグインとは別に公開している
+ */
+export function consumeBotBucket(botId: string): boolean {
+  const bucket = consumeBucket(`bot::${botId}`, limitConfig.bot);
+
+  return bucket.count <= limitConfig.bot.limit;
+}
+
 //レート制限用バケットの古いデータを定期的に削除
 setInterval(() => {
   const now = Date.now();
@@ -307,11 +317,7 @@ export namespace Middleware {
       if (CheckBotToken === undefined) return status(401, "Unauthorized");
 
       //Bot単位で独立したバケットを使う(トークン無効化やIPブロックはしない)
-      const bucket = consumeBucket(
-        `bot::${CheckBotToken._botId}`,
-        limitConfig.bot,
-      );
-      if (bucket.count > limitConfig.bot.limit) {
+      if (!consumeBotBucket(CheckBotToken._botId)) {
         return status(429, "Too Many Requests");
       }
     });

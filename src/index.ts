@@ -50,14 +50,14 @@ export const app = new Elysia({
     return status(500, "somethin went wrong :(");
   })
   .use(Middleware.RequestLogger)
-  .use(wsHandler)
-  .use(extWsHandler)
   //Bot(/ext)はBotRateLimiterで別に制限するため、共通RateLimiterの対象外にする
   //(scopedミドルウェアは後から登録したルートにしか効かない)
+  .use(extWsHandler)
   .use(ext)
   .use(
     Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
   )
+  .use(wsHandler)
   .use(user)
   .use(channel)
   .use(role)

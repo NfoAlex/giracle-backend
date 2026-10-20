@@ -1,5 +1,6 @@
 import Elysia, { t } from "elysia";
 import { GIRACLE_SERVER_CONFIG } from "./init";
+import { consumeBotBucket } from "./Middlewares";
 import { QueryBot } from "./queries/bot.query";
 import { QueryUser } from "./queries/user.query";
 import { Util } from "./Util";
@@ -69,6 +70,19 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
       ws.send({
         signal: "ERROR",
         data: "Your bot is not approved yet",
+      });
+      ws.close();
+      return;
+    }
+
+    //HTTP側(BotRateLimiter)と同じバケットでBot単位に数える
+    if (
+      Bun.env.BOT_RATE_LIMIT_ENABLED === "true" &&
+      !consumeBotBucket(botData.id)
+    ) {
+      ws.send({
+        signal: "ERROR",
+        data: "Too Many Requests",
       });
       ws.close();
       return;
