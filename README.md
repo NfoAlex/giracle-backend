@@ -230,6 +230,7 @@ Bot はユーザーとして作成され、`BOT` ロールが付与される（�
 | DELETE | `/bot` | ✅ | - | 自分の Bot 削除（接続中の WS も切断） |
 | GET | `/bot/list` | ✅ | - | 自分が作成した Bot 一覧（`query` で名前前方一致、`cursorBotId` で継続取得） |
 | POST | `/bot` | ✅ | - | 自分の Bot のユーザー情報更新（改名すると承認が取り消され WS も切断） |
+| POST | `/bot/change-icon` | ✅ | - | 自分の Bot のアイコン変更（`botId` + `icon`） |
 | GET | `/bot/:remoteUserId` | ✅ | - | Bot 管理情報取得（承認状態・作成者。`tokenCode` は含まない） |
 | GET | `/bot/all` | ✅ | `manageServer` | 全 Bot 一覧（新しい順。`query` / `cursorBotId`） |
 

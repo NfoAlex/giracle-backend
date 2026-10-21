@@ -273,43 +273,7 @@ export namespace ServiceUser {
   };
 
   export const ChangeIcon = async (icon: File, _userId: string) => {
-    if (icon.size > 8 * 1024 * 1024) {
-      throw status(400, "File size is too large");
-    }
-    if (
-      icon.type !== "image/png" &&
-      icon.type !== "image/gif" &&
-      icon.type !== "image/jpeg"
-    ) {
-      throw status(400, "File type is invalid");
-    }
-    //拡張子取得
-    const ext = icon.type.split("/")[1];
-
-    //既存のアイコンを削除
-    await unlink(`./STORAGE/icon/${_userId}.png`).catch(() => {});
-    await unlink(`./STORAGE/icon/${_userId}.gif`).catch(() => {});
-    await unlink(`./STORAGE/icon/${_userId}.jpeg`).catch(() => {});
-    await unlink(`./STORAGE/icon/${_userId}.webp`).catch(() => {});
-
-    //画像を圧縮、保存する(GIFとそれ以外で処理を分ける)
-    if (ext === "gif") {
-      await sharp(await icon.arrayBuffer(), { animated: true })
-        .resize(125, 125)
-        .gif({
-          colours: 128, // 色数を128に削減
-          dither: 0, // ディザリングを無効化
-          effort: 7, // パレット生成の計算量を設定
-        })
-        .toFile(`./STORAGE/icon/${_userId}.gif`);
-    } else {
-      await sharp(await icon.arrayBuffer())
-        .resize(125, 125)
-        .webp({ quality: 90 })
-        .toFile(`./STORAGE/icon/${_userId}.webp`);
-    }
-
-    return;
+    await Util.saveUserIcon(icon, _userId);
   };
 
   export const ChangeBanner = async (banner: File, _userId: string) => {

@@ -165,6 +165,23 @@ export namespace ServiceBot {
     return userUpdated;
   };
 
+  export const ChangeIcon = async (
+    icon: File,
+    _userId: string,
+    botId: string,
+  ) => {
+    const [bot] = await QueryBot.getSingle({ botId });
+    if (bot === undefined) {
+      throw status(404, "Bot not found");
+    }
+    if (bot.createdBy !== _userId) {
+      throw status(400, "This is not your bot");
+    }
+
+    //アイコンの検証・変換・保存はユーザー側と同じなので共通処理に委譲する
+    await Util.saveUserIcon(icon, bot.remoteUserId);
+  };
+
   export const GetListAll = async (
     length: number,
     cursorBotId?: string,

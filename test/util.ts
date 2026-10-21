@@ -32,6 +32,19 @@ import {
 
 let FLAG_INIT_COMPLETED = false;
 
+//sharpのresizeを通せる最小PNG(1x1px)
+const PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+/**
+ * アイコン/バナー変更テスト用のPNGファイル。
+ */
+export function pngFile(name = "icon.png") {
+  return new File([Buffer.from(PNG_BASE64, "base64")], name, {
+    type: "image/png",
+  });
+}
+
 /**
  * 全テスト共通のDB初期化処理。
  */

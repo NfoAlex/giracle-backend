@@ -7,7 +7,7 @@ import { QueryBot } from "../src/queries/bot.query";
 import { QueryRoleLink } from "../src/queries/roleLink.query";
 import { QueryUser } from "../src/queries/user.query";
 import { Util } from "../src/Util";
-import { FETCH, INIT } from "./util";
+import { FETCH, INIT, pngFile } from "./util";
 
 beforeAll(async () => {
   await INIT();
@@ -955,5 +955,128 @@ describe("トランザクションの原子性", () => {
       where: eq(users.id, remoteUserId),
     });
     expect(user?.isDeleted).toBe(false);
+  });
+});
+
+describe("POST /bot/change-icon", () => {
+  const ICON_DIR = "./STORAGE/icon";
+  const iconPathOf = (remoteUserId: string) =>
+    `${ICON_DIR}/${remoteUserId}.webp`;
+  const createBot = (name: string) => ServiceBot.PutBot("TESTUSER", name, "");
+  const createdRemoteUserIds: string[] = [];
+
+  const changeIcon = (botId: string, icon: File) => {
+    const formData = new FormData();
+    formData.append("botId", botId);
+    formData.append("icon", icon);
+    return FETCH({ path: "/bot/change-icon", method: "POST", body: formData });
+  };
+
+  afterAll(async () => {
+    //このテストで作ったBotのアイコンだけを掃除する
+    for (const remoteUserId of createdRemoteUserIds) {
+      await Bun.file(iconPathOf(remoteUserId))
+        .delete()
+        .catch(() => {});
+    }
+  });
+
+  it("正常 :: Botのリモートユーザーのアイコンが変更される", async () => {
+    const { bot, remoteUser } = await createBot("BotIconChange1");
+    createdRemoteUserIds.push(remoteUser.id);
+
+    const res = await changeIcon(bot.id, pngFile());
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.message).toBe("Bot icon changed");
+
+    //保存先はBot(リモートユーザー)であり、作成者ではない
+    expect(await Bun.file(iconPathOf(remoteUser.id)).exists()).toBe(true);
+    const iconRes = await FETCH({
+      path: `/user/icon/${remoteUser.id}`,
+      method: "GET",
+    });
+    expect(iconRes.ok).toBe(true);
+  });
+
+  it("正常 :: 作成者自身のアイコンは変更されない", async () => {
+    const ownerIconPath = iconPathOf("TESTUSER");
+    const ownerIconBefore = await Bun.file(ownerIconPath)
+      .stat()
+      .catch(() => null);
+    const { bot, remoteUser } = await createBot("BotIconChange2");
+    createdRemoteUserIds.push(remoteUser.id);
+
+    expect((await changeIcon(bot.id, pngFile())).ok).toBe(true);
+
+    const ownerIconAfter = await Bun.file(ownerIconPath)
+      .stat()
+      .catch(() => null);
+    expect(ownerIconAfter?.mtimeMs).toBe(ownerIconBefore?.mtimeMs);
+  });
+
+  it("異常 :: 不正なファイル形式は400", async () => {
+    const { bot, remoteUser } = await createBot("BotIconChange3");
+    createdRemoteUserIds.push(remoteUser.id);
+    const txt = new File(["hello"], "icon.txt", { type: "text/plain" });
+
+    const res = await changeIcon(bot.id, txt);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("File type is invalid");
+
+    //保存されない
+    expect(await Bun.file(iconPathOf(remoteUser.id)).exists()).toBe(false);
+  });
+
+  it("異常 :: 他人のBotは変更できない", async () => {
+    const { bot, remoteUser } = await createBot("BotIconChange4");
+    createdRemoteUserIds.push(remoteUser.id);
+
+    //作成者TESTUSERのBotをTESTUSER2が変更しようとする
+    const formData = new FormData();
+    formData.append("botId", bot.id);
+    formData.append("icon", pngFile());
+    const res = await FETCH({
+      path: "/bot/change-icon",
+      method: "POST",
+      body: formData,
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("This is not your bot");
+
+    expect(await Bun.file(iconPathOf(remoteUser.id)).exists()).toBe(false);
+  });
+
+  it("異常 :: 存在しないBotは404", async () => {
+    const res = await changeIcon("NOT_EXISTING_BOT", pngFile());
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Bot not found");
+  });
+
+  it("異常 :: botId未指定はバリデーションエラー", async () => {
+    const formData = new FormData();
+    formData.append("icon", pngFile());
+    const res = await FETCH({
+      path: "/bot/change-icon",
+      method: "POST",
+      body: formData,
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("異常 :: 未認証", async () => {
+    const { bot } = await createBot("BotIconChange5");
+
+    const formData = new FormData();
+    formData.append("botId", bot.id);
+    formData.append("icon", pngFile());
+    const res = await FETCH({
+      path: "/bot/change-icon",
+      method: "POST",
+      body: formData,
+      excludeCredential: true,
+    });
+    expect(res.status).toBe(401);
   });
 });

@@ -12,6 +12,7 @@ import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import IsBlankString from "./Utils/isBlankString";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import { GetSafeFileExtension, IsSafePathId } from "./Utils/SafeString";
+import SaveUserIcon from "./Utils/SaveUserIcon";
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
 import SendPushNotification from "./Utils/SendPushNotification";
 import SendSystemMessage from "./Utils/SendSystemMessage";
@@ -37,5 +38,6 @@ export namespace Util {
   export const isSafePathId = IsSafePathId;
   export const getUrlPreviewThumbnailFileName = GetUrlPreviewThumbnailFileName;
   export const readResponseBodyWithByteLimit = ReadResponseBodyWithByteLimit;
+  export const saveUserIcon = SaveUserIcon;
   export const wsUserInstance = WSUserInstance;
 }

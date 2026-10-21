@@ -103,6 +103,26 @@ export const bot = new Elysia({ prefix: "/bot" })
       },
     },
   )
+  .post(
+    "/change-icon",
+    async ({ body: { botId, icon }, CheckToken: { _userId } }) => {
+      await ServiceBot.ChangeIcon(icon, _userId, botId);
+
+      return {
+        message: "Bot icon changed",
+      };
+    },
+    {
+      body: t.Object({
+        botId: t.String(),
+        icon: t.File(),
+      }),
+      detail: {
+        description: "自分のBotユーザー用アイコン画像を変更します",
+        tags: ["Bot"],
+      },
+    },
+  )
   .get(
     "/:remoteUserId",
     async ({ params: { remoteUserId } }) => {
