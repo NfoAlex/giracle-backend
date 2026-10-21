@@ -77,7 +77,7 @@ export const extWsHandler = new Elysia().ws("/ext/ws", {
 
     //HTTP側(BotRateLimiter)と同じバケットでBot単位に数える
     if (
-      Bun.env.BOT_RATE_LIMIT_ENABLED === "true" &&
+      process.env.BOT_RATE_LIMIT_ENABLED === "true" &&
       !consumeBotBucket(botData.id)
     ) {
       ws.send({
