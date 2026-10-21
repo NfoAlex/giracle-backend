@@ -1,5 +1,6 @@
 import { Elysia, t } from "elysia";
 import { Middleware } from "../../Middlewares";
+import { ServiceUser } from "../User/user.service";
 import { ServiceBot } from "./bot.service";
 
 export const bot = new Elysia({ prefix: "/bot" })
@@ -99,6 +100,25 @@ export const bot = new Elysia({ prefix: "/bot" })
       }),
       detail: {
         description: "Botの更新を行います",
+        tags: ["Bot"],
+      },
+    },
+  )
+  .post(
+    "/change-icon",
+    async ({ body: { icon }, CheckToken: { _userId } }) => {
+      await ServiceUser.ChangeIcon(icon, _userId);
+
+      return {
+        message: "Bot icon changed",
+      };
+    },
+    {
+      body: t.Object({
+        icon: t.File(),
+      }),
+      detail: {
+        description: "自分のBotユーザー用アイコン画像を変更します",
         tags: ["Bot"],
       },
     },
