@@ -786,6 +786,39 @@ describe("POST /", () => {
     expect(j.data.selfIntroduction).toBe("after");
   });
 
+  it("異常 :: 名前も自己紹介も未指定なら400", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdateEmpty1", "before");
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "POST",
+      body: { botId: bot.id },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Name or self introduction is essential");
+
+    //何も書き換わらない
+    const row = await db.query.users.findFirst({
+      where: eq(users.id, remoteUser.id),
+    });
+    expect(row?.name).toBe("BotUpdateEmpty1");
+    expect(row?.selfIntroduction).toBe("before");
+  });
+
+  it("正常 :: 自己紹介だけ空文字で指定しても更新できる", async () => {
+    const { bot, remoteUser } = await createBot("BotUpdateEmpty2", "before");
+
+    const res = await FETCH({
+      path: "/bot",
+      method: "POST",
+      body: { botId: bot.id, selfIntroduction: "" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+    expect(j.data.id).toBe(remoteUser.id);
+    expect(j.data.selfIntroduction).toBe("");
+  });
+
   it("異常 :: POST /botで存在しないBotIdは404", async () => {
     const res = await FETCH({
       path: "/bot",

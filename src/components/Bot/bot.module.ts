@@ -72,7 +72,13 @@ export const bot = new Elysia({ prefix: "/bot" })
     async ({
       body: { botId, name, selfIntroduction },
       CheckToken: { _userId },
+      status,
     }) => {
+      //名前と自己紹介どちらかは必須
+      if (name === undefined && selfIntroduction === undefined) {
+        throw status(400, "Name or self introduction is essential");
+      }
+
       const user = await ServiceBot.Update(
         _userId,
         botId,
