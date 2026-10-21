@@ -96,7 +96,7 @@ describe("BotRateLimiter", () => {
     );
 
     expect(res.status).toBe(
-      Bun.env.BOT_RATE_LIMIT_ENABLED === "true" ? 429 : 200,
+      process.env.BOT_RATE_LIMIT_ENABLED === "true" ? 429 : 200,
     );
   });
 

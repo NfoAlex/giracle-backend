@@ -31,8 +31,8 @@ export const app = new Elysia({
 })
   .use(
     cors({
-      origin: Bun.env.CORS_ORIGIN
-        ? Bun.env.CORS_ORIGIN.split(",")
+      origin: process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(",")
             .map((s) => s.trim())
             .filter(Boolean)
         : false,
@@ -55,7 +55,7 @@ export const app = new Elysia({
   .use(extWsHandler)
   .use(ext)
   .use(
-    Bun.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
+    process.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
   )
   .use(wsHandler)
   .use(user)

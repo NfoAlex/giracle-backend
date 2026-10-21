@@ -52,18 +52,18 @@ export function invalidateUserCache(userId: string) {
 //制限設定
 const limitConfig = {
   anonymous: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25", 10),
+    limit: Number.parseInt(process.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) * 1000,
+      Number.parseInt(process.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) * 1000,
   },
   authenticated: {
-    limit: Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200", 10),
+    limit: Number.parseInt(process.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200", 10),
     windowMs:
-      Number.parseInt(Bun.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
+      Number.parseInt(process.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
   },
   bot: {
-    limit: Number.parseInt(Bun.env.BOT_RATE_LIMIT_COUNT ?? "15", 10),
-    windowMs: Number.parseInt(Bun.env.BOT_RATE_LIMIT_TIMEOUT ?? "5", 10) * 1000,
+    limit: Number.parseInt(process.env.BOT_RATE_LIMIT_COUNT ?? "15", 10),
+    windowMs: Number.parseInt(process.env.BOT_RATE_LIMIT_TIMEOUT ?? "5", 10) * 1000,
   },
 };
 type LimitConfig = (typeof limitConfig)["anonymous"];

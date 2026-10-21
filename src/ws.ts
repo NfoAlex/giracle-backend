@@ -4,7 +4,7 @@ import { Util } from "./Util";
 
 // index.tsのcors設定と同一ソース。exact match用
 const ALLOWED_WS_ORIGINS: ReadonlySet<string> = new Set(
-  (Bun.env.CORS_ORIGIN ?? "")
+  (process.env.CORS_ORIGIN ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
