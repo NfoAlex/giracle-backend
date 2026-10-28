@@ -19,6 +19,18 @@ export namespace QueryBot {
       .all();
   };
 
+  //トランザクション内でリモートユーザーId基準のBot管理情報を削除(削除ユーザー自身がBotの場合)
+  export const deleteByRemoteUserIdInTx = (
+    tx: Tx,
+    query: { remoteUserId: string },
+  ) => {
+    return tx
+      .delete(botManages)
+      .where(eq(botManages.remoteUserId, query.remoteUserId))
+      .returning({ id: botManages.id })
+      .all();
+  };
+
   //トランザクション内でBotの管理情報を作成する
   export const insertWithRemoteUserIdInTx = (
     tx: Tx,

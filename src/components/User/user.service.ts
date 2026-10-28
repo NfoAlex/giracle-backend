@@ -599,6 +599,8 @@ export namespace ServiceUser {
       QueryToken.removeByUserInTx(tx, { userId });
       QueryInbox.removeAllByUserInTx(tx, { userId });
       QueryNotification.removeDevicesByUserInTx(tx, { userId });
+      //削除ユーザー自身がBotなら管理情報を消してトークンを失効させる
+      QueryBot.deleteByRemoteUserIdInTx(tx, { remoteUserId: userId });
 
       //削除ユーザーが作成したBotは管理情報を消し、Botユーザーも削除扱いにする(DeleteBotと同じ後始末)
       const bots = QueryBot.deleteByCreatedByInTx(tx, { createdBy: userId });
