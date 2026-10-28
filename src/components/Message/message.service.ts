@@ -618,7 +618,7 @@ export namespace ServiceMessage {
     //チャンネル参加者限定
     const existingMentionedUsers =
       mentionedUserIdsMerged.length > 0
-        ? await QueryChannelJoin.getJoinsByUsersInChannel({
+        ? await QueryChannelJoin.getJoinsByUsersInChannelForMention({
             userIds: mentionedUserIdsMerged,
             channelId,
           })

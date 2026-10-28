@@ -7,14 +7,20 @@ export namespace QueryUser {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-  //ユーザー総数
+  //有効ユーザー総数(削除済みは数えない)
   export const countAll = async () => {
-    return await db.$count(users);
+    return await db.$count(users, eq(users.isDeleted, false));
   };
 
-  //2人目以降のユーザー(初回セットアップ判定用。1件も無ければundefined)
+  //2人目以降の有効ユーザー(初回セットアップ判定用。1件も無ければundefined)
   export const getSecondUser = () => {
-    return db.select().from(users).offset(1).limit(1).get();
+    return db
+      .select()
+      .from(users)
+      .where(eq(users.isDeleted, false))
+      .offset(1)
+      .limit(1)
+      .get();
   };
 
   //ユーザー単体(全列)
@@ -276,15 +282,13 @@ export namespace QueryUser {
     return userUpdated;
   };
 
-  //論理削除
-  export const setDeleted = async (query: { userId: string }) => {
-    const user = await db
-      .update(users)
-      .set({ isDeleted: true })
+  //トランザクション内でBotかどうかのみ取得(削除時の巻き込み防止用)
+  export const getIsBotInTx = (tx: Tx, query: { userId: string }) => {
+    return tx
+      .select({ isBot: users.isBot })
+      .from(users)
       .where(eq(users.id, query.userId))
-      .returning();
-
-    return user[0] !== undefined ? user[0] : undefined;
+      .get();
   };
 
   //トランザクション内での論理削除(対象なしはundefined)

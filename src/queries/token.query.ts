@@ -139,11 +139,6 @@ export namespace QueryToken {
       );
   };
 
-  //ユーザーの全トークンを削除
-  export const removeByUser = async (query: { userId: string }) => {
-    await db.delete(tokens).where(eq(tokens.userId, query.userId));
-  };
-
   //現在のセッションを除いてユーザーのトークンを削除(パスワード変更時)
   export const removeByUserExceptToken = async (query: {
     userId: string;

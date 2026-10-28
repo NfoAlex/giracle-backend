@@ -1,17 +1,21 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
-import { app, db, NAME_MAX_LENGTH } from "../src";
+import { app, db, GIRACLE_SERVER_CONFIG, NAME_MAX_LENGTH } from "../src";
+import { ServiceUser } from "../src/components/User/user.service";
 import {
   botManages,
   channelJoins,
+  inboxes,
   messages,
+  notificationDevices,
   passwords,
   roleInfos,
   roleLinks,
   tokens,
   users,
 } from "../src/db/schema";
+import { QueryUser } from "../src/queries/user.query";
 import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
 
@@ -1137,6 +1141,9 @@ describe("/user/ban & /user/unban", () => {
   });
 });
 
+//削除対象ユーザーが作成したBot(削除時に一緒に片付くことを確認する)
+const DEL_TARGET_BOT_ID = "DEL_TARGET_BOT";
+
 describe("/user/delete", () => {
   let DEL_TARGET_TOKEN = "";
   let DEL_TARGET_USER_ID = "";
@@ -1224,6 +1231,40 @@ describe("/user/delete", () => {
   });
 
   it("正常 :: 論理削除してデータが残りセッションが無効化されることを確認", async () => {
+    //削除で後始末される対象を作る(端末・Inbox・Bot・画像)
+    await db.insert(notificationDevices).values({
+      token: "DEL_TARGET_DEVICE",
+      platform: "web",
+      userId: DEL_TARGET_USER_ID,
+    });
+    const targetMessage = await db.query.messages.findFirst({
+      where: eq(messages.userId, DEL_TARGET_USER_ID),
+    });
+    if (targetMessage === undefined)
+      throw new Error("target message not found");
+    await db.insert(inboxes).values({
+      messageId: targetMessage.id,
+      userId: DEL_TARGET_USER_ID,
+      type: "mention",
+    });
+    await db.insert(users).values({
+      id: DEL_TARGET_BOT_ID,
+      name: "del target bot",
+      selfIntroduction: "",
+      isBot: true,
+    });
+    await db.insert(botManages).values({
+      remoteUserId: DEL_TARGET_BOT_ID,
+      createdBy: DEL_TARGET_USER_ID,
+      tokenCode: "DEL_TARGET_BOT_TOKEN",
+    });
+    await Bun.write(`./STORAGE/icon/${DEL_TARGET_USER_ID}.png`, pngFile());
+    await Bun.write(`./STORAGE/banner/${DEL_TARGET_USER_ID}.png`, pngFile());
+    const activeUsersBefore = await db.$count(
+      users,
+      eq(users.isDeleted, false),
+    );
+
     const res = await FETCH({
       path: "/user",
       method: "DELETE",
@@ -1248,6 +1289,39 @@ describe("/user/delete", () => {
         where: eq(tokens.userId, DEL_TARGET_USER_ID),
       }),
     ).toBeUndefined();
+    //通知端末・Inbox・Bot管理情報も削除されている
+    expect(
+      await db.query.notificationDevices.findFirst({
+        where: eq(notificationDevices.userId, DEL_TARGET_USER_ID),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.inboxes.findFirst({
+        where: eq(inboxes.userId, DEL_TARGET_USER_ID),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.botManages.findFirst({
+        where: eq(botManages.createdBy, DEL_TARGET_USER_ID),
+      }),
+    ).toBeUndefined();
+    //Botユーザーは論理削除され、画像は削除される
+    expect(
+      (
+        await db.query.users.findFirst({
+          where: eq(users.id, DEL_TARGET_BOT_ID),
+        })
+      )?.isDeleted,
+    ).toBe(true);
+    expect(
+      await Bun.file(`./STORAGE/icon/${DEL_TARGET_USER_ID}.png`).exists(),
+    ).toBe(false);
+    expect(
+      await Bun.file(`./STORAGE/banner/${DEL_TARGET_USER_ID}.png`).exists(),
+    ).toBe(false);
+    //削除済みユーザーは総数・初回セットアップ判定から外れる(対象ユーザーとBotユーザーの2件)
+    expect(await QueryUser.countAll()).toBe(activeUsersBefore - 2);
+    expect(QueryUser.getSecondUser()?.isDeleted).toBe(false);
 
     //旧トークンは即時無効化される
     const postRes = await subFetch({
@@ -1291,6 +1365,88 @@ describe("/user/delete", () => {
     const j = await res.json();
     expect(j.data.id).toBe(DEL_TARGET_USER_ID);
     expect(j.data.isDeleted).toBe(true);
+  });
+
+  it("正常 :: 削除対象がBotなら管理情報も消えてトークンが失効する", async () => {
+    const botUserId = "DEL_SELF_BOT";
+    const tokenCode = "DEL_SELF_BOT_TOKEN";
+    const botEnabled = GIRACLE_SERVER_CONFIG.BotEnabled;
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    await db.insert(users).values({
+      id: botUserId,
+      name: "del self bot",
+      selfIntroduction: "",
+      isBot: true,
+    });
+    await db.insert(botManages).values({
+      remoteUserId: botUserId,
+      createdBy: "TESTUSER",
+      tokenCode,
+      isApproved: true,
+    });
+
+    try {
+      const res = await FETCH({
+        path: "/user",
+        method: "DELETE",
+        body: { userId: botUserId },
+      });
+      expect(res.ok).toBe(true);
+
+      //Bot管理情報が消えている
+      expect(
+        await db.query.botManages.findFirst({
+          where: eq(botManages.remoteUserId, botUserId),
+        }),
+      ).toBeUndefined();
+
+      //旧Botトークンは認証を通らない
+      const extRes = await app.handle(
+        new Request("http://localhost/ext/user/TESTUSER", {
+          headers: { authorization: tokenCode },
+        }),
+      );
+      expect(extRes.status).toBe(401);
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotEnabled = botEnabled;
+      await db.delete(botManages).where(eq(botManages.remoteUserId, botUserId));
+      await db.delete(users).where(eq(users.id, botUserId));
+    }
+  });
+
+  it("正常 :: Bot掃除で実ユーザーを巻き込まない", async () => {
+    const creatorId = "CLEANUP_BOT_CREATOR";
+    const realUserId = "CLEANUP_REAL_USER";
+    await db.insert(users).values([
+      { id: creatorId, name: "cleanup bot creator", selfIntroduction: "" },
+      { id: realUserId, name: "cleanup real user", selfIntroduction: "" },
+    ]);
+    //壊れたデータ: BotManageのremoteUserIdが実ユーザーを指している
+    await db.insert(botManages).values({
+      remoteUserId: realUserId,
+      createdBy: creatorId,
+      tokenCode: "CLEANUP_BOT_TOKEN",
+    });
+
+    try {
+      await ServiceUser.Delete(creatorId, "ADMINUSER");
+
+      //Botの管理情報は消える
+      expect(
+        await db.query.botManages.findFirst({
+          where: eq(botManages.createdBy, creatorId),
+        }),
+      ).toBeUndefined();
+      //remoteUserIdが実ユーザーなので論理削除されない
+      expect(
+        (await db.query.users.findFirst({ where: eq(users.id, realUserId) }))
+          ?.isDeleted,
+      ).toBe(false);
+    } finally {
+      await db.delete(botManages).where(eq(botManages.createdBy, creatorId));
+      await db.delete(users).where(eq(users.id, creatorId));
+      await db.delete(users).where(eq(users.id, realUserId));
+    }
   });
 
   it("既に削除済みのユーザーを再度削除しようとする", async () => {

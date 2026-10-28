@@ -14,6 +14,7 @@ import {
   messageUrlPreviewThumbnails,
   roleInfos,
   roleLinks,
+  users,
 } from "../src/db/schema";
 import { cleanupThumbnail, FETCH, INIT, mockFetchFor } from "./util";
 
@@ -1332,6 +1333,64 @@ describe("/message/send", async () => {
     } finally {
       await db.delete(inboxes).where(eq(inboxes.messageId, messageSaved.id));
       await db.delete(messages).where(eq(messages.id, messageSaved.id));
+    }
+  });
+
+  it("削除済みユーザーはメンション通知対象から除外される", async () => {
+    //削除済みでもChannelJoin行は残るため、メンション対象から外れることを確認する
+    await db
+      .insert(channelJoins)
+      .values({ userId: "TESTUSER2", channelId: "TESTCHANNEL1" })
+      .onConflictDoNothing();
+    await db
+      .update(users)
+      .set({ isDeleted: true })
+      .where(eq(users.id, "TESTUSER2"));
+
+    const saved = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "@<TESTUSER> @<TESTUSER2> hi",
+      })
+      .returning();
+    const messageSaved = saved[0];
+
+    try {
+      const targets = await ServiceMessage.addToInbox(
+        messageSaved.id,
+        messageSaved.content,
+        messageSaved.channelId,
+      );
+      //削除済みTESTUSER2は通知対象にならない
+      expect(targets).toEqual(["TESTUSER"]);
+
+      const deletedInbox = await db
+        .select()
+        .from(inboxes)
+        .where(
+          and(
+            eq(inboxes.userId, "TESTUSER2"),
+            eq(inboxes.messageId, messageSaved.id),
+          ),
+        );
+      expect(deletedInbox.length).toBe(0);
+    } finally {
+      await db.delete(inboxes).where(eq(inboxes.messageId, messageSaved.id));
+      await db.delete(messages).where(eq(messages.id, messageSaved.id));
+      await db
+        .delete(channelJoins)
+        .where(
+          and(
+            eq(channelJoins.userId, "TESTUSER2"),
+            eq(channelJoins.channelId, "TESTCHANNEL1"),
+          ),
+        );
+      await db
+        .update(users)
+        .set({ isDeleted: false })
+        .where(eq(users.id, "TESTUSER2"));
     }
   });
 

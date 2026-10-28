@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "..";
-import { channelJoins } from "../db/schema";
+import { channelJoins, users } from "../db/schema";
 
 export namespace QueryChannelJoin {
   //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
@@ -56,17 +56,22 @@ export namespace QueryChannelJoin {
   };
 
   //指定ユーザー群のうちチャンネルに参加しているもの(メンション通知対象の絞り込み用)
-  export const getJoinsByUsersInChannel = (query: {
+  export const getJoinsByUsersInChannelForMention = (query: {
     userIds: string[];
     channelId: string;
   }) => {
-    return db.query.channelJoins.findMany({
-      where: and(
-        inArray(channelJoins.userId, query.userIds),
-        eq(channelJoins.channelId, query.channelId),
-      ),
-      columns: { userId: true },
-    });
+    //削除済みユーザーもChannelJoin行は残る。withのwhereは親行を絞れないためinner joinで除外する
+    return db
+      .select({ userId: channelJoins.userId })
+      .from(channelJoins)
+      .innerJoin(users, eq(users.id, channelJoins.userId))
+      .where(
+        and(
+          inArray(channelJoins.userId, query.userIds),
+          eq(channelJoins.channelId, query.channelId),
+          eq(users.isDeleted, false),
+        ),
+      );
   };
 
   export const insertJoin = async (query: {
