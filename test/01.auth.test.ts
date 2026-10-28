@@ -377,6 +377,12 @@ describe("/user", () => {
     //2番目のトークンがTESTUSERTOKEN_FOR_DELETION_TEST
     expect(j.data[2].thisIsYou).toBeTrue();
     sessionIdRemoving = j.data[2].id;
+
+    //生トークンもハッシュも応答に含めない(該当セッション自身も含む)
+    for (const session of j.data) {
+      expect(session.token).toBeUndefined();
+      expect(session.tokenHash).toBeUndefined();
+    }
   });
 
   it("/change-session-name :: 正常(セッション名を変更)", async () => {
@@ -396,8 +402,11 @@ describe("/user", () => {
     );
     expect(responseChangingName.ok).toBe(true);
     const j = await responseChangingName.json();
-    console.log("01.auth :: /change-session-name : j", j);
     expect(j.data.name).toBe("新しいセッション名");
+
+    //生トークンもハッシュも応答に含めない
+    expect(j.data.token).toBeUndefined();
+    expect(j.data.tokenHash).toBeUndefined();
   });
 
   it("/change-session-name :: 存在しないセッション", async () => {
