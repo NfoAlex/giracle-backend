@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
-import { app, db, NAME_MAX_LENGTH } from "../src";
+import { app, db, GIRACLE_SERVER_CONFIG, NAME_MAX_LENGTH } from "../src";
 import {
   botManages,
   channelJoins,
@@ -1364,6 +1364,53 @@ describe("/user/delete", () => {
     const j = await res.json();
     expect(j.data.id).toBe(DEL_TARGET_USER_ID);
     expect(j.data.isDeleted).toBe(true);
+  });
+
+  it("正常 :: 削除対象がBotなら管理情報も消えてトークンが失効する", async () => {
+    const botUserId = "DEL_SELF_BOT";
+    const tokenCode = "DEL_SELF_BOT_TOKEN";
+    const botEnabled = GIRACLE_SERVER_CONFIG.BotEnabled;
+    GIRACLE_SERVER_CONFIG.BotEnabled = true;
+    await db.insert(users).values({
+      id: botUserId,
+      name: "del self bot",
+      selfIntroduction: "",
+      isBot: true,
+    });
+    await db.insert(botManages).values({
+      remoteUserId: botUserId,
+      createdBy: "TESTUSER",
+      tokenCode,
+      isApproved: true,
+    });
+
+    try {
+      const res = await FETCH({
+        path: "/user",
+        method: "DELETE",
+        body: { userId: botUserId },
+      });
+      expect(res.ok).toBe(true);
+
+      //Bot管理情報が消えている
+      expect(
+        await db.query.botManages.findFirst({
+          where: eq(botManages.remoteUserId, botUserId),
+        }),
+      ).toBeUndefined();
+
+      //旧Botトークンは認証を通らない
+      const extRes = await app.handle(
+        new Request("http://localhost/ext/user/TESTUSER", {
+          headers: { authorization: tokenCode },
+        }),
+      );
+      expect(extRes.status).toBe(401);
+    } finally {
+      GIRACLE_SERVER_CONFIG.BotEnabled = botEnabled;
+      await db.delete(botManages).where(eq(botManages.remoteUserId, botUserId));
+      await db.delete(users).where(eq(users.id, botUserId));
+    }
   });
 
   it("既に削除済みのユーザーを再度削除しようとする", async () => {
