@@ -37,6 +37,11 @@ export namespace QueryInbox {
     return db.delete(inboxes).where(eq(inboxes.userId, query.userId));
   };
 
+  //トランザクション内でユーザーの通知を全削除(ユーザー削除時)
+  export const removeAllByUserInTx = (tx: Tx, query: { userId: string }) => {
+    tx.delete(inboxes).where(eq(inboxes.userId, query.userId)).run();
+  };
+
   //通知を1件保存
   export const insertOne = (query: {
     userId: string;

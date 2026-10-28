@@ -282,17 +282,6 @@ export namespace QueryUser {
     return userUpdated;
   };
 
-  //論理削除
-  export const setDeleted = async (query: { userId: string }) => {
-    const user = await db
-      .update(users)
-      .set({ isDeleted: true })
-      .where(eq(users.id, query.userId))
-      .returning();
-
-    return user[0] !== undefined ? user[0] : undefined;
-  };
-
   //トランザクション内での論理削除(対象なしはundefined)
   export const setDeletedInTx = (tx: Tx, query: { userId: string }) => {
     return tx

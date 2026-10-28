@@ -7,6 +7,18 @@ import { Util } from "../Util";
 export namespace QueryBot {
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+  //トランザクション内でユーザーが作成したBotを全削除(ユーザー削除時)
+  export const deleteByCreatedByInTx = (
+    tx: Tx,
+    query: { createdBy: string },
+  ) => {
+    return tx
+      .delete(botManages)
+      .where(eq(botManages.createdBy, query.createdBy))
+      .returning({ id: botManages.id, remoteUserId: botManages.remoteUserId })
+      .all();
+  };
+
   //トランザクション内でBotの管理情報を作成する
   export const insertWithRemoteUserIdInTx = (
     tx: Tx,

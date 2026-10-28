@@ -12,6 +12,7 @@ import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
 import HashSessionToken from "./Utils/HashSessionToken";
 import IsBlankString from "./Utils/isBlankString";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
+import RemoveUserImages from "./Utils/RemoveUserImages";
 import { GetSafeFileExtension, IsSafePathId } from "./Utils/SafeString";
 import SaveUserIcon from "./Utils/SaveUserIcon";
 import SendMessageNotifications from "./Utils/SendMessageNotifications";
@@ -38,6 +39,7 @@ export namespace Util {
   export const hashSessionToken = HashSessionToken;
   export const getSafeFileExtension = GetSafeFileExtension;
   export const isSafePathId = IsSafePathId;
+  export const removeUserImages = RemoveUserImages;
   export const getUrlPreviewThumbnailFileName = GetUrlPreviewThumbnailFileName;
   export const readResponseBodyWithByteLimit = ReadResponseBodyWithByteLimit;
   export const saveUserIcon = SaveUserIcon;

@@ -12,6 +12,9 @@ export const NOTIFICATION_MODES = ["off", "mention", "all"] as const;
 export type TNotificationMode = (typeof NOTIFICATION_MODES)[number];
 
 export namespace QueryNotification {
+  //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
   export const getSingle = (query: { requestSender: string }) => {
     return db
       .select()
@@ -129,6 +132,16 @@ export namespace QueryNotification {
     return db.query.notificationDevices.findMany({
       where: eq(notificationDevices.userId, query.requestSender),
     });
+  };
+
+  //トランザクション内でユーザーの登録端末を全削除(ユーザー削除時)
+  export const removeDevicesByUserInTx = (
+    tx: Tx,
+    query: { userId: string },
+  ) => {
+    tx.delete(notificationDevices)
+      .where(eq(notificationDevices.userId, query.userId))
+      .run();
   };
 
   //無効になった端末をまとめて削除(プッシュ通知の404/410応答後)

@@ -4,9 +4,12 @@ import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
 import { invalidateTokenCache, invalidateUserCache } from "../../Middlewares";
+import { QueryBot } from "../../queries/bot.query";
 import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
+import { QueryInbox } from "../../queries/inbox.query";
 import { QueryInvite } from "../../queries/invite.query";
+import { QueryNotification } from "../../queries/notification.query";
 import { QueryPassword } from "../../queries/password.query";
 import { QueryRoleLink } from "../../queries/roleLink.query";
 import { QueryToken } from "../../queries/token.query";
@@ -590,18 +593,37 @@ export namespace ServiceUser {
     }
 
     //論理削除（メッセージ・絵文字・チャンネル等のデータは全て残る）
-    await QueryUser.setDeleted({ userId });
+    //  セッション・通知・Botは残しても使い道が無いので、関連行を1トランザクションで消す
+    const botsDeleted = db.transaction((tx) => {
+      QueryUser.setDeletedInTx(tx, { userId });
+      QueryToken.removeByUserInTx(tx, { userId });
+      QueryInbox.removeAllByUserInTx(tx, { userId });
+      QueryNotification.removeDevicesByUserInTx(tx, { userId });
 
-    //全セッションを無効化
-    await QueryToken.removeByUser({ userId });
+      //削除ユーザーが作成したBotは管理情報を消し、Botユーザーも削除扱いにする(DeleteBotと同じ後始末)
+      const bots = QueryBot.deleteByCreatedByInTx(tx, { createdBy: userId });
+      for (const bot of bots) {
+        QueryRoleLink.removeLinkInTx(tx, {
+          userId: bot.remoteUserId,
+          roleId: "BOT",
+        });
+        QueryUser.setDeletedInTx(tx, { userId: bot.remoteUserId });
+      }
+
+      return bots;
+    });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateUserCache(userId);
 
     //既存のWS接続も切断する
     Util.wsUserInstance.disconnect(userId);
-    //削除されたユーザーが作成したBotのWSも切る(BotManager行はcascadeで消えるが接続は残るため)
-    await Util.wsUserInstance.disconnectBotsCreatedBy(userId);
+    //削除したBotのWS接続も切る(BotManage行は消えるが接続は残るため)
+    for (const bot of botsDeleted)
+      Util.wsUserInstance.disconnect(bot.remoteUserId);
+
+    //アイコン・バナー画像を削除(DBの外側なのでトランザクション後に実行)
+    await Util.removeUserImages(userId);
 
     return;
   };
