@@ -51,7 +51,7 @@ export const wsHandler = new Elysia().ws("/ws", {
     }
 
     const tokenWithUser = await QueryToken.getSingleWithUserChannels({
-      token: tokenFromCookie as string,
+      tokenHash: Util.hashSessionToken(tokenFromCookie as string),
     }).catch((e) => {
       console.error("ws :: open : e", { e });
       throw new Error("ws :: 想定外のエラーが発生しました");
@@ -121,7 +121,9 @@ export const wsHandler = new Elysia().ws("/ws", {
     //トークンが無い/引けないときは生WSの同一性からuserIdを引く
     const userToken =
       token !== undefined
-        ? await QueryToken.getSingle({ token: token as string })
+        ? await QueryToken.getSingle({
+            tokenHash: Util.hashSessionToken(token as string),
+          })
         : undefined;
 
     //このユーザーWSインスタンス削除

@@ -170,7 +170,8 @@ export const tokens = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull().default("ログイン情報"),
-    token: text("token").notNull().unique(),
+    //セッショントークンのSHA-256。生トークンはクライアントのみが持つ
+    tokenHash: text("tokenHash").notNull().unique(),
     userId: text("userId")
       .notNull()
       .references(() => users.id, {

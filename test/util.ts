@@ -29,6 +29,7 @@ import {
   tokens,
   users,
 } from "../src/db/schema";
+import { Util } from "../src/Util";
 
 let FLAG_INIT_COMPLETED = false;
 
@@ -91,17 +92,27 @@ export async function INIT() {
     { id: "ADMINUSER", name: "adminuser", selfIntroduction: "" },
     { id: "BOTUSER", name: "botuser", selfIntroduction: "" },
   ]);
+  //DBにはハッシュのみ保存するため、フィクスチャは生トークンをsha256して入れる
   await db.insert(tokens).values([
-    { userId: "TESTUSER", token: "TESTUSERTOKEN" },
-    { userId: "TESTUSER", token: "TESTUSERTOKEN_FOR_SIGNOUT_TEST" },
-    { userId: "TESTUSER", token: "TESTUSERTOKEN_FOR_DELETION_TEST" },
-    { userId: "TESTUSER2", token: "TESTUSER2TOKEN" },
+    { userId: "TESTUSER", tokenHash: Util.hashSessionToken("TESTUSERTOKEN") },
+    {
+      userId: "TESTUSER",
+      tokenHash: Util.hashSessionToken("TESTUSERTOKEN_FOR_SIGNOUT_TEST"),
+    },
+    {
+      userId: "TESTUSER",
+      tokenHash: Util.hashSessionToken("TESTUSERTOKEN_FOR_DELETION_TEST"),
+    },
     {
       userId: "TESTUSER2",
-      token: "TESTUSER2TOKEN_EXPIRED",
+      tokenHash: Util.hashSessionToken("TESTUSER2TOKEN"),
+    },
+    {
+      userId: "TESTUSER2",
+      tokenHash: Util.hashSessionToken("TESTUSER2TOKEN_EXPIRED"),
       expiresAt: new Date(Date.now() - 60 * 1000),
     },
-    { userId: "ADMINUSER", token: "ADMINUSERTOKEN" },
+    { userId: "ADMINUSER", tokenHash: Util.hashSessionToken("ADMINUSERTOKEN") },
   ]);
   await db
     .insert(invitations)

@@ -31,10 +31,10 @@ setInterval(() => {
 
 /**
  * 指定トークンのキャッシュを無効化する（サインアウト・セッション削除時に使用）
- * @param token 無効化するトークン
+ * @param tokenHash 無効化するトークンのハッシュ(キャッシュのキーは生トークンではなくこのハッシュ)
  */
-export function invalidateTokenCache(token: string) {
-  tokenCache.delete(token);
+export function invalidateTokenCache(tokenHash: string) {
+  tokenCache.delete(tokenHash);
 }
 
 /**
@@ -54,16 +54,22 @@ const limitConfig = {
   anonymous: {
     limit: Number.parseInt(process.env.RATE_LIMIT_ANONYMOUS_COUNT ?? "25", 10),
     windowMs:
-      Number.parseInt(process.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) * 1000,
+      Number.parseInt(process.env.RATE_LIMIT_ANONYMOUS_TIMEOUT ?? "60", 10) *
+      1000,
   },
   authenticated: {
-    limit: Number.parseInt(process.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200", 10),
+    limit: Number.parseInt(
+      process.env.RATE_LIMIT_AUTHORIZED_COUNT ?? "200",
+      10,
+    ),
     windowMs:
-      Number.parseInt(process.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) * 1000,
+      Number.parseInt(process.env.RATE_LIMIT_AUTHORIZED_TIMEOUT ?? "60", 10) *
+      1000,
   },
   bot: {
     limit: Number.parseInt(process.env.BOT_RATE_LIMIT_COUNT ?? "15", 10),
-    windowMs: Number.parseInt(process.env.BOT_RATE_LIMIT_TIMEOUT ?? "5", 10) * 1000,
+    windowMs:
+      Number.parseInt(process.env.BOT_RATE_LIMIT_TIMEOUT ?? "5", 10) * 1000,
   },
 };
 type LimitConfig = (typeof limitConfig)["anonymous"];
@@ -122,7 +128,9 @@ export namespace Middleware {
       }
 
       const now = Date.now();
-      const cachedToken = tokenCache.get(tokenValue);
+      //DBにはハッシュのみ保存されている。キャッシュのキーもハッシュにして生トークンを保持しない
+      const tokenHash = Util.hashSessionToken(tokenValue);
+      const cachedToken = tokenCache.get(tokenHash);
 
       // キャッシュ有効時
       if (cachedToken && now - cachedToken.cachedAt <= ONE_MINUITE * 5) {
@@ -137,7 +145,7 @@ export namespace Middleware {
 
         //トークンの期限確認
         if (Date.now().valueOf() > cachedToken.expiresAt.valueOf()) {
-          invalidateTokenCache(tokenValue);
+          invalidateTokenCache(tokenHash);
           return status(401, "Invalid token");
         }
         return { CheckToken: { _userId: cachedToken.userId } };
@@ -145,7 +153,7 @@ export namespace Middleware {
 
       //トークンがDBにあるか確認
       const tokenData = await QueryToken.getSingleWithUser({
-        token: tokenValue,
+        tokenHash,
       });
 
       //トークンが無効ならエラー
@@ -158,7 +166,7 @@ export namespace Middleware {
       }
 
       // キャッシュに保存
-      tokenCache.set(tokenValue, {
+      tokenCache.set(tokenHash, {
         userId: tokenData.userId,
         isBanned: tokenData.user.isBanned,
         cachedAt: now,
@@ -248,8 +256,11 @@ export namespace Middleware {
     async ({ request, cookie: { token }, server }) => {
       //未ログインであるかどうか
       let isAnonymous = false;
-      //識別キー
-      let key: string = (token.value as string | undefined) ?? "anonymous";
+      //識別キー(認証済みならトークンのハッシュ)
+      let key: string =
+        token.value === undefined
+          ? "anonymous"
+          : Util.hashSessionToken(token.value as string);
 
       const tokenValue = token.value as string | undefined;
 
@@ -257,11 +268,11 @@ export namespace Middleware {
       if (tokenValue === undefined) {
         isAnonymous = true;
       } else {
-        const cachedToken = tokenCache.get(tokenValue);
+        const cachedToken = tokenCache.get(key);
         let tokenValid = cachedToken !== undefined;
         if (!tokenValid) {
           const tokenExists = await QueryToken.getSingleWithUserId({
-            token: tokenValue,
+            tokenHash: key,
           });
           tokenValid = tokenExists !== undefined;
         }
@@ -299,7 +310,7 @@ export namespace Middleware {
       if (bucket.count > configUsing.limit) {
         //認証済みで制限を超えたならトークンを無効化
         if (!isAnonymous) {
-          await QueryToken.removeByToken({ token: key });
+          await QueryToken.removeByTokenHash({ tokenHash: key });
           //キャッシュにも残っていると最大5分間有効なままになるため合わせて無効化
           invalidateTokenCache(key);
         } else {
