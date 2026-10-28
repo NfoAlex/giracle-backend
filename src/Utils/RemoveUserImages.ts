@@ -1,5 +1,3 @@
-import { unlink } from "node:fs/promises";
-
 // GetUserIcon / GetUserBanner が参照する拡張子と揃える
 const IMAGE_DIRS = ["./STORAGE/icon", "./STORAGE/banner"];
 const IMAGE_EXTENSIONS = ["png", "gif", "jpeg", "webp"];
@@ -10,8 +8,9 @@ const IMAGE_EXTENSIONS = ["png", "gif", "jpeg", "webp"];
  * @param userId
  */
 export default async function RemoveUserImages(userId: string) {
-  //未作成の拡張子は消すものが無いだけなので無視する
   for (const dir of IMAGE_DIRS)
-    for (const ext of IMAGE_EXTENSIONS)
-      await unlink(`${dir}/${userId}.${ext}`).catch(() => {});
+    for (const ext of IMAGE_EXTENSIONS) {
+      const targetFile = Bun.file(`${dir}/${userId}.${ext}`);
+      if (await targetFile.exists()) await targetFile.delete();
+    }
 }
