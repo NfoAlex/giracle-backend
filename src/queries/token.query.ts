@@ -89,7 +89,7 @@ export namespace QueryToken {
   };
 
   //ユーザーのトークン文字列一覧(キャッシュ無効化用)
-  //トークンを発行
+  //トークンを発行(tokenHashは応答に混ぜないよう必要列だけ返す)
   export const insertToken = async (query: {
     tokenHash: string;
     userId: string;
@@ -100,7 +100,7 @@ export namespace QueryToken {
         tokenHash: query.tokenHash,
         userId: query.userId,
       })
-      .returning();
+      .returning({ id: tokens.id, userId: tokens.userId });
 
     return tokenGenerated;
   };
