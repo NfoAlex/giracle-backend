@@ -474,7 +474,7 @@ export namespace ServiceUser {
       throw status(404, "Session not found");
     }
 
-    return { ...newSession, token: undefined };
+    return { ...newSession, tokenHash: undefined };
   };
 
   export const RemoveSession = async (
