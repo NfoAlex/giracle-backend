@@ -7,16 +7,16 @@ export namespace QueryToken {
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
   //トークン単体(全列)
-  export const getSingle = (query: { token: string }) => {
+  export const getSingle = (query: { tokenHash: string }) => {
     return db.query.tokens.findFirst({
-      where: eq(tokens.token, query.token),
+      where: eq(tokens.tokenHash, query.tokenHash),
     });
   };
 
   //トークンとBAN状態(認証時用)
-  export const getSingleWithUser = (query: { token: string }) => {
+  export const getSingleWithUser = (query: { tokenHash: string }) => {
     return db.query.tokens.findFirst({
-      where: eq(tokens.token, query.token),
+      where: eq(tokens.tokenHash, query.tokenHash),
       columns: {
         userId: true,
         expiresAt: true,
@@ -32,9 +32,9 @@ export namespace QueryToken {
   };
 
   //トークンと参加チャンネル(WS接続用)
-  export const getSingleWithUserChannels = (query: { token: string }) => {
+  export const getSingleWithUserChannels = (query: { tokenHash: string }) => {
     return db.query.tokens.findFirst({
-      where: eq(tokens.token, query.token),
+      where: eq(tokens.tokenHash, query.tokenHash),
       columns: { expiresAt: true },
       with: {
         user: {
@@ -55,9 +55,9 @@ export namespace QueryToken {
   };
 
   //トークン存在確認・匿名判定用のユーザーId(レート制限用)
-  export const getSingleWithUserId = (query: { token: string }) => {
+  export const getSingleWithUserId = (query: { tokenHash: string }) => {
     return db.query.tokens.findFirst({
-      where: eq(tokens.token, query.token),
+      where: eq(tokens.tokenHash, query.tokenHash),
       columns: { userId: true },
     });
   };
@@ -89,25 +89,18 @@ export namespace QueryToken {
   };
 
   //ユーザーのトークン文字列一覧(キャッシュ無効化用)
-  export const getTokensByUser = async (query: { userId: string }) => {
-    return await db
-      .select({ token: tokens.token })
-      .from(tokens)
-      .where(eq(tokens.userId, query.userId));
-  };
-
-  //トークンを発行
+  //トークンを発行(tokenHashは応答に混ぜないよう必要列だけ返す)
   export const insertToken = async (query: {
-    token: string;
+    tokenHash: string;
     userId: string;
   }) => {
     const [tokenGenerated] = await db
       .insert(tokens)
       .values({
-        token: query.token,
+        tokenHash: query.tokenHash,
         userId: query.userId,
       })
-      .returning();
+      .returning({ id: tokens.id, userId: tokens.userId });
 
     return tokenGenerated;
   };
@@ -130,8 +123,8 @@ export namespace QueryToken {
   };
 
   //トークンを削除(サインアウト・レート制限超過時)
-  export const removeByToken = async (query: { token: string }) => {
-    await db.delete(tokens).where(eq(tokens.token, query.token));
+  export const removeByTokenHash = async (query: { tokenHash: string }) => {
+    await db.delete(tokens).where(eq(tokens.tokenHash, query.tokenHash));
   };
 
   //Id・ユーザー単位でトークンを削除
@@ -154,14 +147,14 @@ export namespace QueryToken {
   //現在のセッションを除いてユーザーのトークンを削除(パスワード変更時)
   export const removeByUserExceptToken = async (query: {
     userId: string;
-    exceptToken: string;
+    exceptTokenHash: string;
   }) => {
     await db
       .delete(tokens)
       .where(
         and(
           eq(tokens.userId, query.userId),
-          not(eq(tokens.token, query.exceptToken)),
+          not(eq(tokens.tokenHash, query.exceptTokenHash)),
         ),
       );
   };

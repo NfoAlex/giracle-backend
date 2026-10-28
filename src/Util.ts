@@ -9,6 +9,7 @@ import FetchSafe from "./Utils/FetchSafe";
 import GetUrlPreviewThumbnailFileName from "./Utils/GetUrlPreviewThumbnailFileName";
 import GetUserViewableChannel from "./Utils/GetUserViewableChannel";
 import GetUsersRoleLevel from "./Utils/getUsersRoleLevel";
+import HashSessionToken from "./Utils/HashSessionToken";
 import IsBlankString from "./Utils/isBlankString";
 import ReadResponseBodyWithByteLimit from "./Utils/ReadResponseBodyWithByteLimit";
 import { GetSafeFileExtension, IsSafePathId } from "./Utils/SafeString";
@@ -34,6 +35,7 @@ export namespace Util {
   export const sendPushNotification = SendPushNotification;
   export const sendSystemMessage = SendSystemMessage;
   export const getUsersRoleLevel = GetUsersRoleLevel;
+  export const hashSessionToken = HashSessionToken;
   export const getSafeFileExtension = GetSafeFileExtension;
   export const isSafePathId = IsSafePathId;
   export const getUrlPreviewThumbnailFileName = GetUrlPreviewThumbnailFileName;

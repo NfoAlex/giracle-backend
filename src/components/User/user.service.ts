@@ -165,13 +165,16 @@ export namespace ServiceUser {
       });
     }
 
-    //トークンを生成
-    const tokenGenerated = await QueryToken.insertToken({
-      token: crypto.randomBytes(16).toString("hex"),
+    const token = crypto.randomBytes(32).toString("hex");
+
+    //トークンを生成(DBにはハッシュのみ保存)
+    const tokenInserted = await QueryToken.insertToken({
+      tokenHash: Util.hashSessionToken(token),
       userId: user.id,
     });
 
-    return tokenGenerated;
+    //生トークンはクライアントへ返す
+    return { ...tokenInserted, token };
   };
 
   export const GetOnline = async () => {
@@ -349,7 +352,7 @@ export namespace ServiceUser {
     //パスワード変更時に他のセッションを無効化する(現在のセッションは維持)
     await QueryToken.removeByUserExceptToken({
       userId: userdata.id,
-      exceptToken: currentToken,
+      exceptTokenHash: Util.hashSessionToken(currentToken),
     });
 
     //トークンキャッシュを全件無効化(現在のセッション含めDB再検証させる)
@@ -448,8 +451,8 @@ export namespace ServiceUser {
 
     return sessions.map((session) => ({
       ...session,
-      thisIsYou: session.token === tokenMarking,
-      token: undefined,
+      thisIsYou: session.tokenHash === Util.hashSessionToken(tokenMarking),
+      tokenHash: undefined,
     }));
   };
 
@@ -471,7 +474,7 @@ export namespace ServiceUser {
       throw status(404, "Session not found");
     }
 
-    return { ...newSession, token: undefined };
+    return { ...newSession, tokenHash: undefined };
   };
 
   export const RemoveSession = async (
@@ -485,7 +488,7 @@ export namespace ServiceUser {
     });
 
     if (targetToken === undefined) throw status(404, "Session not found");
-    if (targetToken.token === activeToken)
+    if (targetToken.tokenHash === Util.hashSessionToken(activeToken))
       throw status(400, "You cannot delete your active session");
 
     await QueryToken.removeByIdAndUser({
@@ -496,17 +499,19 @@ export namespace ServiceUser {
     });
 
     //削除したセッションのトークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
-    invalidateTokenCache(targetToken.token);
+    invalidateTokenCache(targetToken.tokenHash);
 
     return;
   };
 
   export const SignOut = async (token: string) => {
+    const tokenHash = Util.hashSessionToken(token);
+
     //トークン削除
-    await QueryToken.removeByToken({ token });
+    await QueryToken.removeByTokenHash({ tokenHash });
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
-    invalidateTokenCache(token);
+    invalidateTokenCache(tokenHash);
 
     return;
   };
@@ -584,9 +589,6 @@ export namespace ServiceUser {
       throw status(400, "You can't delete higher role level user");
     }
 
-    //キャッシュ無効化用に既存トークン一覧を取得
-    const userTokens = await QueryToken.getTokensByUser({ userId });
-
     //論理削除（メッセージ・絵文字・チャンネル等のデータは全て残る）
     await QueryUser.setDeleted({ userId });
 
@@ -595,9 +597,6 @@ export namespace ServiceUser {
 
     //トークンキャッシュを無効化(最大5分の猶予利用を防ぐ)
     invalidateUserCache(userId);
-    for (const userToken of userTokens) {
-      invalidateTokenCache(userToken.token);
-    }
 
     //既存のWS接続も切断する
     Util.wsUserInstance.disconnect(userId);

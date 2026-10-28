@@ -106,6 +106,20 @@
       "when": 1791639671515,
       "tag": "0014_bumpy_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1793183772484,
+      "tag": "0015_lively_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1793183779658,
+      "tag": "0016_closed_santa_claus",
+      "breakpoints": true
     }
   ]
 }
