@@ -605,6 +605,11 @@ export namespace ServiceUser {
       //削除ユーザーが作成したBotは管理情報を消し、Botユーザーも削除扱いにする(DeleteBotと同じ後始末)
       const bots = QueryBot.deleteByCreatedByInTx(tx, { createdBy: userId });
       for (const bot of bots) {
+        //壊れたBot管理情報が実ユーザーを指していても論理削除しない
+        const botUser = QueryUser.getIsBotInTx(tx, {
+          userId: bot.remoteUserId,
+        });
+        if (botUser?.isBot !== true) continue;
         QueryRoleLink.removeLinkInTx(tx, {
           userId: bot.remoteUserId,
           roleId: "BOT",

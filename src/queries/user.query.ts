@@ -282,6 +282,15 @@ export namespace QueryUser {
     return userUpdated;
   };
 
+  //トランザクション内でBotかどうかのみ取得(削除時の巻き込み防止用)
+  export const getIsBotInTx = (tx: Tx, query: { userId: string }) => {
+    return tx
+      .select({ isBot: users.isBot })
+      .from(users)
+      .where(eq(users.id, query.userId))
+      .get();
+  };
+
   //トランザクション内での論理削除(対象なしはundefined)
   export const setDeletedInTx = (tx: Tx, query: { userId: string }) => {
     return tx
