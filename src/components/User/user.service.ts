@@ -625,9 +625,11 @@ export namespace ServiceUser {
 
     //既存のWS接続も切断する
     Util.wsUserInstance.disconnect(userId);
-    //削除したBotのWS接続も切る(BotManage行は消えるが接続は残るため)
-    for (const bot of botsDeleted)
+    //削除したBotのWS接続も切り、アバターも削除
+    for (const bot of botsDeleted) {
       Util.wsUserInstance.disconnect(bot.remoteUserId);
+      await Util.removeUserImages(bot.remoteUserId);
+    }
 
     //アイコン・バナー画像を削除(DBの外側なのでトランザクション後に実行)
     await Util.removeUserImages(userId);
