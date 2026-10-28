@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import { app, db, GIRACLE_SERVER_CONFIG, NAME_MAX_LENGTH } from "../src";
 import { invitations, passwords, tokens, users } from "../src/db/schema";
+import { Util } from "../src/Util";
 import { FETCH, INIT } from "./util";
 
 beforeAll(async () => {
@@ -226,6 +227,26 @@ describe("/user", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data.userId).toBeDefined();
+  });
+
+  it("/sign-in :: DBには生トークンではなくハッシュが保存される", async () => {
+    const res = await FETCH({
+      path: "/user/sign-in",
+      method: "POST",
+      body: { username: "testuser", password: "testuser" },
+      excludeCredential: true,
+    });
+    const rawToken = res.headers.get("set-cookie")?.match(/token=([^;]+)/)?.[1];
+    expect(rawToken).toBeDefined();
+
+    const j = await res.json();
+    //同一ユーザーのセッションが複数あるため、ハッシュの一致と生トークン不在を両方見る
+    const saved = await db.query.tokens.findMany({
+      where: eq(tokens.userId, j.data.userId),
+    });
+    const hashes = saved.map((row) => row.tokenHash);
+    expect(hashes).toContain(Util.hashSessionToken(rawToken as string));
+    expect(hashes).not.toContain(rawToken as string);
   });
 
   describe("/sign-in :: Botユーザー", () => {
