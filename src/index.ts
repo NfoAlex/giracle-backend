@@ -55,7 +55,9 @@ export const app = new Elysia({
   .use(extWsHandler)
   .use(ext)
   .use(
-    process.env.RATE_LIMIT_ENABLED === "true" ? Middleware.RateLimiter : undefined,
+    process.env.RATE_LIMIT_ENABLED === "true"
+      ? Middleware.RateLimiter
+      : undefined,
   )
   .use(wsHandler)
   .use(user)

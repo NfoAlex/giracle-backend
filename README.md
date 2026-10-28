@@ -6,13 +6,13 @@ Giracle のバックエンドサーバー。[Elysia](https://elysiajs.com/) (Bun
 
 ## 技術スタック
 
-| 項目 | 内容 |
-| ------ | ------ |
-| ランタイム | Bun |
-| フレームワーク | Elysia v1.4 |
-| ORM | Drizzle ORM |
-| DB | SQLite (`bun:sqlite`) |
-| リンター | Biome |
+| 項目           | 内容                  |
+| -------------- | --------------------- |
+| ランタイム     | Bun                   |
+| フレームワーク | Elysia v1.4           |
+| ORM            | Drizzle ORM           |
+| DB             | SQLite (`bun:sqlite`) |
+| リンター       | Biome                 |
 
 ---
 
@@ -102,120 +102,120 @@ giracle-backend/
 
 認証不要のルートと認証済みルートが混在する。
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| PUT | `/user/sign-up` | ❌ | - | ユーザー登録（サーバー設定 `RegisterAvailable` が false のときは 400 `User registration is disabled`） |
-| POST | `/user/sign-in` | ❌ | - | サインイン（Cookie にトークンをセット） |
-| POST | `/user/sign-out` | ✅ | - | サインアウト（Cookie 削除） |
-| GET | `/user/verify-token` | ✅ | - | トークン有効性確認 |
-| GET | `/user/get-online` | ✅ | - | オンラインユーザー一覧取得 |
-| GET | `/user/info/:id` | ✅ | - | ユーザー情報取得 |
-| GET | `/user/list` | ✅ | - | ユーザー一覧取得（`length`（既定30・最大50）/ `cursorUserId` によるカーソルページネーション対応。`username`（前方一致）・`joinedChannel`（参加チャンネルでの絞り込み。空文字でいずれかのチャンネル参加者）対応。SYSTEM ユーザーは除外） |
-| GET | `/user/icon/:userId` | ✅ | - | アイコン画像取得 |
-| GET | `/user/banner/:userId` | ✅ | - | バナー画像取得 |
-| POST | `/user/change-icon` | ✅ | - | アイコン変更 |
-| POST | `/user/change-banner` | ✅ | - | バナー変更 |
-| POST | `/user/change-password` | ✅ | - | パスワード変更 |
-| POST | `/user/profile-update` | ✅ | - | プロフィール更新（WS通知: `user::ProfileUpdate`） |
-| GET | `/user/session` | ✅ | - | セッション一覧取得 |
-| POST | `/user/change-session-name` | ✅ | - | セッション名変更 |
-| DELETE | `/user/session` | ✅ | - | セッション削除 |
-| POST | `/user/ban` | ✅ | `manageUser` | ユーザー BAN（WS通知: `user::ProfileUpdate`） |
-| POST | `/user/unban` | ✅ | `manageUser` | ユーザー BAN 解除（WS通知: `user::ProfileUpdate`） |
-| DELETE | `/user` | ✅ | `manageUser` | ユーザー削除（論理削除。メッセージ等のデータは残る。WS通知: `user::Deleted`） |
+| メソッド | パス                        | 認証 | 権限         | 概要                                                                                                                                                                                                                                    |
+| -------- | --------------------------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PUT      | `/user/sign-up`             | ❌   | -            | ユーザー登録（サーバー設定 `RegisterAvailable` が false のときは 400 `User registration is disabled`）                                                                                                                                  |
+| POST     | `/user/sign-in`             | ❌   | -            | サインイン（Cookie にトークンをセット）                                                                                                                                                                                                 |
+| POST     | `/user/sign-out`            | ✅   | -            | サインアウト（Cookie 削除）                                                                                                                                                                                                             |
+| GET      | `/user/verify-token`        | ✅   | -            | トークン有効性確認                                                                                                                                                                                                                      |
+| GET      | `/user/get-online`          | ✅   | -            | オンラインユーザー一覧取得                                                                                                                                                                                                              |
+| GET      | `/user/info/:id`            | ✅   | -            | ユーザー情報取得                                                                                                                                                                                                                        |
+| GET      | `/user/list`                | ✅   | -            | ユーザー一覧取得（`length`（既定30・最大50）/ `cursorUserId` によるカーソルページネーション対応。`username`（前方一致）・`joinedChannel`（参加チャンネルでの絞り込み。空文字でいずれかのチャンネル参加者）対応。SYSTEM ユーザーは除外） |
+| GET      | `/user/icon/:userId`        | ✅   | -            | アイコン画像取得                                                                                                                                                                                                                        |
+| GET      | `/user/banner/:userId`      | ✅   | -            | バナー画像取得                                                                                                                                                                                                                          |
+| POST     | `/user/change-icon`         | ✅   | -            | アイコン変更                                                                                                                                                                                                                            |
+| POST     | `/user/change-banner`       | ✅   | -            | バナー変更                                                                                                                                                                                                                              |
+| POST     | `/user/change-password`     | ✅   | -            | パスワード変更                                                                                                                                                                                                                          |
+| POST     | `/user/profile-update`      | ✅   | -            | プロフィール更新（WS通知: `user::ProfileUpdate`）                                                                                                                                                                                       |
+| GET      | `/user/session`             | ✅   | -            | セッション一覧取得                                                                                                                                                                                                                      |
+| POST     | `/user/change-session-name` | ✅   | -            | セッション名変更                                                                                                                                                                                                                        |
+| DELETE   | `/user/session`             | ✅   | -            | セッション削除                                                                                                                                                                                                                          |
+| POST     | `/user/ban`                 | ✅   | `manageUser` | ユーザー BAN（WS通知: `user::ProfileUpdate`）                                                                                                                                                                                           |
+| POST     | `/user/unban`               | ✅   | `manageUser` | ユーザー BAN 解除（WS通知: `user::ProfileUpdate`）                                                                                                                                                                                      |
+| DELETE   | `/user`                     | ✅   | `manageUser` | ユーザー削除（論理削除。メッセージ等のデータは残る。WS通知: `user::Deleted`）                                                                                                                                                           |
 
 ---
 
 ### Channel モジュール (`/channel`)
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| POST | `/channel/join` | ✅ | - | チャンネル参加（WS通知: `channel::Join`） |
-| POST | `/channel/leave` | ✅ | - | チャンネル退出（WS通知: `channel::Left`） |
-| GET | `/channel/get-info/:channelId` | ✅ | - | チャンネル情報取得 |
-| GET | `/channel/list` | ✅ | - | チャンネル一覧取得 |
-| POST | `/channel/get-history/:channelId` | ✅ | - | メッセージ履歴取得（ページネーション対応） |
-| GET | `/channel/search` | ✅ | - | チャンネル検索（`query` は大小を区別しない前方一致。`cursorChannelId` で継続取得。名前順で最大50件） |
-| POST | `/channel/invite` | ✅ | `manageChannel` | ユーザーをチャンネルへ招待（WS通知: `channel::Join`） |
-| POST | `/channel/kick` | ✅ | `manageChannel` | ユーザーをチャンネルからキック（WS通知: `channel::Left`） |
-| POST | `/channel/update` | ✅ | `manageChannel` | チャンネル情報更新（WS通知: `channel::UpdateChannel`） |
-| PUT | `/channel/create` | ✅ | `manageChannel` | チャンネル作成 |
-| DELETE | `/channel/delete` | ✅ | `manageChannel` | チャンネル削除 |
+| メソッド | パス                              | 認証 | 権限            | 概要                                                                                                 |
+| -------- | --------------------------------- | ---- | --------------- | ---------------------------------------------------------------------------------------------------- |
+| POST     | `/channel/join`                   | ✅   | -               | チャンネル参加（WS通知: `channel::Join`）                                                            |
+| POST     | `/channel/leave`                  | ✅   | -               | チャンネル退出（WS通知: `channel::Left`）                                                            |
+| GET      | `/channel/get-info/:channelId`    | ✅   | -               | チャンネル情報取得                                                                                   |
+| GET      | `/channel/list`                   | ✅   | -               | チャンネル一覧取得                                                                                   |
+| POST     | `/channel/get-history/:channelId` | ✅   | -               | メッセージ履歴取得（ページネーション対応）                                                           |
+| GET      | `/channel/search`                 | ✅   | -               | チャンネル検索（`query` は大小を区別しない前方一致。`cursorChannelId` で継続取得。名前順で最大50件） |
+| POST     | `/channel/invite`                 | ✅   | `manageChannel` | ユーザーをチャンネルへ招待（WS通知: `channel::Join`）                                                |
+| POST     | `/channel/kick`                   | ✅   | `manageChannel` | ユーザーをチャンネルからキック（WS通知: `channel::Left`）                                            |
+| POST     | `/channel/update`                 | ✅   | `manageChannel` | チャンネル情報更新（WS通知: `channel::UpdateChannel`）                                               |
+| PUT      | `/channel/create`                 | ✅   | `manageChannel` | チャンネル作成                                                                                       |
+| DELETE   | `/channel/delete`                 | ✅   | `manageChannel` | チャンネル削除                                                                                       |
 
 ---
 
 ### Message モジュール (`/message`)
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| GET | `/message/:messageId` | ✅ | - | メッセージ単体取得 |
-| GET | `/message/get-new` | ✅ | - | 新着メッセージ確認 |
-| GET | `/message/read-time/get` | ✅ | - | 既読時刻取得 |
-| POST | `/message/read-time/update` | ✅ | - | 既読時刻更新（WS通知: `message::ReadTimeUpdated`） |
-| GET | `/message/search` | ✅ | - | メッセージ検索 |
-| POST | `/message/file/upload` | ✅ | - | ファイルアップロード（チャンネル参加を確認） |
-| GET | `/message/file/:fileId` | ✅ | - | ファイル取得（キャッシュ: 1週間、チャンネル閲覧権限を確認） |
-| DELETE | `/message/delete` | ✅ | - | メッセージ削除（WS通知: `message::MessageDeleted`） |
-| GET | `/message/inbox` | ✅ | - | 通知（inbox）一覧取得 |
-| POST | `/message/inbox/read` | ✅ | - | 通知を既読（WS通知: `inbox::Deleted`） |
-| POST | `/message/inbox/clear` | ✅ | - | 全通知を既読（WS通知: `inbox::Clear`） |
-| POST | `/message/emoji-reaction` | ✅ | - | 絵文字リアクション追加（WS通知: `message::AddReaction`） |
-| GET | `/message/who-reacted` | ✅ | - | リアクションしたユーザー取得 |
-| DELETE | `/message/delete-emoji-reaction` | ✅ | - | 絵文字リアクション削除（WS通知: `message::DeleteReaction`） |
-| POST | `/message/send` | ✅ | - | メッセージ送信（WS通知: `message::SendMessage`、URLプレビュー生成） |
-| POST | `/message/edit` | ✅ | - | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
+| メソッド | パス                             | 認証 | 権限 | 概要                                                                  |
+| -------- | -------------------------------- | ---- | ---- | --------------------------------------------------------------------- |
+| GET      | `/message/:messageId`            | ✅   | -    | メッセージ単体取得                                                    |
+| GET      | `/message/get-new`               | ✅   | -    | 新着メッセージ確認                                                    |
+| GET      | `/message/read-time/get`         | ✅   | -    | 既読時刻取得                                                          |
+| POST     | `/message/read-time/update`      | ✅   | -    | 既読時刻更新（WS通知: `message::ReadTimeUpdated`）                    |
+| GET      | `/message/search`                | ✅   | -    | メッセージ検索                                                        |
+| POST     | `/message/file/upload`           | ✅   | -    | ファイルアップロード（チャンネル参加を確認）                          |
+| GET      | `/message/file/:fileId`          | ✅   | -    | ファイル取得（キャッシュ: 1週間、チャンネル閲覧権限を確認）           |
+| DELETE   | `/message/delete`                | ✅   | -    | メッセージ削除（WS通知: `message::MessageDeleted`）                   |
+| GET      | `/message/inbox`                 | ✅   | -    | 通知（inbox）一覧取得                                                 |
+| POST     | `/message/inbox/read`            | ✅   | -    | 通知を既読（WS通知: `inbox::Deleted`）                                |
+| POST     | `/message/inbox/clear`           | ✅   | -    | 全通知を既読（WS通知: `inbox::Clear`）                                |
+| POST     | `/message/emoji-reaction`        | ✅   | -    | 絵文字リアクション追加（WS通知: `message::AddReaction`）              |
+| GET      | `/message/who-reacted`           | ✅   | -    | リアクションしたユーザー取得                                          |
+| DELETE   | `/message/delete-emoji-reaction` | ✅   | -    | 絵文字リアクション削除（WS通知: `message::DeleteReaction`）           |
+| POST     | `/message/send`                  | ✅   | -    | メッセージ送信（WS通知: `message::SendMessage`、URLプレビュー生成）   |
+| POST     | `/message/edit`                  | ✅   | -    | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
 
 ---
 
 ### Role モジュール (`/role`)
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| GET | `/role/search` | ✅ | - | ロール検索 |
-| GET | `/role/list` | ✅ | - | ロール一覧取得 |
-| GET | `/role/:roleId` | ✅ | - | ロール情報取得 |
-| PUT | `/role/create` | ✅ | `manageRole` | ロール作成（WS通知: `role::Created`） |
-| POST | `/role/update` | ✅ | `manageRole` | ロール更新（WS通知: `role::Updated`） |
-| POST | `/role/link` | ✅ | `manageRole` | ユーザーへロール付与（WS通知: `role::Linked`） |
-| POST | `/role/unlink` | ✅ | `manageRole` | ユーザーからロール剥奪（WS通知: `role::Unlinked`） |
-| DELETE | `/role/delete` | ✅ | `manageRole` | ロール削除（WS通知: `role::Deleted`） |
+| メソッド | パス            | 認証 | 権限         | 概要                                               |
+| -------- | --------------- | ---- | ------------ | -------------------------------------------------- |
+| GET      | `/role/search`  | ✅   | -            | ロール検索                                         |
+| GET      | `/role/list`    | ✅   | -            | ロール一覧取得                                     |
+| GET      | `/role/:roleId` | ✅   | -            | ロール情報取得                                     |
+| PUT      | `/role/create`  | ✅   | `manageRole` | ロール作成（WS通知: `role::Created`）              |
+| POST     | `/role/update`  | ✅   | `manageRole` | ロール更新（WS通知: `role::Updated`）              |
+| POST     | `/role/link`    | ✅   | `manageRole` | ユーザーへロール付与（WS通知: `role::Linked`）     |
+| POST     | `/role/unlink`  | ✅   | `manageRole` | ユーザーからロール剥奪（WS通知: `role::Unlinked`） |
+| DELETE   | `/role/delete`  | ✅   | `manageRole` | ロール削除（WS通知: `role::Deleted`）              |
 
 ---
 
 ### Server モジュール (`/server`)
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| GET | `/server/config` | ❌ | - | サーバー設定取得 |
-| GET | `/server/banner` | ❌ | - | サーバーバナー画像取得 |
-| GET | `/server/custom-emoji` | ✅ | - | カスタム絵文字一覧取得 |
-| GET | `/server/custom-emoji/:code` | ✅ | - | カスタム絵文字取得（キャッシュ: 3日） |
-| GET | `/server/get-invite` | ✅ | `manageServer` | 招待コード一覧取得 |
-| PUT | `/server/create-invite` | ✅ | `manageServer` | 招待コード作成 |
-| DELETE | `/server/delete-invite` | ✅ | `manageServer` | 招待コード削除 |
-| POST | `/server/change-info` | ✅ | `manageServer` | サーバー基本情報変更（WS通知: `server::ConfigUpdate`） |
-| POST | `/server/change-config` | ✅ | `manageServer` | サーバー設定変更（WS通知: `server::ConfigUpdate`）。`BotEnabled` を `false` にすると接続中の Bot の WS も切断される |
-| POST | `/server/change-banner` | ✅ | `manageServer` | バナー画像変更 |
-| PUT | `/server/custom-emoji/upload` | ✅ | `manageEmoji` | カスタム絵文字追加（WS通知: `server::CustomEmojiUploaded`） |
-| DELETE | `/server/custom-emoji/delete` | ✅ | `manageEmoji` | カスタム絵文字削除（WS通知: `server::CustomEmojiDeleted`） |
-| GET | `/server/storage-usage` | ✅ | `manageServer` | ストレージ使用量取得 |
-| GET | `/server/log` | ✅ | `manageServer` | リクエストログ取得（`targetDate` 必須。`cursorLogId` で継続取得。カーソルが対象日の範囲外の場合は 400） |
-| GET | `/server/log-group` | ✅ | `manageServer` | リクエストログの日別集計取得（`type` / `userId` / `cursorLogDate` で絞り込み、`includeFirstLogs` で対象日のログを同梱） |
+| メソッド | パス                          | 認証 | 権限           | 概要                                                                                                                    |
+| -------- | ----------------------------- | ---- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| GET      | `/server/config`              | ❌   | -              | サーバー設定取得                                                                                                        |
+| GET      | `/server/banner`              | ❌   | -              | サーバーバナー画像取得                                                                                                  |
+| GET      | `/server/custom-emoji`        | ✅   | -              | カスタム絵文字一覧取得                                                                                                  |
+| GET      | `/server/custom-emoji/:code`  | ✅   | -              | カスタム絵文字取得（キャッシュ: 3日）                                                                                   |
+| GET      | `/server/get-invite`          | ✅   | `manageServer` | 招待コード一覧取得                                                                                                      |
+| PUT      | `/server/create-invite`       | ✅   | `manageServer` | 招待コード作成                                                                                                          |
+| DELETE   | `/server/delete-invite`       | ✅   | `manageServer` | 招待コード削除                                                                                                          |
+| POST     | `/server/change-info`         | ✅   | `manageServer` | サーバー基本情報変更（WS通知: `server::ConfigUpdate`）                                                                  |
+| POST     | `/server/change-config`       | ✅   | `manageServer` | サーバー設定変更（WS通知: `server::ConfigUpdate`）。`BotEnabled` を `false` にすると接続中の Bot の WS も切断される     |
+| POST     | `/server/change-banner`       | ✅   | `manageServer` | バナー画像変更                                                                                                          |
+| PUT      | `/server/custom-emoji/upload` | ✅   | `manageEmoji`  | カスタム絵文字追加（WS通知: `server::CustomEmojiUploaded`）                                                             |
+| DELETE   | `/server/custom-emoji/delete` | ✅   | `manageEmoji`  | カスタム絵文字削除（WS通知: `server::CustomEmojiDeleted`）                                                              |
+| GET      | `/server/storage-usage`       | ✅   | `manageServer` | ストレージ使用量取得                                                                                                    |
+| GET      | `/server/log`                 | ✅   | `manageServer` | リクエストログ取得（`targetDate` 必須。`cursorLogId` で継続取得。カーソルが対象日の範囲外の場合は 400）                 |
+| GET      | `/server/log-group`           | ✅   | `manageServer` | リクエストログの日別集計取得（`type` / `userId` / `cursorLogDate` で絞り込み、`includeFirstLogs` で対象日のログを同梱） |
 
 ---
 
 ### Notification モジュール (`/notification`)
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| GET | `/notification/vapid-public-key` | ❌ | - | Web Push 用 VAPID 公開鍵取得（未設定時は 503） |
-| GET | `/notification/config` | ✅ | - | 自分の通知設定取得 |
-| POST | `/notification/config` | ✅ | - | 自分の通知設定更新（enabled / mode） |
-| POST | `/notification/device/register` | ✅ | - | プッシュ通知端末の登録（platform: web / android / ios） |
-| POST | `/notification/device/unregister` | ✅ | - | プッシュ通知端末の解除 |
-| GET | `/notification/muted-channels` | ✅ | - | ミュート中チャンネル一覧取得 |
-| POST | `/notification/mute-channel` | ✅ | - | チャンネルをミュート |
-| POST | `/notification/unmute-channel` | ✅ | - | チャンネルのミュート解除 |
+| メソッド | パス                              | 認証 | 権限 | 概要                                                    |
+| -------- | --------------------------------- | ---- | ---- | ------------------------------------------------------- |
+| GET      | `/notification/vapid-public-key`  | ❌   | -    | Web Push 用 VAPID 公開鍵取得（未設定時は 503）          |
+| GET      | `/notification/config`            | ✅   | -    | 自分の通知設定取得                                      |
+| POST     | `/notification/config`            | ✅   | -    | 自分の通知設定更新（enabled / mode）                    |
+| POST     | `/notification/device/register`   | ✅   | -    | プッシュ通知端末の登録（platform: web / android / ios） |
+| POST     | `/notification/device/unregister` | ✅   | -    | プッシュ通知端末の解除                                  |
+| GET      | `/notification/muted-channels`    | ✅   | -    | ミュート中チャンネル一覧取得                            |
+| POST     | `/notification/mute-channel`      | ✅   | -    | チャンネルをミュート                                    |
+| POST     | `/notification/unmute-channel`    | ✅   | -    | チャンネルのミュート解除                                |
 
 ---
 
@@ -224,15 +224,15 @@ giracle-backend/
 Bot はユーザーとして作成され、`BOT` ロールが付与される（既定ロールのため手動リンク不可）。
 作成直後は未承認 (`isApproved=false`) で、`POST /server/bot/set-approve`（`manageServer`）で承認されるまで Bot API は使えない。
 
-| メソッド | パス | 認証 | 権限 | 概要 |
-| ---------- | ------ | ------ | ------ | ------ |
-| PUT | `/bot` | ✅ | - | Bot 作成（名前は 32 文字まで。重複時は 400） |
-| DELETE | `/bot` | ✅ | - | 自分の Bot 削除（接続中の WS も切断） |
-| GET | `/bot/list` | ✅ | - | 自分が作成した Bot 一覧（`query` で名前前方一致、`cursorBotId` で継続取得） |
-| POST | `/bot` | ✅ | - | 自分の Bot のユーザー情報更新（改名すると承認が取り消され WS も切断） |
-| POST | `/bot/change-icon` | ✅ | - | 自分の Bot のアイコン変更（`botId` + `icon`） |
-| GET | `/bot/:remoteUserId` | ✅ | - | Bot 管理情報取得（承認状態・作成者。`tokenCode` は含まない） |
-| GET | `/bot/all` | ✅ | `manageServer` | 全 Bot 一覧（新しい順。`query` / `cursorBotId`） |
+| メソッド | パス                 | 認証 | 権限           | 概要                                                                        |
+| -------- | -------------------- | ---- | -------------- | --------------------------------------------------------------------------- |
+| PUT      | `/bot`               | ✅   | -              | Bot 作成（名前は 32 文字まで。重複時は 400）                                |
+| DELETE   | `/bot`               | ✅   | -              | 自分の Bot 削除（接続中の WS も切断）                                       |
+| GET      | `/bot/list`          | ✅   | -              | 自分が作成した Bot 一覧（`query` で名前前方一致、`cursorBotId` で継続取得） |
+| POST     | `/bot`               | ✅   | -              | 自分の Bot のユーザー情報更新（改名すると承認が取り消され WS も切断）       |
+| POST     | `/bot/change-icon`   | ✅   | -              | 自分の Bot のアイコン変更（`botId` + `icon`）                               |
+| GET      | `/bot/:remoteUserId` | ✅   | -              | Bot 管理情報取得（承認状態・作成者。`tokenCode` は含まない）                |
+| GET      | `/bot/all`           | ✅   | `manageServer` | 全 Bot 一覧（新しい順。`query` / `cursorBotId`）                            |
 
 ---
 
@@ -241,13 +241,13 @@ Bot はユーザーとして作成され、`BOT` ロールが付与される（�
 外部アプリが Bot として操作するための API。認証は Cookie ではなく `Authorization` ヘッダに `tokenCode` を載せる。
 `BotEnabled=false` のときは全て 400、未承認・作成者の BAN/削除時は 401 を返す。
 
-| メソッド | パス | 認証 | 概要 |
-| ---------- | ------ | ------ | ------ |
-| POST | `/ext/message/send` | Bot token | Bot としてメッセージ送信（WS 通知・Inbox 追加も通常送信と同じ） |
-| POST | `/ext/message/edit` | Bot token | Bot 名義のメッセージ編集 |
-| DELETE | `/ext/message/delete` | Bot token | Bot 名義のメッセージ削除 |
-| GET | `/ext/user/:userId` | Bot token | ユーザー情報取得 |
-| WS | `/ext/ws` | Bot token | Bot 用 WebSocket（下記） |
+| メソッド | パス                  | 認証      | 概要                                                            |
+| -------- | --------------------- | --------- | --------------------------------------------------------------- |
+| POST     | `/ext/message/send`   | Bot token | Bot としてメッセージ送信（WS 通知・Inbox 追加も通常送信と同じ） |
+| POST     | `/ext/message/edit`   | Bot token | Bot 名義のメッセージ編集                                        |
+| DELETE   | `/ext/message/delete` | Bot token | Bot 名義のメッセージ削除                                        |
+| GET      | `/ext/user/:userId`   | Bot token | ユーザー情報取得                                                |
+| WS       | `/ext/ws`             | Bot token | Bot 用 WebSocket（下記）                                        |
 
 ---
 
@@ -257,50 +257,50 @@ Bot はユーザーとして作成され、`BOT` ロールが付与される（�
 
 ### 接続時の購読チャンネル
 
-| WS チャンネル | 対象 |
-| --------------- | ------ |
-| `GLOBAL` | 全ユーザー共通イベント |
-| `user::{userId}` | 該当ユーザー向けイベント |
-| `channel::{channelId}` | 参加済みチャンネルのイベント |
+| WS チャンネル               | 対象                                                               |
+| --------------------------- | ------------------------------------------------------------------ |
+| `GLOBAL`                    | 全ユーザー共通イベント                                             |
+| `user::{userId}`            | 該当ユーザー向けイベント                                           |
+| `channel::{channelId}`      | 参加済みチャンネルのイベント                                       |
 | `bot::channel::{channelId}` | Bot 用（`/ext/ws` のみ）。Bot 自身が閲覧できるチャンネルのイベント |
 
 Cookie 認証のため `Origin` ヘッダが必須。`CORS_ORIGIN` 設定時はその一覧に一致する Origin のみ接続できる（未設定時は Origin の一致検査を行わない）。
 
 ### クライアント → サーバー シグナル
 
-| signal | 概要 |
-|--------|------|
+| signal | 概要                      |
+| ------ | ------------------------- |
 | `ping` | 疎通確認（`pong` を返す） |
 
 ### サーバー → クライアント シグナル一覧
 
-| signal | 説明 |
-| -------- | ------ |
-| `user::Connected` | ユーザー接続 |
-| `user::Disconnected` | ユーザー切断 |
-| `user::ProfileUpdate` | プロフィール更新 / BAN 状態変化 |
-| `user::Deleted` | ユーザー削除 |
-| `channel::Join` | チャンネル参加 |
-| `channel::Left` | チャンネル退出 |
-| `channel::UpdateChannel` | チャンネル情報更新 |
-| `channel::Deleted` | チャンネル削除 |
-| `message::SendMessage` | 新規メッセージ |
-| `message::UpdateMessage` | メッセージ編集 / URLプレビュー更新 |
-| `message::MessageDeleted` | メッセージ削除 |
-| `message::ReadTimeUpdated` | 既読時刻更新 |
-| `message::AddReaction` | リアクション追加 |
-| `message::DeleteReaction` | リアクション削除 |
-| `inbox::Added` | 通知追加（mention / reply） |
-| `inbox::Deleted` | 通知既読 |
-| `inbox::Clear` | 全通知クリア |
-| `role::Created` | ロール作成 |
-| `role::Updated` | ロール更新 |
-| `role::Deleted` | ロール削除 |
-| `role::Linked` | ロール付与 |
-| `role::Unlinked` | ロール剥奪 |
-| `server::ConfigUpdate` | サーバー設定更新 |
-| `server::CustomEmojiUploaded` | カスタム絵文字追加 |
-| `server::CustomEmojiDeleted` | カスタム絵文字削除 |
+| signal                        | 説明                               |
+| ----------------------------- | ---------------------------------- |
+| `user::Connected`             | ユーザー接続                       |
+| `user::Disconnected`          | ユーザー切断                       |
+| `user::ProfileUpdate`         | プロフィール更新 / BAN 状態変化    |
+| `user::Deleted`               | ユーザー削除                       |
+| `channel::Join`               | チャンネル参加                     |
+| `channel::Left`               | チャンネル退出                     |
+| `channel::UpdateChannel`      | チャンネル情報更新                 |
+| `channel::Deleted`            | チャンネル削除                     |
+| `message::SendMessage`        | 新規メッセージ                     |
+| `message::UpdateMessage`      | メッセージ編集 / URLプレビュー更新 |
+| `message::MessageDeleted`     | メッセージ削除                     |
+| `message::ReadTimeUpdated`    | 既読時刻更新                       |
+| `message::AddReaction`        | リアクション追加                   |
+| `message::DeleteReaction`     | リアクション削除                   |
+| `inbox::Added`                | 通知追加（mention / reply）        |
+| `inbox::Deleted`              | 通知既読                           |
+| `inbox::Clear`                | 全通知クリア                       |
+| `role::Created`               | ロール作成                         |
+| `role::Updated`               | ロール更新                         |
+| `role::Deleted`               | ロール削除                         |
+| `role::Linked`                | ロール付与                         |
+| `role::Unlinked`              | ロール剥奪                         |
+| `server::ConfigUpdate`        | サーバー設定更新                   |
+| `server::CustomEmojiUploaded` | カスタム絵文字追加                 |
+| `server::CustomEmojiDeleted`  | カスタム絵文字削除                 |
 
 ---
 
@@ -310,13 +310,13 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 `BotEnabled=false`・未承認・作成者の BAN/削除時は接続できない。
 接続時に `user::{botUserId}` と、Bot 自身が閲覧できる各チャンネルの `bot::channel::{channelId}` を購読する。
 
-| signal | 方向 | 説明 |
-| -------- | ------ | ------ |
-| `ping` | 送信 | 疎通確認（`pong` を返す） |
-| `ERROR` | 受信 | 接続拒否・切断理由（`data` に文言） |
-| `user::Connected` / `user::Disconnected` | 受信 | Bot ユーザーの接続状態 |
-| `message::SendMessage` / `message::UpdateMessage` | 受信 | Bot が見られるチャンネルのメッセージ |
-| `inbox::Added` / `inbox::Deleted` / `inbox::Clear` | 受信 | Bot 宛の通知 |
+| signal                                             | 方向 | 説明                                 |
+| -------------------------------------------------- | ---- | ------------------------------------ |
+| `ping`                                             | 送信 | 疎通確認（`pong` を返す）            |
+| `ERROR`                                            | 受信 | 接続拒否・切断理由（`data` に文言）  |
+| `user::Connected` / `user::Disconnected`           | 受信 | Bot ユーザーの接続状態               |
+| `message::SendMessage` / `message::UpdateMessage`  | 受信 | Bot が見られるチャンネルのメッセージ |
+| `inbox::Added` / `inbox::Deleted` / `inbox::Clear` | 受信 | Bot 宛の通知                         |
 
 ---
 
@@ -324,22 +324,22 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 
 `src/Middlewares.ts` に Elysia プラグインとして定義。
 
-| 名前 | 概要 |
-| ------ | ------ |
-| `CheckToken` | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減 |
-| `CheckRoleTerm` | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認 |
-| `RateLimiter` | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
-| `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化 |
+| 名前                | 概要                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `CheckToken`        | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減                              |
+| `CheckRoleTerm`     | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認                                           |
+| `RateLimiter`       | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
+| `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化        |
 
 ### 権限（`checkRoleTerm`）の種類
 
-| 権限名 | 対象操作 |
-| -------- | ---------- |
-| `manageServer` | サーバー設定・招待コード・ストレージ管理 |
+| 権限名          | 対象操作                                 |
+| --------------- | ---------------------------------------- |
+| `manageServer`  | サーバー設定・招待コード・ストレージ管理 |
 | `manageChannel` | チャンネル作成・更新・削除・招待・キック |
-| `manageRole` | ロール作成・更新・削除・付与・剥奪 |
-| `manageUser` | ユーザー BAN / BAN 解除 |
-| `manageEmoji` | カスタム絵文字追加・削除 |
+| `manageRole`    | ロール作成・更新・削除・付与・剥奪       |
+| `manageUser`    | ユーザー BAN / BAN 解除                  |
+| `manageEmoji`   | カスタム絵文字追加・削除                 |
 
 > `manageServer` 権限を持つロールはすべての権限チェックを通過する。
 
@@ -349,16 +349,16 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 
 各ファイルは `src/Util.ts` の `Util` namespace 経由で参照する（`import { Util } from "../../Util"` → `Util.xxx(...)`）。個々のファイルへの直接 import は行わない。
 
-| ファイル | `Util.` プロパティ名 | 概要 |
-| ---------- | ---------------------- | ------ |
-| `SendSystemMessage.ts` | `sendSystemMessage` | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
-| `SendPushNotification.ts` | `sendPushNotification` | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除） |
-| `CalculateReactionTotal.ts` | `calculateReactionTotal` | リアクション集計 |
-| `CalculateRoleLevel.ts` | `calculateRoleLevel` | ロールレベル計算 |
-| `CheckChannelVisibility.ts` | `checkChannelVisibility` | チャンネル閲覧権限チェック |
-| `CompareRoleLevelToRole.ts` | `compareRoleLevelToRole` | ロールレベル比較 |
-| `GetUserViewableChannel.ts` | `getUserViewableChannel` | ユーザーが閲覧可能なチャンネル一覧取得 |
-| `getUsersRoleLevel.ts` | `getUsersRoleLevel` | ユーザーのロールレベル取得 |
+| ファイル                    | `Util.` プロパティ名     | 概要                                                                                               |
+| --------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `SendSystemMessage.ts`      | `sendSystemMessage`      | システムメッセージ送信（WELCOME / CHANNEL_JOIN / CHANNEL_LEFT / CHANNEL_INVITED / CHANNEL_KICKED） |
+| `SendPushNotification.ts`   | `sendPushNotification`   | Web Push 送信（VAPID 初期化・端末別送信・無効端末の自動削除）                                      |
+| `CalculateReactionTotal.ts` | `calculateReactionTotal` | リアクション集計                                                                                   |
+| `CalculateRoleLevel.ts`     | `calculateRoleLevel`     | ロールレベル計算                                                                                   |
+| `CheckChannelVisibility.ts` | `checkChannelVisibility` | チャンネル閲覧権限チェック                                                                         |
+| `CompareRoleLevelToRole.ts` | `compareRoleLevelToRole` | ロールレベル比較                                                                                   |
+| `GetUserViewableChannel.ts` | `getUserViewableChannel` | ユーザーが閲覧可能なチャンネル一覧取得                                                             |
+| `getUsersRoleLevel.ts`      | `getUsersRoleLevel`      | ユーザーのロールレベル取得                                                                         |
 
 新しい Utils ファイルを追加した場合は `src/Util.ts` に import と namespace export を追記する。
 
@@ -366,21 +366,21 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 
 ## 環境変数
 
-| 変数名 | デフォルト | 概要 |
-| -------- | ----------- | ------ |
-| `DATABASE_URL` | `file:./dev.db` | ローカル SQLite ファイルパス(`file:` プレフィックス付き。`bun:sqlite` 採用のためリモート libsql 接続は不可) |
-| `CORS_ORIGIN` | - | CORS 許可オリジン |
-| `RATE_LIMIT_ENABLED` | - | `"true"` でレート制限有効化 |
-| `RATE_LIMIT_ANONYMOUS_COUNT` | `25` | 未認証の制限リクエスト数 |
-| `RATE_LIMIT_ANONYMOUS_TIMEOUT` | `60` | 未認証のウィンドウ幅（秒） |
-| `RATE_LIMIT_AUTHORIZED_COUNT` | `200` | 認証済みの制限リクエスト数 |
-| `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60` | 認証済みのウィンドウ幅（秒） |
-| `BOT_RATE_LIMIT_ENABLED` | - | `"true"` で Bot のレート制限有効化 |
-| `BOT_RATE_LIMIT_COUNT` | `15` | Bot(`/ext/*`)の制限リクエスト数(Bot単位) |
-| `BOT_RATE_LIMIT_TIMEOUT` | `5` | Botのウィンドウ幅（秒） |
-| `VAPID_PUBLIC_KEY` | - | Web Push 用 VAPID 公開鍵 |
-| `VAPID_PRIVATE_KEY` | - | Web Push 用 VAPID 秘密鍵 |
-| `VAPID_SUBJECT` | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
+| 変数名                          | デフォルト                 | 概要                                                                                                                                                       |
+| ------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                  | `file:./dev.db`            | ローカル SQLite ファイルパス(`file:` プレフィックス付き。`bun:sqlite` 採用のためリモート libsql 接続は不可)                                                |
+| `CORS_ORIGIN`                   | -                          | CORS 許可オリジン                                                                                                                                          |
+| `RATE_LIMIT_ENABLED`            | -                          | `"true"` でレート制限有効化                                                                                                                                |
+| `RATE_LIMIT_ANONYMOUS_COUNT`    | `25`                       | 未認証の制限リクエスト数                                                                                                                                   |
+| `RATE_LIMIT_ANONYMOUS_TIMEOUT`  | `60`                       | 未認証のウィンドウ幅（秒）                                                                                                                                 |
+| `RATE_LIMIT_AUTHORIZED_COUNT`   | `200`                      | 認証済みの制限リクエスト数                                                                                                                                 |
+| `RATE_LIMIT_AUTHORIZED_TIMEOUT` | `60`                       | 認証済みのウィンドウ幅（秒）                                                                                                                               |
+| `BOT_RATE_LIMIT_ENABLED`        | -                          | `"true"` で Bot のレート制限有効化                                                                                                                         |
+| `BOT_RATE_LIMIT_COUNT`          | `15`                       | Bot(`/ext/*`)の制限リクエスト数(Bot単位)                                                                                                                   |
+| `BOT_RATE_LIMIT_TIMEOUT`        | `5`                        | Botのウィンドウ幅（秒）                                                                                                                                    |
+| `VAPID_PUBLIC_KEY`              | -                          | Web Push 用 VAPID 公開鍵                                                                                                                                   |
+| `VAPID_PRIVATE_KEY`             | -                          | Web Push 用 VAPID 秘密鍵                                                                                                                                   |
+| `VAPID_SUBJECT`                 | `mailto:admin@example.com` | Web Push の subject (mailto: または https:)主目的はPush Service (FCM / Mozilla autopush / Apple push) の運営者がアプリサーバ運営者に連絡を取るための連絡先 |
 
 ### プッシュ通知 (Web Push) セットアップ
 
