@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 import { app, db, GIRACLE_SERVER_CONFIG, NAME_MAX_LENGTH } from "../src";
+import { ServiceUser } from "../src/components/User/user.service";
 import {
   botManages,
   channelJoins,
@@ -1410,6 +1411,41 @@ describe("/user/delete", () => {
       GIRACLE_SERVER_CONFIG.BotEnabled = botEnabled;
       await db.delete(botManages).where(eq(botManages.remoteUserId, botUserId));
       await db.delete(users).where(eq(users.id, botUserId));
+    }
+  });
+
+  it("正常 :: Bot掃除で実ユーザーを巻き込まない", async () => {
+    const creatorId = "CLEANUP_BOT_CREATOR";
+    const realUserId = "CLEANUP_REAL_USER";
+    await db.insert(users).values([
+      { id: creatorId, name: "cleanup bot creator", selfIntroduction: "" },
+      { id: realUserId, name: "cleanup real user", selfIntroduction: "" },
+    ]);
+    //壊れたデータ: BotManageのremoteUserIdが実ユーザーを指している
+    await db.insert(botManages).values({
+      remoteUserId: realUserId,
+      createdBy: creatorId,
+      tokenCode: "CLEANUP_BOT_TOKEN",
+    });
+
+    try {
+      await ServiceUser.Delete(creatorId, "ADMINUSER");
+
+      //Botの管理情報は消える
+      expect(
+        await db.query.botManages.findFirst({
+          where: eq(botManages.createdBy, creatorId),
+        }),
+      ).toBeUndefined();
+      //remoteUserIdが実ユーザーなので論理削除されない
+      expect(
+        (await db.query.users.findFirst({ where: eq(users.id, realUserId) }))
+          ?.isDeleted,
+      ).toBe(false);
+    } finally {
+      await db.delete(botManages).where(eq(botManages.createdBy, creatorId));
+      await db.delete(users).where(eq(users.id, creatorId));
+      await db.delete(users).where(eq(users.id, realUserId));
     }
   });
 
