@@ -95,8 +95,8 @@ export const user = new Elysia({ prefix: "/user" })
 
   .get(
     "/get-online",
-    async () => {
-      const uniqueOnlineUserIds = await ServiceUser.GetOnline();
+    async ({ query: { cursorUserId } }) => {
+      const uniqueOnlineUserIds = await ServiceUser.GetOnline(cursorUserId);
 
       return {
         message: "Fetched online user list",
@@ -104,6 +104,9 @@ export const user = new Elysia({ prefix: "/user" })
       };
     },
     {
+      query: t.Object({
+        cursorUserId: t.Optional(t.String({ minLength: 1 })),
+      }),
       detail: {
         description: "オンラインユーザーを取得します",
         tags: ["User"],
