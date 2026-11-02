@@ -116,7 +116,7 @@ export const user = new Elysia({ prefix: "/user" })
   .get(
     "/list",
     async ({
-      query: { length, cursorUserId, username, joinedChannel },
+      query: { length, cursorUserId, username, filterOnline, joinedChannel },
       CheckToken: { _userId },
     }) => {
       const users = await ServiceUser.GetUserList(
@@ -124,6 +124,7 @@ export const user = new Elysia({ prefix: "/user" })
         length,
         cursorUserId,
         username,
+        filterOnline,
         joinedChannel,
       );
 
@@ -137,11 +138,12 @@ export const user = new Elysia({ prefix: "/user" })
         length: t.Number({ default: 30, maximum: 50, minimum: 1 }),
         cursorUserId: t.Optional(t.String({ minLength: 1 })),
         username: t.Optional(t.String({ minLength: 0 })),
+        filterOnline: t.Optional(t.Boolean()),
         joinedChannel: t.Optional(t.String()),
       }),
       detail: {
         description:
-          "ユーザーの情報を一覧で取得します。username(前方一致)・joinedChannel(参加チャンネル)で絞り込みできます",
+          "ユーザーの情報を一覧で取得します。username(前方一致)・joinedChannel(参加チャンネル)・filterOnline(オンライン限定)で絞り込みできます",
         tags: ["User"],
       },
     },

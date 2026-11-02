@@ -164,6 +164,7 @@ export namespace QueryUser {
     cursorUser?: { createdAt: Date; id: string } | undefined;
     username?: string | undefined;
     joinedChannel?: string | undefined;
+    onlineUserIds?: string[] | undefined;
   }) => {
     //検索条件を組み立て
     const conditions = [];
@@ -189,6 +190,10 @@ export namespace QueryUser {
             ),
         ),
       );
+    }
+
+    if (query.onlineUserIds !== undefined) {
+      conditions.push(inArray(users.id, query.onlineUserIds));
     }
 
     return await db.query.users.findMany({

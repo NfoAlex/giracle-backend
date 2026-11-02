@@ -571,6 +571,46 @@ describe("/user/list", () => {
     expect(res.ok).toBe(false);
     expect(t).toContain("somethin went wrong :(");
   });
+
+  it("filterOnline :: オンラインユーザーのみ返る", async () => {
+    const saved = new Map(Util.wsUserInstance.instances);
+    Util.wsUserInstance.instances.clear();
+    Util.wsUserInstance.instances.set("TESTUSER2", []);
+    try {
+      const res = await FETCH({
+        path: "/user/list?length=50&filterOnline=true",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data.map((u: { id: string }) => u.id)).toEqual(["TESTUSER2"]);
+    } finally {
+      Util.wsUserInstance.instances.clear();
+      for (const [userId, ws] of saved) {
+        Util.wsUserInstance.instances.set(userId, ws);
+      }
+    }
+  });
+
+  it("filterOnline :: オンライン0件なら空配列", async () => {
+    // 接続中のユーザーが存在しない状態
+    const saved = new Map(Util.wsUserInstance.instances);
+    Util.wsUserInstance.instances.clear();
+    try {
+      const res = await FETCH({
+        path: "/user/list?length=50&filterOnline=true",
+        method: "GET",
+      });
+      const j = await res.json();
+      expect(res.ok).toBe(true);
+      expect(j.data).toEqual([]);
+    } finally {
+      Util.wsUserInstance.instances.clear();
+      for (const [userId, ws] of saved) {
+        Util.wsUserInstance.instances.set(userId, ws);
+      }
+    }
+  });
 });
 
 describe("/user/icon & /user/banner", () => {

@@ -207,9 +207,10 @@ export namespace ServiceUser {
     length: number = 30,
     cursorUserId?: string,
     username?: string,
+    filterOnline?: boolean,
     joinedChannel?: string,
   ) => {
-    //チャンネル指定をしているならそれぞれが閲覧可能であるかを調べる(空文字は全チャンネル参加者指定のため対象外)
+    //チャンネル指定ありならリクエスト者が閲覧可能であるかを調べる(空文字は全チャンネル参加者指定のため対象外)
     if (joinedChannel !== undefined && joinedChannel !== "") {
       const canView = await Util.checkChannelVisibility(joinedChannel, _userId);
       if (canView === false) {
@@ -233,12 +234,21 @@ export namespace ServiceUser {
 
     const viewableChannels = await Util.getUserViewableChannel(_userId);
 
+    //オンライン限定指定時は接続中のWSインスタンスから対象ユーザーIdを抽出
+    const onlineUserIds = filterOnline
+      ? [...Util.wsUserInstance.instances.keys()]
+      : undefined;
+
+    //オンライン限定指定かつ該当者なし
+    if (onlineUserIds !== undefined && onlineUserIds.length === 0) return [];
+
     const usersFound = await QueryUser.getList({
       viewableChannelIds: viewableChannels.map((vc) => vc.id),
       length,
       cursorUser,
       username,
       joinedChannel,
+      onlineUserIds,
     });
 
     return usersFound;
