@@ -243,6 +243,7 @@ export namespace ServiceUser {
 
     return usersFound;
   };
+
   export const GetUserIcon = async (userId: string) => {
     //不正なuserIdは未設定扱い(パストラバーサル対策)
     if (!Util.isSafePathId(userId)) return null;
