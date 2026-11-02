@@ -120,11 +120,53 @@ beforeAll(async () => {
 });
 
 describe("/user/get-online", () => {
+  //オンライン状態はMapの挿入順(=接続順)でページングされるため、専用のキーで検証する
+  const onlineUserIds = Array.from({ length: 35 }, (_, i) => `ONLINE_TEST_${i}`);
+
+  const setOnline = () => {
+    for (const userId of onlineUserIds) {
+      Util.wsUserInstance.instances.set(userId, []);
+    }
+  };
+  const clearOnline = () => {
+    for (const userId of onlineUserIds) {
+      Util.wsUserInstance.instances.delete(userId);
+    }
+  };
+
   it("正常", async () => {
     const res = await FETCH({ path: "/user/get-online", method: "GET" });
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data).toBeArray();
+    expect(j.data.length).toBeLessThanOrEqual(30);
+  });
+
+  it("正常 :: 30件区切りでカーソルの次から取得", async () => {
+    setOnline();
+
+    try {
+      const first = await FETCH({ path: "/user/get-online", method: "GET" });
+      const firstIds: string[] = (await first.json()).data;
+      expect(firstIds).toEqual(onlineUserIds.slice(0, 30));
+
+      const second = await FETCH({
+        path: `/user/get-online?cursorUserId=${firstIds[29]}`,
+        method: "GET",
+      });
+      const secondIds: string[] = (await second.json()).data;
+      expect(secondIds).toEqual(onlineUserIds.slice(30));
+    } finally {
+      clearOnline();
+    }
+  });
+
+  it("存在しないカーソル :: 404", async () => {
+    const res = await FETCH({
+      path: "/user/get-online?cursorUserId=NOT_ONLINE",
+      method: "GET",
+    });
+    expect(res.status).toBe(404);
   });
 });
 

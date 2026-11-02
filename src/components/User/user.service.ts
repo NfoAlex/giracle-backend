@@ -180,13 +180,26 @@ export namespace ServiceUser {
     return { ...tokenInserted, token };
   };
 
-  export const GetOnline = async () => {
-    //オンラインユーザーIDを取得
-    const onlineUserIds = Array.from(Util.wsUserInstance.instances.keys());
-    //重複を削除
-    const uniqueOnlineUserIds = Array.from(new Set(onlineUserIds)).map(String);
+  export const GetOnline = async (cursorUserId?: string) => {
+    const onlineUserIds: string[] = [];
+    let flagFoundCursor = cursorUserId === undefined;
 
-    return uniqueOnlineUserIds;
+    for (const userId of Util.wsUserInstance.instances.keys()) {
+      if (!flagFoundCursor) {
+        flagFoundCursor = userId === cursorUserId;
+        continue;
+      }
+
+      onlineUserIds.push(userId);
+      if (onlineUserIds.length === 50) return onlineUserIds;
+    }
+
+    //カーソルが既に切断済み(オフライン)、あるいは存在しない場合
+    if (!flagFoundCursor) {
+      throw status(404, "Cursor user not found");
+    }
+
+    return onlineUserIds;
   };
 
   export const GetUserList = async (
