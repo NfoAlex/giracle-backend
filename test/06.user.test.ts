@@ -121,7 +121,10 @@ beforeAll(async () => {
 
 describe("/user/get-online", () => {
   //オンライン状態はMapの挿入順(=接続順)でページングされるため、専用のキーで検証する
-  const onlineUserIds = Array.from({ length: 55 }, (_, i) => `ONLINE_TEST_${i}`);
+  const onlineUserIds = Array.from(
+    { length: 55 },
+    (_, i) => `ONLINE_TEST_${i}`,
+  );
 
   const setOnline = () => {
     for (const userId of onlineUserIds) {
