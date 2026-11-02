@@ -121,7 +121,7 @@ beforeAll(async () => {
 
 describe("/user/get-online", () => {
   //オンライン状態はMapの挿入順(=接続順)でページングされるため、専用のキーで検証する
-  const onlineUserIds = Array.from({ length: 35 }, (_, i) => `ONLINE_TEST_${i}`);
+  const onlineUserIds = Array.from({ length: 55 }, (_, i) => `ONLINE_TEST_${i}`);
 
   const setOnline = () => {
     for (const userId of onlineUserIds) {
@@ -139,23 +139,23 @@ describe("/user/get-online", () => {
     const j = await res.json();
     expect(res.ok).toBe(true);
     expect(j.data).toBeArray();
-    expect(j.data.length).toBeLessThanOrEqual(30);
+    expect(j.data.length).toBeLessThanOrEqual(50);
   });
 
-  it("正常 :: 30件区切りでカーソルの次から取得", async () => {
+  it("正常 :: 50件区切りでカーソルの次から取得", async () => {
     setOnline();
 
     try {
       const first = await FETCH({ path: "/user/get-online", method: "GET" });
       const firstIds: string[] = (await first.json()).data;
-      expect(firstIds).toEqual(onlineUserIds.slice(0, 30));
+      expect(firstIds).toEqual(onlineUserIds.slice(0, 50));
 
       const second = await FETCH({
-        path: `/user/get-online?cursorUserId=${firstIds[29]}`,
+        path: `/user/get-online?cursorUserId=${firstIds[49]}`,
         method: "GET",
       });
       const secondIds: string[] = (await second.json()).data;
-      expect(secondIds).toEqual(onlineUserIds.slice(30));
+      expect(secondIds).toEqual(onlineUserIds.slice(50));
     } finally {
       clearOnline();
     }
