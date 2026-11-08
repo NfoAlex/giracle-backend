@@ -1542,6 +1542,42 @@ describe("/message/send", async () => {
     }
   });
 
+  // HTML読み込み上限 (1MB) の境界。上限超過は失敗扱いでプレビューを作らない
+  // 巨大HTML/gzip bombによるOOM対策の回帰テスト
+  const HTML_BYTE_LIMIT = 1 * 1024 * 1024;
+  for (const [label, bodySize, expectedCount] of [
+    ["上限ちょうど", HTML_BYTE_LIMIT, 1],
+    ["上限超過", HTML_BYTE_LIMIT + 1, 0],
+  ] as const) {
+    it(`HTML最大サイズ :: ${label}はプレビュー${expectedCount === 1 ? "作成" : "未作成"}`, async () => {
+      const targetUrl = `https://example.com/limit-${bodySize}`;
+      safeFetchStubs.set(targetUrl, {
+        status: 200,
+        body: "x".repeat(bodySize),
+      });
+
+      try {
+        const res = await FETCH({
+          path: "/message/send",
+          method: "POST",
+          body: {
+            channelId: "TESTCHANNEL1",
+            message: `Check this out ${targetUrl}`,
+          },
+        });
+        const j = await res.json();
+        await Bun.sleep(500);
+
+        const getJ = await (
+          await FETCH({ path: `/message/${j.data.id}`, method: "GET" })
+        ).json();
+        expect(getJ.data.MessageUrlPreview.length).toBe(expectedCount);
+      } finally {
+        safeFetchStubs.clear();
+      }
+    });
+  }
+
   it("Twitter・IP・通常URL混在メッセージ送信（IPのみ除外・Twitterはfxtwitter変換）", async () => {
     const res = await FETCH({
       path: "/message/send",
