@@ -338,6 +338,9 @@ export namespace Middleware {
       }
     });
 
+  // OGP解析用HTMLの読み込み上限 (巨大HTML/gzip bombによるOOM対策)
+  const URL_PREVIEW_MAX_HTML_BYTES = 1 * 1024 * 1024;
+
   export const UrlPreviewControl = new Elysia({ name: "urlPreviewControl" })
     .guard({
       body: t.Object({
@@ -411,10 +414,15 @@ export namespace Middleware {
               }
 
               // 取得HTMLをオフライン解析 (ogs内蔵fetchは使わない)
-              const html = await fetched.response.text().catch(() => null);
-              if (html === null) {
+              // 上限超過は失敗扱い (転送量は制限できないため読み込み中に打ち切る)
+              const bytes = await Util.readResponseBodyWithByteLimit(
+                fetched.response,
+                URL_PREVIEW_MAX_HTML_BYTES,
+              );
+              if (bytes === null) {
                 throw new Error(`HTML read failed for ${url}`);
               }
+              const html = new TextDecoder().decode(bytes);
               const data = await ogs({ html });
               if (data.error) {
                 throw new Error(`OGS Parse Error for ${url}`);
