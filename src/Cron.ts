@@ -45,3 +45,5 @@ export const CronInstances = {
       ? Bun.cron("0 * * * *", runRefreshUrlPreview)
       : undefined,
 };
+
+console.log("Cron :: CRONプロセス開始");
