@@ -1,6 +1,4 @@
-import fs from "node:fs";
-import { unlink } from "node:fs/promises";
-import * as path from "node:path";
+import { readdir, unlink } from "node:fs/promises";
 import { status } from "elysia";
 import sharp from "sharp";
 import { GIRACLE_SERVER_CONFIG } from "../..";
@@ -269,20 +267,15 @@ export namespace ServiceServer {
   };
 
   export const StorageUsage = async () => {
-    //ディレクトリ一覧を取得
-    const dirs = fs.readdirSync("./STORAGE/file");
-    if (dirs.length === 0) return 0;
-
-    //合計サイズ
+    //ディレクトリごとにファイルサイズを合計
     let totalSize = 0;
 
-    //ディレクトリごとにファイルを取得、パスを格納する
-    for (const dir of dirs) {
-      const insideDir = fs.readdirSync(`./STORAGE/file/${dir}`);
-      for (const f of insideDir) {
-        totalSize += fs.statSync(path.join(`./STORAGE/file/${dir}`, f)).size;
+    for (const dir of await readdir("./STORAGE/file")) {
+      for (const f of await readdir(`./STORAGE/file/${dir}`)) {
+        totalSize += Bun.file(`./STORAGE/file/${dir}/${f}`).size;
       }
     }
+
     return totalSize;
   };
 
