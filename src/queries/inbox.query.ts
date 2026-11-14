@@ -42,6 +42,14 @@ export namespace QueryInbox {
     tx.delete(inboxes).where(eq(inboxes.userId, query.userId)).run();
   };
 
+  //トランザクション内で指定チャンネルの通知を全削除(チャンネル削除時)
+  export const removeAllByChannelIdInTx = (
+    tx: Tx,
+    query: { channelId: string },
+  ) => {
+    tx.delete(inboxes).where(eq(inboxes.channelId, query.channelId)).run();
+  };
+
   //通知を1件保存
   export const insertOne = (query: {
     userId: string;
