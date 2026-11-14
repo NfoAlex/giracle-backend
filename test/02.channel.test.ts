@@ -4,8 +4,10 @@ import { db, NAME_MAX_LENGTH } from "../src";
 import {
   channels,
   channelViewableRoles,
+  inboxes,
   messageFileAttached,
   messageReadTimes,
+  messages,
   roleLinks,
 } from "../src/db/schema";
 import { FETCH, INIT } from "./util";
@@ -1108,6 +1110,21 @@ describe("/channel/delete", async () => {
       size: 1,
       type: "image/png",
     });
+    //InboxはMessage削除のrestrictに引っかからないよう、チャンネル削除時に一緒に消えることを確認
+    const [inboxTargetMessage] = await db
+      .insert(messages)
+      .values({
+        channelId: TEST__NEW_CREATED_CHANNELID,
+        userId: "TESTUSER",
+        content: "inbox orphan check",
+      })
+      .returning();
+    await db.insert(inboxes).values({
+      type: "mention",
+      messageId: inboxTargetMessage.id,
+      channelId: TEST__NEW_CREATED_CHANNELID,
+      userId: "TESTUSER",
+    });
 
     const res = await FETCH({
       path: "/channel/delete",
@@ -1136,6 +1153,11 @@ describe("/channel/delete", async () => {
       .from(messageFileAttached)
       .where(eq(messageFileAttached.channelId, TEST__NEW_CREATED_CHANNELID));
     expect(filesLeft.length).toBe(0);
+    const inboxesLeft = await db
+      .select()
+      .from(inboxes)
+      .where(eq(inboxes.channelId, TEST__NEW_CREATED_CHANNELID));
+    expect(inboxesLeft.length).toBe(0);
   });
 
   it("存在しないチャンネルを削除", async () => {

@@ -7,6 +7,7 @@ import { QueryChannel } from "../../queries/channel.query";
 import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryChannelViewableRole } from "../../queries/channelViewableRole.query";
+import { QueryInbox } from "../../queries/inbox.query";
 import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
@@ -467,8 +468,10 @@ export namespace ServiceChannel {
       );
     }
 
-    //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・チャンネル本体を1トランザクションで削除(孤児データ防止)
+    //メッセージ・チャンネル参加データ・デフォルト参加データ・既読時間・閲覧ロール・添付ファイル情報・通知・チャンネル本体を1トランザクションで削除(孤児データ防止)
     db.transaction((tx) => {
+      //InboxはMessage削除のrestrictに引っかからないよう先に消す
+      QueryInbox.removeAllByChannelIdInTx(tx, { channelId });
       QueryMessageReadTime.removeByChannelInTx(tx, { channelId });
       QueryChannelViewableRole.removeByChannelInTx(tx, { channelId });
       QueryMessageFileAttached.removeByChannelInTx(tx, { channelId });
