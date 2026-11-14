@@ -439,6 +439,13 @@ export const inboxes = sqliteTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
+    //通知の宛先チャンネル。チャンネル削除時に通知もcascadeで消えるよう非正規化して保持する
+    channelId: text("channelId")
+      .notNull()
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
       .references(() => users.id, {
@@ -449,6 +456,8 @@ export const inboxes = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.messageId, table.userId] }),
     index("Inbox_userId_idx").on(table.userId),
+    //チャンネル削除時のcascadeとチャンネル単位の通知削除を高速化する
+    index("Inbox_channelId_idx").on(table.channelId),
   ],
 );
 

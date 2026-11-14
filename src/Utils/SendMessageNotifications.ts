@@ -94,6 +94,7 @@ export default async function SendMessageNotifications(input: {
       await QueryInbox.insertOne({
         userId: replyTargetUserId,
         messageId: messageSaved.id,
+        channelId,
         type: "reply",
       });
       //WS通知

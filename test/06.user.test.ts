@@ -1244,6 +1244,7 @@ describe("/user/delete", () => {
       throw new Error("target message not found");
     await db.insert(inboxes).values({
       messageId: targetMessage.id,
+      channelId: targetMessage.channelId,
       userId: DEL_TARGET_USER_ID,
       type: "mention",
     });

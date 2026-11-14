@@ -448,6 +448,7 @@ describe("/ext/message/delete", async () => {
       .values({
         type: "message",
         messageId: "BOTMESSAGEDEL",
+        channelId: "TESTCHANNEL1",
         userId: "TESTUSER",
       })
       .onConflictDoNothing();

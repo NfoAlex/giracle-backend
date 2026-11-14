@@ -120,6 +120,13 @@
       "when": 1793183779658,
       "tag": "0016_closed_santa_claus",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794665727958,
+      "tag": "0017_quiet_colonel_america",
+      "breakpoints": true
     }
   ]
 }

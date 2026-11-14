@@ -633,6 +633,7 @@ export namespace ServiceMessage {
       savingInboxData.push({
         userId: mentionedUserId,
         messageId: sourceMessageId,
+        channelId,
         type: "mention",
       });
     }

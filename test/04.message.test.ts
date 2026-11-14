@@ -1131,6 +1131,8 @@ describe("/message/send", async () => {
         );
       expect(rows.length).toBe(1);
       expect(rows[0].type).toBe("reply");
+      //チャンネル削除で通知も消えるよう、通知はチャンネルIdを保持する
+      expect(rows[0].channelId).toBe("TESTCHANNEL1");
 
       //後続テストへ影響しないよう後始末(通知→メッセージの順でFKを満たす)
       await db.delete(inboxes).where(eq(inboxes.messageId, repliedId));
@@ -2141,6 +2143,7 @@ describe("/message/delete", async () => {
     await db.insert(inboxes).values({
       type: "mention",
       messageId: target.id,
+      channelId: target.channelId,
       userId: "TESTUSER",
     });
     await db.insert(messageReactions).values({
