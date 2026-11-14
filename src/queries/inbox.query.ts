@@ -46,11 +46,13 @@ export namespace QueryInbox {
   export const insertOne = (query: {
     userId: string;
     messageId: string;
+    channelId: string;
     type: string;
   }) => {
     return db.insert(inboxes).values({
       userId: query.userId,
       messageId: query.messageId,
+      channelId: query.channelId,
       type: query.type,
     });
   };

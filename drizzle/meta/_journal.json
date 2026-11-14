@@ -127,6 +127,13 @@
       "when": 1794837789544,
       "tag": "0017_natural_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1795355699168,
+      "tag": "0018_third_sway",
+      "breakpoints": true
     }
   ]
 }

@@ -245,11 +245,21 @@ export async function INIT() {
 
   await db
     .insert(inboxes)
-    .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER" })
+    .values({
+      type: "message",
+      messageId: "TESTMESSAGE1",
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER",
+    })
     .onConflictDoNothing();
   await db
     .insert(inboxes)
-    .values({ type: "message", messageId: "TESTMESSAGE1", userId: "TESTUSER2" })
+    .values({
+      type: "message",
+      messageId: "TESTMESSAGE1",
+      channelId: "TESTCHANNEL1",
+      userId: "TESTUSER2",
+    })
     .onConflictDoNothing();
 
   // --- 05.bot: Bot管理情報を作成 ---
