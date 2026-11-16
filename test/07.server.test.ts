@@ -303,6 +303,12 @@ describe("DELETE /server/delete-old-files", () => {
     });
   });
 
+  const remainingIds = (ids: string[]) =>
+    db.query.messageFileAttached
+      .findMany({ where: inArray(messageFileAttached.id, ids) })
+      .sync()
+      .map((r) => r.id);
+
   it("正常 :: 指定時刻より古いファイルだけをDB・実ファイルともに削除", async () => {
     const res = await FETCH({
       path: "/server/delete-old-files",
@@ -312,15 +318,12 @@ describe("DELETE /server/delete-old-files", () => {
     expect(res.ok).toBe(true);
     expect((await res.json()).message).toBe("Files deleted");
 
-    const remaining = db.query.messageFileAttached
-      .findMany({ where: inArray(messageFileAttached.id, fileIds) })
-      .sync();
-    expect(remaining.length).toBe(OLDER_COUNT);
-    const remainingIds = new Set(remaining.map((r) => r.id));
+    const remaining = new Set(remainingIds(fileIds));
+    expect(remaining.size).toBe(OLDER_COUNT);
 
     for (const [i, f] of dummyFiles.entries()) {
       const shouldRemain = i < OLDER_COUNT;
-      expect(remainingIds.has(f.id)).toBe(shouldRemain);
+      expect(remaining.has(f.id)).toBe(shouldRemain);
 
       const exists = await Bun.file(
         `./STORAGE/file/${CHANNEL_ID}/${f.fileName}`,
@@ -337,5 +340,49 @@ describe("DELETE /server/delete-old-files", () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
+  });
+
+  it("上限 :: 残件ありを返し、2回目の呼び出しで全件削除される", async () => {
+    // 1リクエストの上限(500件 x 10回)を1件超える件数。上の30件と混ざらないよう、より古い時刻にする
+    const CAP_COUNT = 5001;
+    const capIds = Array.from({ length: CAP_COUNT }, (_, i) => `CAPFILE${i}`);
+    const capCutoff = new Date(BASE_TIME - 12 * 60 * 60_000);
+    const body = { deleteOlderThan: capCutoff.toISOString() };
+
+    // 実ファイルは作らない。存在しないファイルはENOENTで「削除済み」扱いになる
+    await db.insert(messageFileAttached).values(
+      capIds.map((id) => ({
+        id,
+        channelId: CHANNEL_ID,
+        userId: "TESTUSER",
+        actualFileName: `${id}.txt`,
+        savedFileName: `${id}.txt`,
+        size: 1,
+        type: "text/plain",
+        createdAt: new Date(BASE_TIME - 24 * 60 * 60_000),
+      })),
+    );
+
+    try {
+      const first = await FETCH({
+        path: "/server/delete-old-files",
+        method: "DELETE",
+        body,
+      });
+      expect((await first.json()).data.hasMoreFiles).toBe(true);
+      expect(remainingIds(capIds).length).toBe(CAP_COUNT - 5000);
+
+      const second = await FETCH({
+        path: "/server/delete-old-files",
+        method: "DELETE",
+        body,
+      });
+      expect((await second.json()).data.hasMoreFiles).toBe(false);
+      expect(remainingIds(capIds).length).toBe(0);
+    } finally {
+      await db
+        .delete(messageFileAttached)
+        .where(inArray(messageFileAttached.id, capIds));
+    }
   });
 });
