@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "..";
 import { messageFileAttached } from "../db/schema";
 
@@ -25,6 +25,49 @@ export namespace QueryMessageFileAttached {
     return db.query.messageFileAttached.findMany({
       where: inArray(messageFileAttached.id, query.fileIds),
     });
+  };
+
+  export const deleteFileOlderThen = async (query: { olderThan: Date }) => {
+    const MAX_ITERATION_NUM = 10;
+
+    for (let i = 0; i < MAX_ITERATION_NUM; i++) {
+      const fileDatas = await db.query.messageFileAttached.findMany({
+        columns: {
+          id: true,
+          savedFileName: true,
+          channelId: true,
+        },
+        where: lte(messageFileAttached.createdAt, query.olderThan),
+        orderBy: asc(messageFileAttached.createdAt),
+        limit: 500,
+      });
+
+      for (const file of fileDatas) {
+        const fileFromBun = Bun.file(
+          `./STORAGE/file/${file.channelId}/${file.savedFileName}`,
+        );
+        await fileFromBun
+          .delete()
+          .catch((e) =>
+            console.error(
+              "messageFileAttached.query :: deleteFileOlderThen : ファイル削除失敗 ",
+              { e },
+            ),
+          );
+      }
+      const fileDataLength = fileDatas.length;
+
+      await db.delete(messageFileAttached).where(
+        inArray(
+          messageFileAttached.id,
+          fileDatas.map((f) => f.id),
+        ),
+      );
+
+      if (fileDataLength < 500) {
+        break;
+      }
+    }
   };
 
   //添付ファイル情報を保存

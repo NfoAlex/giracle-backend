@@ -1,10 +1,12 @@
-import { beforeAll, describe, expect, it } from "bun:test";
-import { eq, ne } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import fs from "node:fs/promises";
+import { eq, inArray, ne } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db, sqlite } from "../src/db";
 import {
   channelJoinOnDefaults,
   invitations,
+  messageFileAttached,
   roleInfos,
   roleLinks,
   serverConfigs,
@@ -252,6 +254,86 @@ describe("POST /server/change-config", () => {
         MessageMaxFileSize: 2048,
         DefaultJoinChannel: ["TESTCHANNEL1", "TESTCHANNEL2"],
       },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe("DELETE /server/delete-old-files", () => {
+  const CHANNEL_ID = "TESTCHANNEL1";
+  const FILE_COUNT = 30;
+  // 指定時刻ちょうども削除対象(lte)なので、境界の1件を含めた件数を期待値にする
+  const OLDER_COUNT = 15;
+  const BASE_TIME = Date.now();
+  // i が大きいほど古い(1分間隔で30件)
+  const dummyFiles = Array.from({ length: FILE_COUNT }, (_, i) => ({
+    id: `OLDFILE${i}`,
+    fileName: `dummy-${i}.txt`,
+    createdAt: new Date(BASE_TIME - i * 60_000),
+  }));
+  const cutoff = new Date(BASE_TIME - OLDER_COUNT * 60_000);
+  const fileIds = dummyFiles.map((f) => f.id);
+
+  beforeAll(async () => {
+    await db.insert(messageFileAttached).values(
+      dummyFiles.map((f) => ({
+        id: f.id,
+        channelId: CHANNEL_ID,
+        userId: "TESTUSER",
+        actualFileName: f.fileName,
+        savedFileName: f.fileName,
+        size: 1,
+        type: "text/plain",
+        createdAt: f.createdAt,
+      })),
+    );
+
+    for (const f of dummyFiles)
+      await Bun.write(`./STORAGE/file/${CHANNEL_ID}/${f.fileName}`, "dummy");
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(messageFileAttached)
+      .where(inArray(messageFileAttached.id, fileIds));
+    await fs.rm(`./STORAGE/file/${CHANNEL_ID}`, {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it("正常 :: 指定時刻より古いファイルだけをDB・実ファイルともに削除", async () => {
+    const res = await FETCH({
+      path: "/server/delete-uploaded-files",
+      method: "DELETE",
+      body: { deleteOlderThan: cutoff.toISOString() },
+    });
+    expect(res.ok).toBe(true);
+    expect((await res.json()).message).toBe("Files deleted");
+
+    const remaining = db.query.messageFileAttached
+      .findMany({ where: inArray(messageFileAttached.id, fileIds) })
+      .sync();
+    expect(remaining.length).toBe(OLDER_COUNT);
+    const remainingIds = new Set(remaining.map((r) => r.id));
+
+    for (const [i, f] of dummyFiles.entries()) {
+      const shouldRemain = i < OLDER_COUNT;
+      expect(remainingIds.has(f.id)).toBe(shouldRemain);
+
+      const exists = await Bun.file(
+        `./STORAGE/file/${CHANNEL_ID}/${f.fileName}`,
+      ).exists();
+      expect(exists).toBe(shouldRemain);
+    }
+  });
+
+  it("権限無", async () => {
+    const res = await FETCH({
+      path: "/server/delete-uploaded-files",
+      method: "DELETE",
+      body: { deleteOlderThan: cutoff.toISOString() },
       useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
