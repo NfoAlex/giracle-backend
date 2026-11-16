@@ -39,11 +39,11 @@ export const runRefreshUrlPreview = async (): Promise<boolean> => {
   }
 };
 
-export const CronInstances = {
+const CronInstances = process.env.NODE_ENV !== "test" ? {
   refreshUrlPreview:
     process.env.NODE_ENV !== "test"
       ? Bun.cron("0 * * * *", runRefreshUrlPreview)
       : undefined,
-};
+} : null;
 
-console.log("Cron :: CRONプロセス開始");
+CronInstances && console.log("Cron :: CRONプロセス開始");
