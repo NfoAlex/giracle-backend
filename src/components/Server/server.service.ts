@@ -6,7 +6,6 @@ import { QueryBot } from "../../queries/bot.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryCustomEmoji } from "../../queries/customEmoji.query";
 import { QueryInvite } from "../../queries/invite.query";
-import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { QueryRequestLog } from "../../queries/requestLog.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
