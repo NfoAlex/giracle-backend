@@ -305,7 +305,7 @@ describe("DELETE /server/delete-old-files", () => {
 
   it("正常 :: 指定時刻より古いファイルだけをDB・実ファイルともに削除", async () => {
     const res = await FETCH({
-      path: "/server/delete-uploaded-files",
+      path: "/server/delete-old-files",
       method: "DELETE",
       body: { deleteOlderThan: cutoff.toISOString() },
     });
@@ -331,7 +331,7 @@ describe("DELETE /server/delete-old-files", () => {
 
   it("権限無", async () => {
     const res = await FETCH({
-      path: "/server/delete-uploaded-files",
+      path: "/server/delete-old-files",
       method: "DELETE",
       body: { deleteOlderThan: cutoff.toISOString() },
       useSecondaryUser: true,
