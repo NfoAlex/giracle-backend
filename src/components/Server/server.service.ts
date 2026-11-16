@@ -281,10 +281,12 @@ export namespace ServiceServer {
   };
 
   export const DeleteOldFiles = async (deleteOlderThan: Date) => {
-    await QueryMessageFileAttached.deleteFileOlderThen({
-      olderThan: deleteOlderThan,
-    });
-    return;
+    const { hasMoreFiles } = await QueryMessageFileAttached.deleteFileOlderThen(
+      {
+        olderThan: deleteOlderThan,
+      },
+    );
+    return hasMoreFiles;
   };
 
   export const GetLogs = async (targetDate: Date, cursorLogId?: string) => {

@@ -339,10 +339,11 @@ export const server = new Elysia({ prefix: "/server" })
   .delete(
     "/delete-old-files",
     async ({ body: { deleteOlderThan } }) => {
-      await ServiceServer.DeleteOldFiles(deleteOlderThan);
+      const hasMoreFiles = await ServiceServer.DeleteOldFiles(deleteOlderThan);
 
       return {
         message: "Files deleted",
+        data: { hasMoreFiles },
       };
     },
     {
