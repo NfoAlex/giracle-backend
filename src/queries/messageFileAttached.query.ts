@@ -29,6 +29,7 @@ export namespace QueryMessageFileAttached {
 
   export const deleteFileOlderThen = async (query: { olderThan: Date }) => {
     const MAX_ITERATION_NUM = 10;
+    const BATCH_SIZE = 500;
 
     for (let i = 0; i < MAX_ITERATION_NUM; i++) {
       const fileDatas = await db.query.messageFileAttached.findMany({
@@ -39,35 +40,40 @@ export namespace QueryMessageFileAttached {
         },
         where: lte(messageFileAttached.createdAt, query.olderThan),
         orderBy: asc(messageFileAttached.createdAt),
-        limit: 500,
+        limit: BATCH_SIZE,
       });
 
+      //削除できたファイルの行だけ消す。失敗分は残して次回リトライさせる
+      const deletedIds: string[] = [];
       for (const file of fileDatas) {
-        const fileFromBun = Bun.file(
-          `./STORAGE/file/${file.channelId}/${file.savedFileName}`,
-        );
-        await fileFromBun
-          .delete()
-          .catch((e) =>
+        try {
+          await Bun.file(
+            `./STORAGE/file/${file.channelId}/${file.savedFileName}`,
+          ).delete();
+          deletedIds.push(file.id);
+        } catch (e) {
+          //既に無いファイルは消せたものとして扱う(行を残すと永久に再試行し続ける)
+          if ((e as NodeJS.ErrnoException).code === "ENOENT")
+            deletedIds.push(file.id);
+          else
             console.error(
               "messageFileAttached.query :: deleteFileOlderThen : ファイル削除失敗 ",
               { e },
-            ),
-          );
+            );
+        }
       }
-      const fileDataLength = fileDatas.length;
 
-      await db.delete(messageFileAttached).where(
-        inArray(
-          messageFileAttached.id,
-          fileDatas.map((f) => f.id),
-        ),
-      );
+      if (deletedIds.length > 0)
+        await db
+          .delete(messageFileAttached)
+          .where(inArray(messageFileAttached.id, deletedIds));
 
-      if (fileDataLength < 500) {
-        break;
-      }
+      //打ち切り判定は取得件数で行う(失敗分を除いた件数ではない)
+      if (fileDatas.length < BATCH_SIZE) return { hasMoreFiles: false };
     }
+
+    //上限まで埋まった = 古いファイルがまだ残っている可能性
+    return { hasMoreFiles: true };
   };
 
   //添付ファイル情報を保存
