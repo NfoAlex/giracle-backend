@@ -341,6 +341,9 @@ export namespace Middleware {
   // OGP解析用HTMLの読み込み上限 (巨大HTML/gzip bombによるOOM対策)
   const URL_PREVIEW_MAX_HTML_BYTES = 1 * 1024 * 1024;
 
+  // 1メッセージあたりのプレビュー生成上限 (外部fetch増幅対策。超過分は保存のみ)
+  const URL_PREVIEW_MAX_PER_MESSAGE = 10;
+
   export const UrlPreviewControl = new Elysia({ name: "urlPreviewControl" })
     .guard({
       body: t.Object({
@@ -373,6 +376,9 @@ export namespace Middleware {
             ];
 
             if (urlMatched.length === 0 && !messageData.isEdited) return;
+
+            // 11件以上のURLでもメッセージ自体は保存済み。プレビューは先頭10件のみ生成する
+            urlMatched = urlMatched.slice(0, URL_PREVIEW_MAX_PER_MESSAGE);
 
             // Twitter/Xのリンクをfxtwitterに置換（URLオブジェクトを使って安全にパース）
             // 変換済みURLは追跡除外用に記録 (追跡するとx.comに戻りOGPが取れない)
