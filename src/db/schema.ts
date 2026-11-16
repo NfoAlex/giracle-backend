@@ -383,6 +383,9 @@ export const messageFileAttached = sqliteTable(
       onDelete: "cascade",
       onUpdate: "cascade",
     }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [
     index("MessageFileAttached_channelId_idx").on(table.channelId),

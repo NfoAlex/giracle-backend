@@ -1,10 +1,12 @@
-import { beforeAll, describe, expect, it } from "bun:test";
-import { eq, ne } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import fs from "node:fs/promises";
+import { eq, inArray, ne } from "drizzle-orm";
 import { GIRACLE_SERVER_CONFIG } from "../src";
 import { db, sqlite } from "../src/db";
 import {
   channelJoinOnDefaults,
   invitations,
+  messageFileAttached,
   roleInfos,
   roleLinks,
   serverConfigs,
@@ -255,5 +257,132 @@ describe("POST /server/change-config", () => {
       useSecondaryUser: true,
     });
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("DELETE /server/delete-old-files", () => {
+  const CHANNEL_ID = "TESTCHANNEL1";
+  const FILE_COUNT = 30;
+  // 指定時刻ちょうども削除対象(lte)なので、境界の1件を含めた件数を期待値にする
+  const OLDER_COUNT = 15;
+  const BASE_TIME = Date.now();
+  // i が大きいほど古い(1分間隔で30件)
+  const dummyFiles = Array.from({ length: FILE_COUNT }, (_, i) => ({
+    id: `OLDFILE${i}`,
+    fileName: `dummy-${i}.txt`,
+    createdAt: new Date(BASE_TIME - i * 60_000),
+  }));
+  const cutoff = new Date(BASE_TIME - OLDER_COUNT * 60_000);
+  const fileIds = dummyFiles.map((f) => f.id);
+
+  beforeAll(async () => {
+    await db.insert(messageFileAttached).values(
+      dummyFiles.map((f) => ({
+        id: f.id,
+        channelId: CHANNEL_ID,
+        userId: "TESTUSER",
+        actualFileName: f.fileName,
+        savedFileName: f.fileName,
+        size: 1,
+        type: "text/plain",
+        createdAt: f.createdAt,
+      })),
+    );
+
+    for (const f of dummyFiles)
+      await Bun.write(`./STORAGE/file/${CHANNEL_ID}/${f.fileName}`, "dummy");
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(messageFileAttached)
+      .where(inArray(messageFileAttached.id, fileIds));
+    await fs.rm(`./STORAGE/file/${CHANNEL_ID}`, {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  const remainingIds = (ids: string[]) =>
+    db.query.messageFileAttached
+      .findMany({ where: inArray(messageFileAttached.id, ids) })
+      .sync()
+      .map((r) => r.id);
+
+  it("正常 :: 指定時刻より古いファイルだけをDB・実ファイルともに削除", async () => {
+    const res = await FETCH({
+      path: "/server/delete-old-files",
+      method: "DELETE",
+      body: { deleteOlderThan: cutoff.toISOString() },
+    });
+    expect(res.ok).toBe(true);
+    expect((await res.json()).message).toBe("Files deleted");
+
+    const remaining = new Set(remainingIds(fileIds));
+    expect(remaining.size).toBe(OLDER_COUNT);
+
+    for (const [i, f] of dummyFiles.entries()) {
+      const shouldRemain = i < OLDER_COUNT;
+      expect(remaining.has(f.id)).toBe(shouldRemain);
+
+      const exists = await Bun.file(
+        `./STORAGE/file/${CHANNEL_ID}/${f.fileName}`,
+      ).exists();
+      expect(exists).toBe(shouldRemain);
+    }
+  });
+
+  it("権限無", async () => {
+    const res = await FETCH({
+      path: "/server/delete-old-files",
+      method: "DELETE",
+      body: { deleteOlderThan: cutoff.toISOString() },
+      useSecondaryUser: true,
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("上限 :: 残件ありを返し、2回目の呼び出しで全件削除される", async () => {
+    // 1リクエストの上限(500件 x 10回)を1件超える件数。上の30件と混ざらないよう、より古い時刻にする
+    const CAP_COUNT = 5001;
+    const capIds = Array.from({ length: CAP_COUNT }, (_, i) => `CAPFILE${i}`);
+    const capCutoff = new Date(BASE_TIME - 12 * 60 * 60_000);
+    const body = { deleteOlderThan: capCutoff.toISOString() };
+
+    // 実ファイルは作らない。存在しないファイルはENOENTで「削除済み」扱いになる
+    await db.insert(messageFileAttached).values(
+      capIds.map((id) => ({
+        id,
+        channelId: CHANNEL_ID,
+        userId: "TESTUSER",
+        actualFileName: `${id}.txt`,
+        savedFileName: `${id}.txt`,
+        size: 1,
+        type: "text/plain",
+        createdAt: new Date(BASE_TIME - 24 * 60 * 60_000),
+      })),
+    );
+
+    try {
+      const first = await FETCH({
+        path: "/server/delete-old-files",
+        method: "DELETE",
+        body,
+      });
+      expect((await first.json()).data.hasMoreFiles).toBe(true);
+      expect(remainingIds(capIds).length).toBe(CAP_COUNT - 5000);
+
+      const second = await FETCH({
+        path: "/server/delete-old-files",
+        method: "DELETE",
+        body,
+      });
+      expect((await second.json()).data.hasMoreFiles).toBe(false);
+      expect(remainingIds(capIds).length).toBe(0);
+    } finally {
+      await db
+        .delete(messageFileAttached)
+        .where(inArray(messageFileAttached.id, capIds));
+    }
   });
 });

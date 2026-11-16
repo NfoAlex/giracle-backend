@@ -1,6 +1,4 @@
-import fs from "node:fs";
-import { unlink } from "node:fs/promises";
-import * as path from "node:path";
+import { readdir, unlink } from "node:fs/promises";
 import { status } from "elysia";
 import sharp from "sharp";
 import { GIRACLE_SERVER_CONFIG } from "../..";
@@ -8,6 +6,7 @@ import { QueryBot } from "../../queries/bot.query";
 import { QueryChannelJoinOnDefault } from "../../queries/channelJoinOnDefault.query";
 import { QueryCustomEmoji } from "../../queries/customEmoji.query";
 import { QueryInvite } from "../../queries/invite.query";
+import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
 import { QueryRequestLog } from "../../queries/requestLog.query";
 import { QueryServerConfig } from "../../queries/serverConfig.query";
 import { QueryUser } from "../../queries/user.query";
@@ -269,21 +268,25 @@ export namespace ServiceServer {
   };
 
   export const StorageUsage = async () => {
-    //ディレクトリ一覧を取得
-    const dirs = fs.readdirSync("./STORAGE/file");
-    if (dirs.length === 0) return 0;
-
-    //合計サイズ
+    //ディレクトリごとにファイルサイズを合計
     let totalSize = 0;
 
-    //ディレクトリごとにファイルを取得、パスを格納する
-    for (const dir of dirs) {
-      const insideDir = fs.readdirSync(`./STORAGE/file/${dir}`);
-      for (const f of insideDir) {
-        totalSize += fs.statSync(path.join(`./STORAGE/file/${dir}`, f)).size;
+    for (const dir of await readdir("./STORAGE/file")) {
+      for (const f of await readdir(`./STORAGE/file/${dir}`)) {
+        totalSize += Bun.file(`./STORAGE/file/${dir}/${f}`).size;
       }
     }
+
     return totalSize;
+  };
+
+  export const DeleteOldFiles = async (deleteOlderThan: Date) => {
+    const { hasMoreFiles } = await QueryMessageFileAttached.deleteFileOlderThen(
+      {
+        olderThan: deleteOlderThan,
+      },
+    );
+    return hasMoreFiles;
   };
 
   export const GetLogs = async (targetDate: Date, cursorLogId?: string) => {

@@ -331,9 +331,31 @@ export const server = new Elysia({ prefix: "/server" })
     {
       detail: {
         description: "サーバーのストレージ使用量を取得します",
-        tags: ["Server"],
+        tags: ["Server", "File"],
       },
       checkRoleTerm: "manageServer",
+    },
+  )
+  .delete(
+    "/delete-old-files",
+    async ({ body: { deleteOlderThan } }) => {
+      const hasMoreFiles = await ServiceServer.DeleteOldFiles(deleteOlderThan);
+
+      return {
+        message: "Files deleted",
+        data: { hasMoreFiles },
+      };
+    },
+    {
+      body: t.Object({
+        deleteOlderThan: t.Date(),
+      }),
+      checkRoleTerm: "manageServer",
+      detail: {
+        description:
+          "サーバー上にある指定時間より古いファイルをすべて削除します",
+        tags: ["Server", "File"],
+      },
     },
   )
   .get(
