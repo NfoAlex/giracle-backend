@@ -329,7 +329,7 @@ Bot 用 WebSocket。認証は `Authorization` ヘッダの `tokenCode`（Cookie 
 | `CheckToken`        | Cookie の `token` を検証し `_userId` をコンテキストへ注入。トークンキャッシュ（5分）で DB 負荷軽減                              |
 | `CheckRoleTerm`     | ルート定義時の `checkRoleTerm` オプションに指定したロール権限を `beforeHandle` で確認                                           |
 | `RateLimiter`       | 未認証は接続元 IP（`server.requestIP()`）ベース、認証済みはトークンベースでリクエスト数を制限。超過で 429。環境変数で閾値設定可 |
-| `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化        |
+| `UrlPreviewControl` | メッセージ送信・編集後に URL を抽出し OGP 情報を DB 保存（1 メッセージ最大 10 件）。Twitter/X は fxTwitter へ変換。`bindUrlPreview: true` で有効化 |
 
 ### 権限（`checkRoleTerm`）の種類
 

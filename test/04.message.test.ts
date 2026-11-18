@@ -1603,6 +1603,35 @@ describe("/message/send", async () => {
     expect(urls).toContain("https://example.com");
   });
 
+  // 外部fetch増幅対策: 1メッセージあたりのプレビュー生成は10件まで
+  // 11件以上のURLを含んでもメッセージ自体は全文保存される
+  it("11件以上のURL含むメッセージ送信（保存は全文・プレビューは10件まで）", async () => {
+    const urls = Array.from(
+      { length: 12 },
+      (_, i) => `https://example.com/many/${i}`,
+    );
+    const content = urls.join(" ");
+
+    const res = await FETCH({
+      path: "/message/send",
+      method: "POST",
+      body: { channelId: "TESTCHANNEL1", message: content },
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message sent");
+    await Bun.sleep(500);
+
+    const getJ = await (
+      await FETCH({ path: `/message/${j.data.id}`, method: "GET" })
+    ).json();
+    expect(getJ.data.content).toBe(content);
+
+    const previewUrls = getJ.data.MessageUrlPreview.map(
+      (p: { url: string }) => p.url,
+    ).sort();
+    expect(previewUrls).toEqual(urls.slice(0, 10).sort());
+  });
+
   // SSRF対策: IPv4の異表記がプレビュー対象にならないこと
   const ssrfBlockedUrls = [
     "http://2130706433/", // 10進表記 = 127.0.0.1
