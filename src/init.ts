@@ -23,8 +23,11 @@ await Promise.all(
   ),
 );
 
-//起動時にシードを投入(migrate済みDBが前提)。
-await seedIt();
+//testならスルー
+if (process.env.NODE_ENV !== "test") {
+  //起動時にシードを投入(migrate済みDBが前提)。
+  await seedIt();
+}
 
 //プッシュ通知設定
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
