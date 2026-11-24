@@ -442,6 +442,12 @@ export const inboxes = sqliteTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
+    channelId: text("channelId")
+      .notNull()
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     userId: text("userId")
       .notNull()
       .references(() => users.id, {
@@ -452,6 +458,7 @@ export const inboxes = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.messageId, table.userId] }),
     index("Inbox_userId_idx").on(table.userId),
+    index("Inbox_channelId_idx").on(table.channelId),
   ],
 );
 
