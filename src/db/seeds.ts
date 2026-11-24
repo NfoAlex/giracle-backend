@@ -7,6 +7,7 @@ export async function seedIt() {
   await db
     .insert(serverConfigs)
     .values({
+      id: 1,
       name: "Giracle",
       introduction: "みんなで楽しめるチャットサーバー。",
     })
