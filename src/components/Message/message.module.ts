@@ -175,7 +175,7 @@ export const message = new Elysia({ prefix: "/message" })
       const fileData = await ServiceMessage.GetFile(fileId, _userId);
 
       //画像のキャッシュ期間を設定
-      set.headers["Cache-Control"] = "public, max-age=604800"; // 1週間
+      set.headers["Cache-Control"] = "private, max-age=604800"; // 1週間
       //格納型XSS対策: インライン実行を防ぐ
       set.headers["Content-Disposition"] = "attachment";
       set.headers["X-Content-Type-Options"] = "nosniff";

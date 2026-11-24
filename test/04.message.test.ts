@@ -533,6 +533,7 @@ describe("/message/file/get", async () => {
     });
     const buf = await res.arrayBuffer();
     expect(res.headers.get("content-type")).toBe("image/webp");
+    expect(res.headers.get("cache-control")).toBe("private, max-age=604800");
     expect(res.headers.get("content-disposition")).toBe("attachment");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(buf).toBeObject();
