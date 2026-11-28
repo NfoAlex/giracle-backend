@@ -146,6 +146,11 @@ export namespace QueryMessage {
       with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
+        MessagePinned: {
+          columns: {
+            id: true
+          }
+        }
       },
       limit: query.fetchLength,
       orderBy: (t, { asc, desc }) =>
