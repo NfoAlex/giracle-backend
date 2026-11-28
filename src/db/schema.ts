@@ -137,10 +137,16 @@ export const messagePinned = sqliteTable(
     messageId: text("messageId")
       .notNull()
       .unique()
-      .references(() => messages.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => messages.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     channelId: text("channelId")
       .notNull()
-      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),

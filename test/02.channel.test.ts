@@ -1160,13 +1160,13 @@ describe("/channel/delete", async () => {
     });
     //削除テストに使うメッセージ
     const [targetMessage] = await db
-    .insert(messages)
-    .values({
-      channelId: TEST__NEW_CREATED_CHANNELID,
-      userId: "TESTUSER",
-      content: "inbox orphan check",
-    })
-    .returning();
+      .insert(messages)
+      .values({
+        channelId: TEST__NEW_CREATED_CHANNELID,
+        userId: "TESTUSER",
+        content: "inbox orphan check",
+      })
+      .returning();
     //InboxはMessage削除のrestrictに引っかからないよう、チャンネル削除時に一緒に消えることを確認
     await db.insert(inboxes).values({
       type: "mention",
@@ -1175,12 +1175,11 @@ describe("/channel/delete", async () => {
       userId: "TESTUSER",
     });
     //MessagePinned
-    await db.insert(messagePinned)
-      .values({
-        messageId: targetMessage.id,
-        pinnedBy: "TESTUSER",
-        channelId: targetMessage.channelId
-      });
+    await db.insert(messagePinned).values({
+      messageId: targetMessage.id,
+      pinnedBy: "TESTUSER",
+      channelId: targetMessage.channelId,
+    });
 
     const res = await FETCH({
       path: "/channel/delete",

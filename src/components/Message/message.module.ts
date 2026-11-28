@@ -213,10 +213,6 @@ export const message = new Elysia({ prefix: "/message" })
         targetUrl: t.String({ format: "uri" }),
         forFavicon: t.Boolean({ default: false }),
       }),
-      response: {
-        200: t.Any(),
-        400: t.Literal("Failed to fetch thumbnail"),
-      },
       detail: {
         description: "URLプレビュー用に圧縮されたサムネイルを取得します",
         tags: ["Message"],
@@ -284,20 +280,6 @@ export const message = new Elysia({ prefix: "/message" })
         description: "メッセージをピン留めします",
         tags: ["Message", "Pin"],
       },
-      response: {
-        200: t.Object({
-          message: t.Literal("Message pinned"),
-          data: t.Object({
-            id: t.Number(),
-            pinnedBy: t.String(),
-            messageId: t.String(),
-            channelId: t.String(),
-            createdAt: t.Date(),
-          }),
-        }),
-        400: t.Literal("Already pinned"),
-        404: t.Literal("Not found"),
-      },
     },
   )
   .delete(
@@ -328,20 +310,6 @@ export const message = new Elysia({ prefix: "/message" })
       detail: {
         description: "メッセージのピン留めを外します",
         tags: ["Message", "Pin"],
-      },
-      response: {
-        200: t.Object({
-          message: t.Literal("Message unpinned"),
-          data: t.Object({
-            id: t.Number(),
-            pinnedBy: t.String(),
-            messageId: t.String(),
-            channelId: t.String(),
-            createdAt: t.Date(),
-          }),
-        }),
-        400: t.Literal("Message is not pinned"),
-        404: t.Literal("Not found"),
       },
     },
   )

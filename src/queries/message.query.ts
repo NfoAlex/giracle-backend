@@ -51,7 +51,7 @@ export namespace QueryMessage {
             id: true,
           },
         },
-      }
+      },
     });
   };
 
@@ -148,9 +148,9 @@ export namespace QueryMessage {
         MessageFileAttached: true,
         MessagePinned: {
           columns: {
-            id: true
-          }
-        }
+            id: true,
+          },
+        },
       },
       limit: query.fetchLength,
       orderBy: (t, { asc, desc }) =>
@@ -242,9 +242,9 @@ export namespace QueryMessage {
         MessageFileAttached: true,
         MessagePinned: {
           columns: {
-            id: true
-          }
-        }
+            id: true,
+          },
+        },
       },
       limit: SEARCH_PAGE_SIZE,
       offset: messageSkipping,
