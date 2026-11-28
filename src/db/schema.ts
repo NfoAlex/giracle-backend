@@ -691,6 +691,13 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   }),
 }));
 
+export const messagePinnedRelations = relations(messagePinned, ({ one }) => ({
+  message: one(messages, {
+    fields: [messagePinned.messageId],
+    references: [messages.id],
+  }),
+}));
+
 export const notificationDevicesRelations = relations(
   notificationDevices,
   ({ one }) => ({
