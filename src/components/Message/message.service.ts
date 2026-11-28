@@ -394,28 +394,30 @@ export namespace ServiceMessage {
     const targetMessage = await QueryMessage.getSingle({ messageId });
     if (targetMessage === undefined) throw status(404, "Not found");
 
-    return QueryMessagePinned.insertPin({ userId: _userId, messageId, channelId: targetMessage.channelId })
-      .catch((e) => {
-        const E = e as SQLiteError;
-        if (E.code === "SQLITE_CONSTRAINT_UNIQUE")
-          throw status(400, "Already pinned");
-        throw status(500, "Internal error");
-      });
+    return QueryMessagePinned.insertPin({
+      userId: _userId,
+      messageId,
+      channelId: targetMessage.channelId,
+    }).catch((e) => {
+      //重複ピンはunique制約違反で弾かれる(MessagePinned.messageId)
+      if (e instanceof SQLiteError && e.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        throw status(400, "Already pinned");
+      }
+      console.error("message.service :: Pin : e", e);
+      throw status(500, "Internal error");
+    });
   };
 
   export const Unpin = async (messageId: string) => {
     const targetMessage = await QueryMessage.getSingle({ messageId });
     if (targetMessage === undefined) throw status(404, "Not found");
 
-    const [unpinned] = await QueryMessagePinned.remove({ messageId })
-      .catch((e) => {
-        const E = e as SQLiteError;
-        console.error("message.service :: Unpin : E", E);
-        if (E.code === "ENOENT") {
-          throw status(400, "Message is not pinned");
-        }
+    const [unpinned] = await QueryMessagePinned.remove({ messageId }).catch(
+      (e) => {
+        console.error("message.service :: Unpin : e", e);
         throw status(500, "Internal error");
-      });
+      },
+    );
     if (unpinned === undefined) {
       throw status(400, "Message is not pinned");
     }
