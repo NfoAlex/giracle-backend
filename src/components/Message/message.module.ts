@@ -213,10 +213,6 @@ export const message = new Elysia({ prefix: "/message" })
         targetUrl: t.String({ format: "uri" }),
         forFavicon: t.Boolean({ default: false }),
       }),
-      response: {
-        200: t.Any(),
-        400: t.Literal("Failed to fetch thumbnail"),
-      },
       detail: {
         description: "URLプレビュー用に圧縮されたサムネイルを取得します",
         tags: ["Message"],
@@ -252,6 +248,98 @@ export const message = new Elysia({ prefix: "/message" })
       detail: {
         description: "メッセージを削除します",
         tags: ["Message"],
+      },
+    },
+  )
+  .post(
+    "/pin",
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
+      const [pinned] = await ServiceMessage.Pin(_userId, messageId);
+
+      server?.publish(
+        `channel::${pinned.channelId}`,
+        JSON.stringify({
+          signal: "message::Pinned",
+          data: {
+            messageId: pinned.messageId,
+            channelId: pinned.channelId,
+          },
+        }),
+      );
+
+      return {
+        message: "Message pinned",
+        data: pinned,
+      };
+    },
+    {
+      body: t.Object({
+        messageId: t.String(),
+      }),
+      detail: {
+        description: "メッセージをピン留めします",
+        tags: ["Message", "Pin"],
+      },
+    },
+  )
+  .delete(
+    "/pin",
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
+      const unpinned = await ServiceMessage.Unpin(messageId, _userId);
+
+      server?.publish(
+        `channel::${unpinned.channelId}`,
+        JSON.stringify({
+          signal: "message::Unpinned",
+          data: {
+            messageId: unpinned.messageId,
+            channelId: unpinned.channelId,
+          },
+        }),
+      );
+
+      return {
+        message: "Message unpinned",
+        data: unpinned,
+      };
+    },
+    {
+      body: t.Object({
+        messageId: t.String(),
+      }),
+      detail: {
+        description: "メッセージのピン留めを外します",
+        tags: ["Message", "Pin"],
+      },
+    },
+  )
+  .get(
+    "/pin",
+    async ({
+      query: { channelId, cursorMessageId, fetchLength },
+      CheckToken: { _userId },
+    }) => {
+      const pinned = await ServiceMessage.GetPinned(
+        channelId,
+        cursorMessageId,
+        fetchLength ?? 30,
+        _userId,
+      );
+
+      return {
+        message: "Fetched pinned messages",
+        data: pinned,
+      };
+    },
+    {
+      query: t.Object({
+        channelId: t.String({ minLength: 1 }),
+        cursorMessageId: t.Optional(t.String({ minLength: 1 })),
+        fetchLength: t.Optional(t.Integer({ minimum: 1, maximum: 30 })),
+      }),
+      detail: {
+        description: "チャンネルのピン留め一覧をピン留め順で取得します",
+        tags: ["Message", "Pin"],
       },
     },
   )

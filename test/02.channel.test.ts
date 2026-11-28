@@ -6,6 +6,7 @@ import {
   channelViewableRoles,
   inboxes,
   messageFileAttached,
+  messagePinned,
   messageReadTimes,
   messages,
   roleLinks,
@@ -263,6 +264,53 @@ describe("/channel/get-history/:channelId", async () => {
     expect(j.data.history[0].id).toBe(TEST__HISTORY_MSG_B);
     expect(j.data.atEnd).toBeTrue();
     expect(j.data.atTop).toBeTrue();
+  });
+
+  it("正常 :: ピン留めしたメッセージはisPinned=trueで返る", async () => {
+    const pinned = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: TEST__HISTORY_MSG_B },
+    });
+    expect(pinned.ok).toBe(true);
+
+    const res = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: { userId: "TESTUSER" },
+    });
+    const j = await res.json();
+    expect(res.ok).toBe(true);
+
+    const pinnedMessage = j.data.history.find(
+      (m: { id: string }) => m.id === TEST__HISTORY_MSG_B,
+    );
+    const otherMessage = j.data.history.find(
+      (m: { id: string }) => m.id === "TESTMESSAGE1",
+    );
+    expect(pinnedMessage.isPinned).toBe(true);
+    expect(otherMessage.isPinned).toBe(false);
+    //リレーションの生データはレスポンスに混ざらない
+    expect(pinnedMessage.MessagePinned).toBeUndefined();
+
+    const unpinned = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: TEST__HISTORY_MSG_B },
+    });
+    expect(unpinned.ok).toBe(true);
+
+    //後続テストに状態を持ち越さず、解除後はfalseになることも確認
+    const resAfter = await FETCH({
+      path: "/channel/get-history/TESTCHANNEL1",
+      method: "POST",
+      body: { userId: "TESTUSER" },
+    });
+    const jAfter = await resAfter.json();
+    const unpinnedMessage = jAfter.data.history.find(
+      (m: { id: string }) => m.id === TEST__HISTORY_MSG_B,
+    );
+    expect(unpinnedMessage.isPinned).toBe(false);
   });
 
   it("正常 :: 違うポジションから", async () => {
@@ -1110,8 +1158,8 @@ describe("/channel/delete", async () => {
       size: 1,
       type: "image/png",
     });
-    //InboxはMessage削除のrestrictに引っかからないよう、チャンネル削除時に一緒に消えることを確認
-    const [inboxTargetMessage] = await db
+    //削除テストに使うメッセージ
+    const [targetMessage] = await db
       .insert(messages)
       .values({
         channelId: TEST__NEW_CREATED_CHANNELID,
@@ -1119,11 +1167,18 @@ describe("/channel/delete", async () => {
         content: "inbox orphan check",
       })
       .returning();
+    //InboxはMessage削除のrestrictに引っかからないよう、チャンネル削除時に一緒に消えることを確認
     await db.insert(inboxes).values({
       type: "mention",
-      messageId: inboxTargetMessage.id,
+      messageId: targetMessage.id,
       channelId: TEST__NEW_CREATED_CHANNELID,
       userId: "TESTUSER",
+    });
+    //MessagePinned
+    await db.insert(messagePinned).values({
+      messageId: targetMessage.id,
+      pinnedBy: "TESTUSER",
+      channelId: targetMessage.channelId,
     });
 
     const res = await FETCH({
@@ -1158,6 +1213,11 @@ describe("/channel/delete", async () => {
       .from(inboxes)
       .where(eq(inboxes.channelId, TEST__NEW_CREATED_CHANNELID));
     expect(inboxesLeft.length).toBe(0);
+    const pinLeft = await db
+      .select()
+      .from(messagePinned)
+      .where(eq(messagePinned.channelId, TEST__NEW_CREATED_CHANNELID));
+    expect(pinLeft.length).toBe(0);
   });
 
   it("存在しないチャンネルを削除", async () => {

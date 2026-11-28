@@ -126,6 +126,40 @@ export const messages = sqliteTable(
   ],
 );
 
+export const messagePinned = sqliteTable(
+  "MessagePinned",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pinnedBy: text("userId")
+      .notNull()
+      .references(() => users.id, { onUpdate: "cascade" }),
+    messageId: text("messageId")
+      .notNull()
+      .unique()
+      .references(() => messages.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    channelId: text("channelId")
+      .notNull()
+      .references(() => channels.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    //ピン一覧のchannelId + createdAt範囲・ソートを高速化する複合インデックス
+    //(channelId単独の検索もこのインデックスでカバーされる)
+    index("MessagePinned_channelId_createdAt_idx").on(
+      table.channelId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const notificationDevices = sqliteTable(
   "NotificationDevice",
   {
@@ -651,6 +685,17 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   MessageFileAttached: many(messageFileAttached),
   MessageReaction: many(messageReactions),
   MessageUrlPreview: many(messageUrlPreviews),
+  MessagePinned: one(messagePinned, {
+    fields: [messages.id],
+    references: [messagePinned.messageId],
+  }),
+}));
+
+export const messagePinnedRelations = relations(messagePinned, ({ one }) => ({
+  message: one(messages, {
+    fields: [messagePinned.messageId],
+    references: [messages.id],
+  }),
 }));
 
 export const notificationDevicesRelations = relations(

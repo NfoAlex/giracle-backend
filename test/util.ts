@@ -14,6 +14,7 @@ import {
   inboxes,
   invitations,
   messageFileAttached,
+  messagePinned,
   messageReactions,
   messageReadTimes,
   messages,
@@ -72,6 +73,7 @@ export async function INIT() {
   await db.delete(messageReactions);
   await db.delete(messageUrlPreviewThumbnails);
   await db.delete(messageUrlPreviews);
+  await db.delete(messagePinned);
   await db.delete(messages);
   await db.delete(roleLinks);
   await db.delete(roleInfos);

@@ -138,14 +138,20 @@ export namespace ServiceChannel {
     //履歴を取得する
     //新しい方向への取得は昇順で直接取得することで、範囲境界を求める事前クエリを省く
     const fetchNewer = fetchDirection === "newer" && timeFrom !== undefined;
-    const history = await QueryMessage.getHistory({
+    const historyFetched = await QueryMessage.getHistory({
       channelId,
       timeFrom,
       fetchNewer,
       fetchLength,
     });
     //レスポンスは常に新しい順で返す
-    if (fetchNewer) history.reverse();
+    if (fetchNewer) historyFetched.reverse();
+
+    //ピン留めを反映
+    const history = historyFetched.map((message) => {
+      const { MessagePinned, ...messageSplitted } = message;
+      return { isPinned: MessagePinned !== null, ...messageSplitted };
+    });
 
     //履歴の最新・最初まで取得したかどうかを判別するため、取得方向に必要な側のみ取得
     const firstMessageOfChannel =

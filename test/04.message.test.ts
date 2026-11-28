@@ -8,6 +8,7 @@ import {
   channelJoins,
   inboxes,
   messageFileAttached,
+  messagePinned,
   messageReactions,
   messages,
   messageUrlPreviews,
@@ -120,6 +121,7 @@ describe("/message/:messageId", async () => {
     const j = await res.json();
     expect(j.message).toBe("Fetched message");
     expect(j.data.id).toBe("TESTMESSAGE1");
+    expect(j.data.isPinned).toBeFalse();
   });
 
   it("存在しないメッセージ", async () => {
@@ -154,7 +156,6 @@ describe("/message/get-new :: 既読時間無し", async () => {
       method: "GET",
     });
     const j = await res.json();
-    console.log("/message/get-new :: j->", j);
     expect(j.message).toBe("Fetched news");
     expect(j.data.TESTCHANNEL1).toBeFalse();
   });
@@ -224,7 +225,6 @@ describe("/message/get-new :: 既読時間アリ", async () => {
       method: "GET",
     });
     const j = await res.json();
-    console.log("/message/get-new :: j->", j);
     expect(j.message).toBe("Fetched news");
     expect(j.data.TESTCHANNEL1).toBeTrue();
   });
@@ -251,6 +251,7 @@ describe("/message/search", async () => {
     expect(j.message).toBe("Searched messages");
     expect(j.data).toBeArray();
     expect(j.data.length).toBe(1);
+    expect(j.data[0].isPinned).toBeFalse();
   });
 
   it("正常 :: 全探索", async () => {
@@ -2054,6 +2055,363 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
+  });
+});
+
+describe("/message/pin", async () => {
+  it("正常 :: ピン留めされていないメッセージは isPinned が false", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "not pinned",
+      })
+      .returning();
+
+    const res = await FETCH({ path: `/message/${target.id}`, method: "GET" });
+    const j = await res.json();
+    expect(j.data.isPinned).toBeFalse();
+  });
+
+  it("正常 :: メッセージをピン留めする", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.message).toBe("Message pinned");
+    expect(j.data.messageId).toBe("TESTMESSAGE1");
+    expect(j.data.channelId).toBe("TESTCHANNEL1");
+    expect(j.data.pinnedBy).toBe("TESTUSER");
+
+    const pinned = await db.query.messagePinned.findFirst({
+      where: eq(messagePinned.messageId, "TESTMESSAGE1"),
+    });
+    expect(pinned).toBeDefined();
+    expect(pinned?.channelId).toBe("TESTCHANNEL1");
+  });
+
+  it("同じメッセージのピン留めはできない", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const t = await res.text();
+    expect(res.status).toBe(400);
+    expect(res.ok).toBeFalse();
+    expect(t).toBe("Already pinned");
+  });
+
+  it("正常 :: ピン留め済みメッセージは isPinned が true", async () => {
+    const res = await FETCH({ path: "/message/TESTMESSAGE1", method: "GET" });
+    const j = await res.json();
+    expect(j.message).toBe("Fetched message");
+    expect(j.data.isPinned).toBeTrue();
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Not found");
+  });
+
+  it("正常 :: メッセージのピンを外す", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.message).toBe("Message unpinned");
+    expect(j.data.messageId).toBe("TESTMESSAGE1");
+
+    //DBからピンが消えている
+    expect(
+      await db.query.messagePinned.findFirst({
+        where: eq(messagePinned.messageId, "TESTMESSAGE1"),
+      }),
+    ).toBeUndefined();
+
+    //取得結果のisPinnedもfalseに戻る
+    const getRes = await FETCH({
+      path: "/message/TESTMESSAGE1",
+      method: "GET",
+    });
+    const getJ = await getRes.json();
+    expect(getJ.data.isPinned).toBeFalse();
+  });
+
+  it("すでに外されたメッセージを再度外そうとする", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const t = await res.text();
+    expect(res.status).toBe(400);
+    expect(res.ok).toBeFalse();
+    expect(t).toBe("Message is not pinned");
+  });
+
+  it("存在しないメッセージのピン解除", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    expect(res.status).toBe(404);
+    expect(res.ok).toBeFalse();
+    expect(await res.text()).toBe("Not found");
+  });
+
+  it("閲覧できないチャンネルのメッセージはピン留めできない", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL3",
+        userId: "TESTUSER",
+        content: "private channel pin target",
+      })
+      .returning();
+
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: target.id },
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Not found");
+
+    //ピンは作られていない
+    expect(
+      await db.query.messagePinned.findFirst({
+        where: eq(messagePinned.messageId, target.id),
+      }),
+    ).toBeUndefined();
+  });
+
+  it("閲覧できないチャンネルのピンは解除できない", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL3",
+        userId: "TESTUSER",
+        content: "private channel pinned message",
+      })
+      .returning();
+
+    const pinned = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: target.id },
+    });
+    expect(pinned.status).toBe(200);
+
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: target.id },
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Not found");
+
+    //ピンは残っている
+    expect(
+      await db.query.messagePinned.findFirst({
+        where: eq(messagePinned.messageId, target.id),
+      }),
+    ).toBeDefined();
+
+    //後片付け
+    const cleanup = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: target.id },
+    });
+    expect(cleanup.status).toBe(200);
+  });
+});
+
+describe("GET /message/pin", async () => {
+  //同一ファイル内の先行テストが TESTCHANNEL1 にピンを残しうるため、
+  //全件一致ではなく自作メッセージの順序・包含だけを確認する
+  const createMessage = async (content: string) => {
+    const [row] = await db
+      .insert(messages)
+      .values({ channelId: "TESTCHANNEL1", userId: "TESTUSER", content })
+      .returning();
+    return row;
+  };
+
+  const pin = async (messageId: string) => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId },
+    });
+    expect(res.status).toBe(200);
+  };
+
+  it("正常 :: ピン留め順で新しい順に返る", async () => {
+    const contents = ["pin-list-oldest", "pin-list-middle", "pin-list-newest"];
+    for (const content of contents) {
+      const message = await createMessage(content);
+      await pin(message.id);
+    }
+
+    //他チャンネルのピンが混入しないことを確認する(TESTUSERはTESTCHANNEL3を閲覧できる)
+    const [other] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL3",
+        userId: "TESTUSER",
+        content: "pin-list-other-channel",
+      })
+      .returning();
+    await pin(other.id);
+
+    const res = await FETCH({
+      path: "/message/pin?channelId=TESTCHANNEL1&fetchLength=30",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.message).toBe("Fetched pinned messages");
+
+    const mine = j.data.filter((m: { content: string }) =>
+      contents.includes(m.content),
+    );
+    expect(mine.map((m: { content: string }) => m.content)).toEqual([
+      "pin-list-newest",
+      "pin-list-middle",
+      "pin-list-oldest",
+    ]);
+
+    for (const item of mine) {
+      expect(item.channelId).toBe("TESTCHANNEL1");
+      expect(item.isPinned).toBeTrue();
+      expect(item.pinnedBy).toBe("TESTUSER");
+      expect(typeof item.pinnedAt).toBe("string");
+    }
+
+    expect(
+      j.data.some(
+        (m: { content: string }) => m.content === "pin-list-other-channel",
+      ),
+    ).toBeFalse();
+
+    //後片付け
+    const cleanup = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: other.id },
+    });
+    expect(cleanup.status).toBe(200);
+  });
+
+  it("正常 :: カーソルで継続取得できカーソル自身は含まれない", async () => {
+    const contents = [
+      "pin-cursor-oldest",
+      "pin-cursor-middle",
+      "pin-cursor-newest",
+    ];
+    for (const content of contents) {
+      const message = await createMessage(content);
+      await pin(message.id);
+    }
+
+    //直近にピン留めした1件がカーソルになる
+    const pageOne = await FETCH({
+      path: "/message/pin?channelId=TESTCHANNEL1&fetchLength=1",
+      method: "GET",
+    });
+    const j1 = await pageOne.json();
+    expect(pageOne.status).toBe(200);
+    expect(j1.data).toHaveLength(1);
+    expect(j1.data[0].content).toBe("pin-cursor-newest");
+    const cursorMessageId = j1.data[0].id as string;
+
+    const pageTwo = await FETCH({
+      path: `/message/pin?channelId=TESTCHANNEL1&fetchLength=30&cursorMessageId=${cursorMessageId}`,
+      method: "GET",
+    });
+    const j2 = await pageTwo.json();
+    expect(pageTwo.status).toBe(200);
+    expect(
+      j2.data.some((m: { id: string }) => m.id === cursorMessageId),
+    ).toBeFalse();
+    expect(
+      j2.data.some(
+        (m: { content: string }) => m.content === "pin-cursor-middle",
+      ),
+    ).toBeTrue();
+    expect(
+      j2.data.some(
+        (m: { content: string }) => m.content === "pin-cursor-oldest",
+      ),
+    ).toBeTrue();
+  });
+
+  it("異常 :: 閲覧できないチャンネルは404", async () => {
+    const res = await FETCH({
+      path: "/message/pin?channelId=TESTCHANNEL3",
+      method: "GET",
+      useSecondaryUser: true,
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Channel not found");
+  });
+
+  it("異常 :: 不正カーソルは404", async () => {
+    const missing = await FETCH({
+      path: "/message/pin?channelId=TESTCHANNEL1&cursorMessageId=NOTEXIST",
+      method: "GET",
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).toBe("Message cursor position not found");
+
+    //他チャンネルのピンIDをカーソルに使っても存在確認の oracle にしない
+    const target = await createMessage("pin-cursor-oracle");
+    await pin(target.id);
+
+    const list = await FETCH({ path: "/channel/list", method: "GET" });
+    const listJ = await list.json();
+    const other = (listJ.data as { id: string }[]).find(
+      (c) => c.id !== "TESTCHANNEL1",
+    );
+    //可視チャンネルが1つしか無い場合はクロスチャンネル検証を省略する
+    if (other === undefined) return;
+
+    const cross = await FETCH({
+      path: `/message/pin?channelId=${other.id}&cursorMessageId=${target.id}`,
+      method: "GET",
+    });
+    expect(cross.status).toBe(404);
+    expect(await cross.text()).toBe("Message cursor position not found");
+  });
+
+  it("正常 :: fetchLength で件数制限", async () => {
+    const message = await createMessage("pin-list-limit-target");
+    await pin(message.id);
+
+    const res = await FETCH({
+      path: "/message/pin?channelId=TESTCHANNEL1&fetchLength=1",
+      method: "GET",
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.data).toHaveLength(1);
   });
 });
 

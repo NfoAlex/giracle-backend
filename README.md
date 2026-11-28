@@ -164,6 +164,9 @@ giracle-backend/
 | DELETE   | `/message/delete-emoji-reaction` | ✅   | -    | 絵文字リアクション削除（WS通知: `message::DeleteReaction`）           |
 | POST     | `/message/send`                  | ✅   | -    | メッセージ送信（WS通知: `message::SendMessage`、URLプレビュー生成）   |
 | POST     | `/message/edit`                  | ✅   | -    | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
+| POST     | `/message/pin`                   | ✅   | -    | メッセージをピン留め（WS通知: `message::Pinned`）                     |
+| DELETE   | `/message/pin`                   | ✅   | -    | ピン留めを解除（WS通知: `message::Unpinned`）                         |
+| GET      | `/message/pin`                   | ✅   | -    | チャンネルのピン留め一覧（messageIdカーソル、ピン留め順）            |
 
 ---
 
@@ -288,6 +291,8 @@ Cookie 認証のため `Origin` ヘッダが必須。`CORS_ORIGIN` 設定時は�
 | `message::UpdateMessage`      | メッセージ編集 / URLプレビュー更新 |
 | `message::MessageDeleted`     | メッセージ削除                     |
 | `message::ReadTimeUpdated`    | 既読時刻更新                       |
+| `message::Pinned`             | ピン留め                           |
+| `message::Unpinned`           | ピン解除                           |
 | `message::AddReaction`        | リアクション追加                   |
 | `message::DeleteReaction`     | リアクション削除                   |
 | `inbox::Added`                | 通知追加（mention / reply）        |

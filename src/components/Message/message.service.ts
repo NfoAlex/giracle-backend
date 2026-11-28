@@ -1,3 +1,4 @@
+import { SQLiteError } from "bun:sqlite";
 import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { status } from "elysia";
@@ -9,6 +10,7 @@ import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryInbox } from "../../queries/inbox.query";
 import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
+import { QueryMessagePinned } from "../../queries/messagePinned.query";
 import { QueryMessageReaction } from "../../queries/messageReaction.query";
 import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
 import { QueryMessageUrlPreview } from "../../queries/messageUrlPreview.query";
@@ -31,7 +33,10 @@ export namespace ServiceMessage {
       throw status(404, "Message not found");
     }
 
-    return messageData;
+    //ピン留めリレーションは存在有無だけをboolで返す(drizzleのoneは未存在でnull)
+    const { MessagePinned, ...message } = messageData;
+
+    return { ...message, isPinned: MessagePinned !== null };
   };
 
   export const GetNew = async (_userId: string) => {
@@ -137,7 +142,7 @@ export namespace ServiceMessage {
     }
 
     //メッセージを検索する
-    return await QueryMessage.search({
+    const messagesFound = await QueryMessage.search({
       content,
       channelId,
       viewableChannelIds,
@@ -146,6 +151,11 @@ export namespace ServiceMessage {
       hasFileAttachment,
       loadIndex,
       sort,
+    });
+
+    return messagesFound.map((m) => {
+      const { MessagePinned, ...message } = m;
+      return { isPinned: MessagePinned !== null, ...message };
     });
   };
 
@@ -377,6 +387,100 @@ export namespace ServiceMessage {
     });
 
     return messageData;
+  };
+
+  export const Pin = async (_userId: string, messageId: string) => {
+    const targetMessage = await QueryMessage.getSingleWithMinimum({
+      messageId,
+    });
+    if (targetMessage === undefined) throw status(404, "Not found");
+    //閲覧できないチャンネルのメッセージは存在しない扱いにする(存在確認のoracleにしない)
+    if (
+      !(await Util.checkChannelVisibility(targetMessage.channelId, _userId))
+    ) {
+      throw status(404, "Not found");
+    }
+
+    return QueryMessagePinned.insertPin({
+      userId: _userId,
+      messageId,
+      channelId: targetMessage.channelId,
+    }).catch((e) => {
+      //重複ピンはunique制約違反で弾かれる(MessagePinned.messageId)
+      if (e instanceof SQLiteError && e.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        throw status(400, "Already pinned");
+      }
+      console.error("message.service :: Pin : e", e);
+      throw status(500, "Internal error");
+    });
+  };
+
+  export const Unpin = async (messageId: string, _userId: string) => {
+    const targetMessage = await QueryMessage.getSingleWithMinimum({
+      messageId,
+    });
+    if (targetMessage === undefined) throw status(404, "Not found");
+    //閲覧できないチャンネルのピンは外せない
+    if (
+      !(await Util.checkChannelVisibility(targetMessage.channelId, _userId))
+    ) {
+      throw status(404, "Not found");
+    }
+
+    const [unpinned] = await QueryMessagePinned.remove({ messageId }).catch(
+      (e) => {
+        console.error("message.service :: Unpin : e", e);
+        throw status(500, "Internal error");
+      },
+    );
+    if (unpinned === undefined) {
+      throw status(400, "Message is not pinned");
+    }
+
+    return unpinned;
+  };
+
+  export const GetPinned = async (
+    channelId: string,
+    cursorMessageId: string | undefined,
+    fetchLength: number,
+    _userId: string,
+  ) => {
+    //チャンネルの存在確認
+    const channel = await QueryChannel.getSingleId({ channelId });
+    if (channel === undefined) {
+      throw status(404, "Channel not found");
+    }
+    //チャンネルへのアクセス権限があるか調べる
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
+      throw status(404, "Channel not found");
+    }
+
+    let cursor: { createdAt: Date; id: number } | undefined;
+    if (cursorMessageId !== undefined) {
+      const cursorPin = await QueryMessagePinned.getCursorPin({
+        messageId: cursorMessageId,
+      });
+      //他チャンネルのピンをカーソルに使っても存在確認のoracleにしない
+      if (cursorPin === undefined || cursorPin.channelId !== channelId) {
+        throw status(404, "Message cursor position not found");
+      }
+      cursor = { createdAt: cursorPin.createdAt, id: cursorPin.id };
+    }
+
+    const pins = await QueryMessagePinned.listByChannel({
+      channelId,
+      cursor,
+      fetchLength,
+    });
+
+    //履歴・検索と同じアイテム形(relations付きメッセージ+isPinned)にピン留め情報を足す
+    return pins.map(({ message, pinnedBy, createdAt }) => ({
+      ...message,
+      isPinned: true as const,
+      pinnedBy,
+      pinnedAt: createdAt,
+    }));
   };
 
   export const GetInbox = async (_userId: string) => {
