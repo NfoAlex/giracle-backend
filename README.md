@@ -166,6 +166,7 @@ giracle-backend/
 | POST     | `/message/edit`                  | ✅   | -    | メッセージ編集（WS通知: `message::UpdateMessage`、URLプレビュー更新） |
 | POST     | `/message/pin`                   | ✅   | -    | メッセージをピン留め（WS通知: `message::Pinned`）                     |
 | DELETE   | `/message/pin`                   | ✅   | -    | ピン留めを解除（WS通知: `message::Unpinned`）                         |
+| GET      | `/message/pin`                   | ✅   | -    | チャンネルのピン留め一覧（messageIdカーソル、ピン留め順）            |
 
 ---
 
