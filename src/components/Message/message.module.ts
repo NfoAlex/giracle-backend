@@ -257,12 +257,23 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .post(
     "/pin",
-    async ({ body: { messageId }, CheckToken: { _userId } }) => {
-      const [msg] = await ServiceMessage.Pin(_userId, messageId);
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
+      const [pinned] = await ServiceMessage.Pin(_userId, messageId);
+
+      server?.publish(
+        `channel::${pinned.channelId}`,
+        JSON.stringify({
+          signal: "message::Pinned",
+          data: {
+            messageId: pinned.messageId,
+            channelId: pinned.channelId,
+          },
+        }),
+      );
 
       return {
         message: "Message pinned",
-        data: msg,
+        data: pinned,
       };
     },
     {
@@ -277,8 +288,19 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/pin",
-    async ({ body: { messageId } }) => {
+    async ({ body: { messageId }, server }) => {
       const unpinned = await ServiceMessage.Unpin(messageId);
+
+      server?.publish(
+        `channel::${unpinned.channelId}`,
+        JSON.stringify({
+          signal: "message::Unpinned",
+          data: {
+            messageId: unpinned.messageId,
+            channelId: unpinned.channelId,
+          },
+        }),
+      );
 
       return {
         message: "Message unpinned",
