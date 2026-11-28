@@ -2100,7 +2100,8 @@ describe("/message/pin", async () => {
       method: "POST",
       body: { messageId: "TESTMESSAGE1" },
     });
-    const t = await res.clone().text();
+    const t = await res.text();
+    expect(res.status).toBe(400);
     expect(res.ok).toBeFalse();
     expect(t).toBe("Already pinned");
   });
@@ -2126,22 +2127,50 @@ describe("/message/pin", async () => {
     const res = await FETCH({
       path: "/message/pin",
       method: "DELETE",
-      body: { messageId: "TESTMESSAGE1" }
+      body: { messageId: "TESTMESSAGE1" },
     });
     const j = await res.json();
+    expect(res.status).toBe(200);
     expect(j.message).toBe("Message unpinned");
     expect(j.data.messageId).toBe("TESTMESSAGE1");
+
+    //DBからピンが消えている
+    expect(
+      await db.query.messagePinned.findFirst({
+        where: eq(messagePinned.messageId, "TESTMESSAGE1"),
+      }),
+    ).toBeUndefined();
+
+    //取得結果のisPinnedもfalseに戻る
+    const getRes = await FETCH({
+      path: "/message/TESTMESSAGE1",
+      method: "GET",
+    });
+    const getJ = await getRes.json();
+    expect(getJ.data.isPinned).toBeFalse();
   });
 
   it("すでに外されたメッセージを再度外そうとする", async () => {
     const res = await FETCH({
       path: "/message/pin",
       method: "DELETE",
-      body: { messageId: "TESTMESSAGE1" }
+      body: { messageId: "TESTMESSAGE1" },
     });
     const t = await res.text();
+    expect(res.status).toBe(400);
+    expect(res.ok).toBeFalse();
     expect(t).toBe("Message is not pinned");
-    console.log("04.message :: /message/pin : t", t);
+  });
+
+  it("存在しないメッセージのピン解除", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    expect(res.status).toBe(404);
+    expect(res.ok).toBeFalse();
+    expect(await res.text()).toBe("Not found");
   });
 });
 
