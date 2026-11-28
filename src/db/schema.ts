@@ -6,6 +6,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  unique,
 } from "drizzle-orm/sqlite-core";
 
 // ============================================================
@@ -123,6 +124,39 @@ export const messages = sqliteTable(
       table.createdAt,
     ),
     index("Message_userId_idx").on(table.userId),
+  ],
+);
+
+export const messagePinned = sqliteTable(
+  "MessagePinned",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pinnedBy: text("userId")
+      .notNull()
+      .references(() => users.id, { onUpdate: "cascade" }),
+    messageId: text("messageId")
+      .notNull()
+      .unique()
+      .references(() => messages.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    channelId: text("channelId")
+      .notNull()
+      .references(() => channels.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("MessagePinned_channelId_idx").on(table.channelId),
+    unique("MessagePinned_channelId_messageId_uq").on(
+      table.channelId,
+      table.messageId,
+    ),
+    //GetHistoryのchannelId + createdAt範囲・ソートを高速化する複合インデックス
+    //(channelId単独の検索もこのインデックスでカバーされる)
+    index("MessagePinned_channelId_createdAt_idx").on(
+      table.channelId,
+      table.createdAt,
+    ),
   ],
 );
 
