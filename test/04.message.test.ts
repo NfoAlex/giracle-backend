@@ -120,6 +120,7 @@ describe("/message/:messageId", async () => {
     const j = await res.json();
     expect(j.message).toBe("Fetched message");
     expect(j.data.id).toBe("TESTMESSAGE1");
+    expect(j.data.isPinned).toBeFalse();
   });
 
   it("存在しないメッセージ", async () => {
@@ -251,6 +252,7 @@ describe("/message/search", async () => {
     expect(j.message).toBe("Searched messages");
     expect(j.data).toBeArray();
     expect(j.data.length).toBe(1);
+    expect(j.data[0].isPinned).toBeFalse();
   });
 
   it("正常 :: 全探索", async () => {

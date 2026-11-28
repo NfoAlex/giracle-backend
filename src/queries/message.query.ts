@@ -46,7 +46,12 @@ export namespace QueryMessage {
       with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
-      },
+        MessagePinned: {
+          columns: {
+            id: true,
+          },
+        },
+      }
     });
   };
 
@@ -230,6 +235,11 @@ export namespace QueryMessage {
       with: {
         MessageUrlPreview: true,
         MessageFileAttached: true,
+        MessagePinned: {
+          columns: {
+            id: true
+          }
+        }
       },
       limit: SEARCH_PAGE_SIZE,
       offset: messageSkipping,

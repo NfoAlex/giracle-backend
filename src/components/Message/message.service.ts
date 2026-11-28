@@ -31,7 +31,10 @@ export namespace ServiceMessage {
       throw status(404, "Message not found");
     }
 
-    return messageData;
+    //ピン留めリレーションは存在有無だけをboolで返す(drizzleのoneは未存在でnull)
+    const { MessagePinned, ...message } = messageData;
+
+    return { ...message, isPinned: MessagePinned !== null };
   };
 
   export const GetNew = async (_userId: string) => {
@@ -137,7 +140,7 @@ export namespace ServiceMessage {
     }
 
     //メッセージを検索する
-    return await QueryMessage.search({
+    const messagesFound = await QueryMessage.search({
       content,
       channelId,
       viewableChannelIds,
@@ -147,6 +150,11 @@ export namespace ServiceMessage {
       loadIndex,
       sort,
     });
+
+    return messagesFound.map((m) => {
+      const { MessagePinned, ...message } = m;
+      return { isPinned: MessagePinned !== null, ...message };
+    })
   };
 
   export const UploadFile = async (
