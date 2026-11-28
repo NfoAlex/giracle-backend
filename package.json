@@ -1,6 +1,6 @@
 {
   "name": "giracle-backend",
-  "version": "0.28.1-alpha",
+  "version": "0.28.2-alpha",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -19,7 +19,7 @@
     "@libsql/client": "^0.17.4",
     "drizzle-orm": "^0.45.4",
     "elysia": "^1.4.32",
-    "image-size": "^2.1.0",
+    "image-size": "^2.2.0",
     "open-graph-scraper": "^6.13.0",
     "sharp": "^0.35.5",
     "undici": "^7.30.2",
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
     "@types/web-push": "^3.6.4",
-    "bun-types": "^1.4.4",
+    "bun-types": "^1.4.5",
     "drizzle-kit": "^0.31.11"
   },
   "module": "src/index.js"
