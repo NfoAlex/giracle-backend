@@ -335,7 +335,7 @@ export const message = new Elysia({ prefix: "/message" })
       query: t.Object({
         channelId: t.String({ minLength: 1 }),
         cursorMessageId: t.Optional(t.String({ minLength: 1 })),
-        fetchLength: t.Optional(t.Number({ minimum: 1, maximum: 30 })),
+        fetchLength: t.Optional(t.Integer({ minimum: 1, maximum: 30 })),
       }),
       detail: {
         description: "チャンネルのピン留め一覧をピン留め順で取得します",

@@ -2270,6 +2270,17 @@ describe("GET /message/pin", async () => {
       await pin(message.id);
     }
 
+    //他チャンネルのピンが混入しないことを確認する(TESTUSERはTESTCHANNEL3を閲覧できる)
+    const [other] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL3",
+        userId: "TESTUSER",
+        content: "pin-list-other-channel",
+      })
+      .returning();
+    await pin(other.id);
+
     const res = await FETCH({
       path: "/message/pin?channelId=TESTCHANNEL1&fetchLength=30",
       method: "GET",
@@ -2293,6 +2304,20 @@ describe("GET /message/pin", async () => {
       expect(item.pinnedBy).toBe("TESTUSER");
       expect(typeof item.pinnedAt).toBe("string");
     }
+
+    expect(
+      j.data.some(
+        (m: { content: string }) => m.content === "pin-list-other-channel",
+      ),
+    ).toBeFalse();
+
+    //後片付け
+    const cleanup = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: other.id },
+    });
+    expect(cleanup.status).toBe(200);
   });
 
   it("正常 :: カーソルで継続取得できカーソル自身は含まれない", async () => {
@@ -2377,6 +2402,9 @@ describe("GET /message/pin", async () => {
   });
 
   it("正常 :: fetchLength で件数制限", async () => {
+    const message = await createMessage("pin-list-limit-target");
+    await pin(message.id);
+
     const res = await FETCH({
       path: "/message/pin?channelId=TESTCHANNEL1&fetchLength=1",
       method: "GET",

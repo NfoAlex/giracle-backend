@@ -380,7 +380,6 @@ export namespace ServiceMessage {
     //DB上の関連データを子→親の順にまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
     db.transaction((tx) => {
       QueryMessageUrlPreview.removeByMessageInTx(tx, { messageId });
-      QueryMessagePinned.removeInTx(tx, { messageId });
       QueryMessageReaction.removeByMessageInTx(tx, { messageId });
       QueryMessageFileAttached.removeByMessageInTx(tx, { messageId });
       QueryInbox.removeByMessageInTx(tx, { messageId });

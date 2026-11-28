@@ -3,9 +3,6 @@ import { db } from "..";
 import { messagePinned } from "../db/schema";
 
 export namespace QueryMessagePinned {
-  //bun-sqliteの同期トランザクション。呼び出し側のdb.transactionから受け取る
-  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
   export const insertPin = (query: {
     userId: string;
     channelId: string;
@@ -66,13 +63,5 @@ export namespace QueryMessagePinned {
       orderBy: [desc(messagePinned.createdAt), desc(messagePinned.id)],
       limit: query.fetchLength,
     });
-  };
-
-  export const removeInTx = (tx: Tx, query: { messageId: string }) => {
-    return tx
-      .delete(messagePinned)
-      .where(eq(messagePinned.messageId, query.messageId))
-      .returning({ id: messagePinned.id })
-      .run();
   };
 }

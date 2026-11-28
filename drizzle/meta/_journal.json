@@ -141,6 +141,13 @@
       "when": 1795856250147,
       "tag": "0019_overrated_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1795875830427,
+      "tag": "0020_chief_midnight",
+      "breakpoints": true
     }
   ]
 }

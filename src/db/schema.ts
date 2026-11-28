@@ -6,7 +6,6 @@ import {
   primaryKey,
   sqliteTable,
   text,
-  unique,
 } from "drizzle-orm/sqlite-core";
 
 // ============================================================
@@ -152,12 +151,7 @@ export const messagePinned = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [
-    index("MessagePinned_channelId_idx").on(table.channelId),
-    unique("MessagePinned_channelId_messageId_uq").on(
-      table.channelId,
-      table.messageId,
-    ),
-    //GetHistoryのchannelId + createdAt範囲・ソートを高速化する複合インデックス
+    //ピン一覧のchannelId + createdAt範囲・ソートを高速化する複合インデックス
     //(channelId単独の検索もこのインデックスでカバーされる)
     index("MessagePinned_channelId_createdAt_idx").on(
       table.channelId,
