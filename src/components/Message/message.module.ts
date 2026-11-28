@@ -288,8 +288,8 @@ export const message = new Elysia({ prefix: "/message" })
   )
   .delete(
     "/pin",
-    async ({ body: { messageId }, server }) => {
-      const unpinned = await ServiceMessage.Unpin(messageId);
+    async ({ body: { messageId }, CheckToken: { _userId }, server }) => {
+      const unpinned = await ServiceMessage.Unpin(messageId, _userId);
 
       server?.publish(
         `channel::${unpinned.channelId}`,

@@ -391,8 +391,16 @@ export namespace ServiceMessage {
   };
 
   export const Pin = async (_userId: string, messageId: string) => {
-    const targetMessage = await QueryMessage.getSingle({ messageId });
+    const targetMessage = await QueryMessage.getSingleWithMinimum({
+      messageId,
+    });
     if (targetMessage === undefined) throw status(404, "Not found");
+    //閲覧できないチャンネルのメッセージは存在しない扱いにする(存在確認のoracleにしない)
+    if (
+      !(await Util.checkChannelVisibility(targetMessage.channelId, _userId))
+    ) {
+      throw status(404, "Not found");
+    }
 
     return QueryMessagePinned.insertPin({
       userId: _userId,
@@ -408,9 +416,17 @@ export namespace ServiceMessage {
     });
   };
 
-  export const Unpin = async (messageId: string) => {
-    const targetMessage = await QueryMessage.getSingle({ messageId });
+  export const Unpin = async (messageId: string, _userId: string) => {
+    const targetMessage = await QueryMessage.getSingleWithMinimum({
+      messageId,
+    });
     if (targetMessage === undefined) throw status(404, "Not found");
+    //閲覧できないチャンネルのピンは外せない
+    if (
+      !(await Util.checkChannelVisibility(targetMessage.channelId, _userId))
+    ) {
+      throw status(404, "Not found");
+    }
 
     const [unpinned] = await QueryMessagePinned.remove({ messageId }).catch(
       (e) => {
