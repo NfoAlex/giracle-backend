@@ -262,7 +262,7 @@ export const message = new Elysia({ prefix: "/message" })
 
       return {
         message: "Message pinned",
-        data: msg
+        data: msg,
       };
     },
     {
@@ -273,7 +273,7 @@ export const message = new Elysia({ prefix: "/message" })
         description: "メッセージをピン留めします",
         tags: ["Message", "Pin"],
       },
-    }
+    },
   )
   .delete(
     "/pin",
@@ -282,18 +282,18 @@ export const message = new Elysia({ prefix: "/message" })
 
       return {
         message: "Message unpinned",
-        data: unpinned
+        data: unpinned,
       };
     },
     {
       body: t.Object({
-        messageId: t.String()
+        messageId: t.String(),
       }),
       detail: {
         description: "メッセージのピン留めを外します",
         tags: ["Message", "Pin"],
       },
-    }
+    },
   )
   .get(
     "/inbox",

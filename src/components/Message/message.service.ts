@@ -1,22 +1,22 @@
+import { SQLiteError } from "bun:sqlite";
 import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import { SQLiteError } from "bun:sqlite";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import { messagePinned, type Message } from "../../db/schema";
+import type { Message } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryInbox } from "../../queries/inbox.query";
 import { QueryMessage } from "../../queries/message.query";
 import { QueryMessageFileAttached } from "../../queries/messageFileAttached.query";
+import { QueryMessagePinned } from "../../queries/messagePinned.query";
 import { QueryMessageReaction } from "../../queries/messageReaction.query";
 import { QueryMessageReadTime } from "../../queries/messageReadTime.query";
 import { QueryMessageUrlPreview } from "../../queries/messageUrlPreview.query";
 import { QueryMessageUrlPreviewThumbnail } from "../../queries/messageUrlPreviewThumbnail.query";
 import { QueryRoleLink } from "../../queries/roleLink.query";
 import { Util } from "../../Util";
-import { QueryMessagePinned } from "../../queries/messagePinned.query";
 
 export namespace ServiceMessage {
   export const Get = async (messageId: string, _userId: string) => {
@@ -156,7 +156,7 @@ export namespace ServiceMessage {
     return messagesFound.map((m) => {
       const { MessagePinned, ...message } = m;
       return { isPinned: MessagePinned !== null, ...message };
-    })
+    });
   };
 
   export const UploadFile = async (
