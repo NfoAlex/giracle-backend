@@ -2121,6 +2121,28 @@ describe("/message/pin", async () => {
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Not found");
   });
+
+  it("正常 :: メッセージのピンを外す", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE1" }
+    });
+    const j = await res.json();
+    expect(j.message).toBe("Message unpinned");
+    expect(j.data.messageId).toBe("TESTMESSAGE1");
+  });
+
+  it("すでに外されたメッセージを再度外そうとする", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "DELETE",
+      body: { messageId: "TESTMESSAGE1" }
+    });
+    const t = await res.text();
+    expect(t).toBe("Message is not pinned");
+    console.log("04.message :: /message/pin : t", t);
+  });
 });
 
 describe("/message/delete", async () => {

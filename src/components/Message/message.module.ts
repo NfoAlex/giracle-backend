@@ -263,12 +263,36 @@ export const message = new Elysia({ prefix: "/message" })
       return {
         message: "Message pinned",
         data: msg
-      }
+      };
     },
     {
       body: t.Object({
         messageId: t.String(),
-      })
+      }),
+      detail: {
+        description: "メッセージをピン留めします",
+        tags: ["Message", "Pin"],
+      },
+    }
+  )
+  .delete(
+    "/pin",
+    async ({ body: { messageId } }) => {
+      const unpinned = await ServiceMessage.Unpin(messageId);
+
+      return {
+        message: "Message unpinned",
+        data: unpinned
+      };
+    },
+    {
+      body: t.Object({
+        messageId: t.String()
+      }),
+      detail: {
+        description: "メッセージのピン留めを外します",
+        tags: ["Message", "Pin"],
+      },
     }
   )
   .get(

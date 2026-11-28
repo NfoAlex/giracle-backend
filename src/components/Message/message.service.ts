@@ -404,7 +404,23 @@ export namespace ServiceMessage {
   };
 
   export const Unpin = async (messageId: string) => {
-    return QueryMessagePinned.remove({ messageId });
+    const targetMessage = await QueryMessage.getSingle({ messageId });
+    if (targetMessage === undefined) throw status(404, "Not found");
+
+    const [unpinned] = await QueryMessagePinned.remove({ messageId })
+      .catch((e) => {
+        const E = e as SQLiteError;
+        console.error("message.service :: Unpin : E", E);
+        if (E.code === "ENOENT") {
+          throw status(400, "Message is not pinned");
+        }
+        throw status(500, "Internal error");
+      });
+    if (unpinned === undefined) {
+      throw status(400, "Message is not pinned");
+    }
+
+    return unpinned;
   };
 
   export const GetInbox = async (_userId: string) => {
