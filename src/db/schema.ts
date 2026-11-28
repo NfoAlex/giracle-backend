@@ -685,6 +685,10 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   MessageFileAttached: many(messageFileAttached),
   MessageReaction: many(messageReactions),
   MessageUrlPreview: many(messageUrlPreviews),
+  MessagePinned: one(messagePinned, {
+    fields: [messages.id],
+    references: [messagePinned.messageId],
+  }),
 }));
 
 export const notificationDevicesRelations = relations(

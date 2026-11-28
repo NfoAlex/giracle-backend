@@ -134,6 +134,13 @@
       "when": 1795355699168,
       "tag": "0018_third_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1795856250147,
+      "tag": "0019_overrated_harpoon",
+      "breakpoints": true
     }
   ]
 }
