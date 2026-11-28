@@ -1,9 +1,10 @@
 import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
+import { SQLiteError } from "bun:sqlite";
 import { status } from "elysia";
 import sharp from "sharp";
 import { db, GIRACLE_SERVER_CONFIG } from "../..";
-import type { Message } from "../../db/schema";
+import { messagePinned, type Message } from "../../db/schema";
 import { QueryChannel } from "../../queries/channel.query";
 import { QueryChannelJoin } from "../../queries/channelJoin.query";
 import { QueryInbox } from "../../queries/inbox.query";
@@ -15,6 +16,7 @@ import { QueryMessageUrlPreview } from "../../queries/messageUrlPreview.query";
 import { QueryMessageUrlPreviewThumbnail } from "../../queries/messageUrlPreviewThumbnail.query";
 import { QueryRoleLink } from "../../queries/roleLink.query";
 import { Util } from "../../Util";
+import { QueryMessagePinned } from "../../queries/messagePinned.query";
 
 export namespace ServiceMessage {
   export const Get = async (messageId: string, _userId: string) => {
@@ -378,6 +380,7 @@ export namespace ServiceMessage {
     //DB上の関連データを子→親の順にまとめて削除(途中失敗による孤児データ防止のため1トランザクションにまとめる)
     db.transaction((tx) => {
       QueryMessageUrlPreview.removeByMessageInTx(tx, { messageId });
+      QueryMessagePinned.removeInTx(tx, { messageId });
       QueryMessageReaction.removeByMessageInTx(tx, { messageId });
       QueryMessageFileAttached.removeByMessageInTx(tx, { messageId });
       QueryInbox.removeByMessageInTx(tx, { messageId });
@@ -385,6 +388,23 @@ export namespace ServiceMessage {
     });
 
     return messageData;
+  };
+
+  export const Pin = async (_userId: string, messageId: string) => {
+    const targetMessage = await QueryMessage.getSingle({ messageId });
+    if (targetMessage === undefined) throw status(404, "Not found");
+
+    return QueryMessagePinned.insertPin({ userId: _userId, messageId, channelId: targetMessage.channelId })
+      .catch((e) => {
+        const E = e as SQLiteError;
+        if (E.code === "SQLITE_CONSTRAINT_UNIQUE")
+          throw status(400, "Already pinned");
+        throw status(500, "Internal error");
+      });
+  };
+
+  export const Unpin = async (messageId: string) => {
+    return QueryMessagePinned.remove({ messageId });
   };
 
   export const GetInbox = async (_userId: string) => {

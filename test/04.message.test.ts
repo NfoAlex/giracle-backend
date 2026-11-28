@@ -8,6 +8,7 @@ import {
   channelJoins,
   inboxes,
   messageFileAttached,
+  messagePinned,
   messageReactions,
   messages,
   messageUrlPreviews,
@@ -155,7 +156,6 @@ describe("/message/get-new :: 既読時間無し", async () => {
       method: "GET",
     });
     const j = await res.json();
-    console.log("/message/get-new :: j->", j);
     expect(j.message).toBe("Fetched news");
     expect(j.data.TESTCHANNEL1).toBeFalse();
   });
@@ -225,7 +225,6 @@ describe("/message/get-new :: 既読時間アリ", async () => {
       method: "GET",
     });
     const j = await res.json();
-    console.log("/message/get-new :: j->", j);
     expect(j.message).toBe("Fetched news");
     expect(j.data.TESTCHANNEL1).toBeTrue();
   });
@@ -2056,6 +2055,71 @@ describe("/message/edit", async () => {
     expect(t).toBe("Message not found");
     expect(res.status).toBe(404);
     expect(res.ok).toBeFalse();
+  });
+});
+
+describe("/message/pin", async () => {
+  it("正常 :: ピン留めされていないメッセージは isPinned が false", async () => {
+    const [target] = await db
+      .insert(messages)
+      .values({
+        channelId: "TESTCHANNEL1",
+        userId: "TESTUSER",
+        content: "not pinned",
+      })
+      .returning();
+
+    const res = await FETCH({ path: `/message/${target.id}`, method: "GET" });
+    const j = await res.json();
+    expect(j.data.isPinned).toBeFalse();
+  });
+
+  it("正常 :: メッセージをピン留めする", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.message).toBe("Message pinned");
+    expect(j.data.messageId).toBe("TESTMESSAGE1");
+    expect(j.data.channelId).toBe("TESTCHANNEL1");
+    expect(j.data.pinnedBy).toBe("TESTUSER");
+
+    const pinned = await db.query.messagePinned.findFirst({
+      where: eq(messagePinned.messageId, "TESTMESSAGE1"),
+    });
+    expect(pinned).toBeDefined();
+    expect(pinned?.channelId).toBe("TESTCHANNEL1");
+  });
+
+  it("同じメッセージのピン留めはできない", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE1" },
+    });
+    const t = await res.clone().text();
+    expect(res.ok).toBeFalse();
+    expect(t).toBe("Already pinned");
+  });
+
+  it("正常 :: ピン留め済みメッセージは isPinned が true", async () => {
+    const res = await FETCH({ path: "/message/TESTMESSAGE1", method: "GET" });
+    const j = await res.json();
+    expect(j.message).toBe("Fetched message");
+    expect(j.data.isPinned).toBeTrue();
+  });
+
+  it("存在しないメッセージ", async () => {
+    const res = await FETCH({
+      path: "/message/pin",
+      method: "POST",
+      body: { messageId: "TESTMESSAGE999" },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Not found");
   });
 });
 

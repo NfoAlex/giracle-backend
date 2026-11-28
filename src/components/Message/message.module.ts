@@ -255,6 +255,22 @@ export const message = new Elysia({ prefix: "/message" })
       },
     },
   )
+  .post(
+    "/pin",
+    async ({ body: { messageId }, CheckToken: { _userId } }) => {
+      const [msg] = await ServiceMessage.Pin(_userId, messageId);
+
+      return {
+        message: "Message pinned",
+        data: msg
+      }
+    },
+    {
+      body: t.Object({
+        messageId: t.String(),
+      })
+    }
+  )
   .get(
     "/inbox",
     async ({ CheckToken: { _userId } }) => {
