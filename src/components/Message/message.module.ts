@@ -346,6 +346,36 @@ export const message = new Elysia({ prefix: "/message" })
     },
   )
   .get(
+    "/pin",
+    async ({
+      query: { channelId, cursorMessageId, fetchLength },
+      CheckToken: { _userId },
+    }) => {
+      const pinned = await ServiceMessage.GetPinned(
+        channelId,
+        cursorMessageId,
+        fetchLength ?? 30,
+        _userId,
+      );
+
+      return {
+        message: "Fetched pinned messages",
+        data: pinned,
+      };
+    },
+    {
+      query: t.Object({
+        channelId: t.String({ minLength: 1 }),
+        cursorMessageId: t.Optional(t.String({ minLength: 1 })),
+        fetchLength: t.Optional(t.Number({ minimum: 1, maximum: 30 })),
+      }),
+      detail: {
+        description: "チャンネルのピン留め一覧をピン留め順で取得します",
+        tags: ["Message", "Pin"],
+      },
+    },
+  )
+  .get(
     "/inbox",
     async ({ CheckToken: { _userId } }) => {
       //通知を取得する

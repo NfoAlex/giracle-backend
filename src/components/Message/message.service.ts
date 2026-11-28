@@ -441,6 +441,49 @@ export namespace ServiceMessage {
     return unpinned;
   };
 
+  export const GetPinned = async (
+    channelId: string,
+    cursorMessageId: string | undefined,
+    fetchLength: number,
+    _userId: string,
+  ) => {
+    //チャンネルの存在確認
+    const channel = await QueryChannel.getSingleId({ channelId });
+    if (channel === undefined) {
+      throw status(404, "Channel not found");
+    }
+    //チャンネルへのアクセス権限があるか調べる
+    if (!(await Util.checkChannelVisibility(channelId, _userId))) {
+      throw status(404, "Channel not found");
+    }
+
+    let cursor: { createdAt: Date; id: number } | undefined;
+    if (cursorMessageId !== undefined) {
+      const cursorPin = await QueryMessagePinned.getCursorPin({
+        messageId: cursorMessageId,
+      });
+      //他チャンネルのピンをカーソルに使っても存在確認のoracleにしない
+      if (cursorPin === undefined || cursorPin.channelId !== channelId) {
+        throw status(404, "Message cursor position not found");
+      }
+      cursor = { createdAt: cursorPin.createdAt, id: cursorPin.id };
+    }
+
+    const pins = await QueryMessagePinned.listByChannel({
+      channelId,
+      cursor,
+      fetchLength,
+    });
+
+    //履歴・検索と同じアイテム形(relations付きメッセージ+isPinned)にピン留め情報を足す
+    return pins.map(({ message, pinnedBy, createdAt }) => ({
+      ...message,
+      isPinned: true as const,
+      pinnedBy,
+      pinnedAt: createdAt,
+    }));
+  };
+
   export const GetInbox = async (_userId: string) => {
     //通知を取得する
     return QueryInbox.getByUserWithMessage({ userId: _userId });
